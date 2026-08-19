@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+
+# ─────────────────────────────────────────────────────────────
+# DATI IN CHIARO — MAI committati.
+# Il master in chiaro vive solo qui, sul Mac. Nel repo viaggia
+# esclusivamente la versione cifrata in public/data/*.enc
+# ─────────────────────────────────────────────────────────────
+/data/
+!/data/.gitkeep
+
+# Passphrase e token: mai nel repo
+.env
+.env.*
+/.secrets/

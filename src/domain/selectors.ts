@@ -1,0 +1,693 @@
+/**
+ * Tutte le statistiche di Margine, come funzioni pure.
+ *
+ * Convenzione: `visibleFor()` applica una volta il filtro di vista (persona +
+ * vacanze sì/no); tutti gli altri selettori ricevono una lista già filtrata e
+ * la persona, così non c'è ambiguità su chi ha già filtrato cosa.
+ */
+
+import {
+  addMonths,
+  daysInMonth,
+  daysInclusive,
+  elapsedDaysInMonth,
+  monthKeyOf,
+  monthRange,
+  yearOf,
+  type MonthKey,
+} from './dates'
+import { round2, sumBy, toCents } from './money'
+import type { Expense, PersonId, Source, Trip } from './types'
+
+export interface ViewOptions {
+  person: PersonId
+  /**
+   * Una settimana di viaggio fa sembrare «fuori media» un mese normale:
+   * di default le vacanze restano fuori dalle statistiche mensili ordinarie.
+   */
+  includeVacations: boolean
+}
+
+export const DEFAULT_VIEW: ViewOptions = { person: 'me', includeVacations: false }
+
+export function shareOf(expense: Expense, person: PersonId): number {
+  return expense.shares[person] ?? 0
+}
+
+/** Quanto di quella spesa è uscito dalle vostre tasche, sommando i due. */
+export function coupleShare(expense: Expense): number {
+  return round2(expense.shares.me + expense.shares.partner)
+}
+
+/** Quanto di quella spesa era di altre persone: zero fuori dalle vacanze di gruppo. */
+export function othersShare(expense: Expense): number {
+  return expense.shares.others ?? 0
+}
+
+/**
+ * Vero quando la spesa è stata pagata col welfare **da questa persona**: per lei
+ * non è un'uscita, perché quei soldi non sono mai passati dal suo conto e non
+ * stanno fra le sue entrate. Per l'altra la quota resta una spesa normale: quella
+ * la rimborsa in contanti. → ADR-0014
+ */
+export function fundedByWelfare(expense: Expense, person: PersonId): boolean {
+  return expense.welfare === true && expense.paidBy === person
+}
+
+/**
+ * Quanto di questa spesa non è uscito da nessuna tasca.
+ *
+ * Il welfare paga tutto il conto, ma la quota dell'altra persona rientra in
+ * contanti: l'unica parte davvero risparmiata è quella di chi ha anticipato.
+ */
+export function welfareShare(expense: Expense): number {
+  if (expense.welfare !== true || expense.paidBy === 'others') return 0
+  return shareOf(expense, expense.paidBy)
+}
+
+/**
+ * Le spese che erodono il budget della persona selezionata, nella vista richiesta.
+ *
+ * È il filtro delle **statistiche mensili**: margine, medie, andamento, categorie,
+ * confronti. Le pagine che raccontano un fatto invece di misurare un budget — Spese,
+ * Vacanze, 730, Gatto — hanno il loro perimetro e non passano da qui.
+ */
+export function visibleFor(expenses: readonly Expense[], view: ViewOptions): Expense[] {
+  return expenses.filter(
+    (e) =>
+      toCents(shareOf(e, view.person)) > 0 &&
+      (view.includeVacations || e.source !== 'vacanze') &&
+      !fundedByWelfare(e, view.person),
+  )
+}
+
+/** Come `visibleFor`, ma senza escludere le vacanze (per le viste che le vogliono sempre). */
+export function allFor(expenses: readonly Expense[], person: PersonId): Expense[] {
+  return expenses.filter((e) => toCents(shareOf(e, person)) > 0)
+}
+
+export function totalShare(expenses: readonly Expense[], person: PersonId): number {
+  return sumBy(expenses, (e) => shareOf(e, person))
+}
+
+/** Il totale fatturato, quote di terzi comprese: è il numero che riconcilia con Tricount. */
+export function totalAmount(expenses: readonly Expense[]): number {
+  return sumBy(expenses, (e) => e.amount)
+}
+
+/** Quanto è uscito dalle vostre tasche in due. Fuori dalle vacanze di gruppo coincide con `totalAmount`. */
+export function totalCouple(expenses: readonly Expense[]): number {
+  return sumBy(expenses, coupleShare)
+}
+
+export function totalOthers(expenses: readonly Expense[]): number {
+  return sumBy(expenses, othersShare)
+}
+
+export function monthsOf(expenses: readonly Expense[]): MonthKey[] {
+  const set = new Set<MonthKey>()
+  for (const e of expenses) set.add(monthKeyOf(e.date))
+  return [...set].sort()
+}
+
+/** Anni presenti, dal più recente. */
+export function yearsOf(expenses: readonly Expense[]): number[] {
+  const set = new Set<number>()
+  for (const e of expenses) set.add(yearOf(e.date))
+  return [...set].sort((a, b) => b - a)
+}
+
+export function groupByMonth(expenses: readonly Expense[]): Map<MonthKey, Expense[]> {
+  const map = new Map<MonthKey, Expense[]>()
+  for (const e of expenses) {
+    const key = monthKeyOf(e.date)
+    const bucket = map.get(key)
+    if (bucket) bucket.push(e)
+    else map.set(key, [e])
+  }
+  return map
+}
+
+export function expensesOfMonth(
+  visible: readonly Expense[],
+  month: MonthKey,
+): Expense[] {
+  return visible.filter((e) => monthKeyOf(e.date) === month).sort(byDateDesc)
+}
+
+function byDateDesc(a: Expense, b: Expense): number {
+  if (a.date === b.date) return b.amount - a.amount
+  return a.date < b.date ? 1 : -1
+}
+
+// ─────────────────────────────── serie mensile ───────────────────────────────
+
+export interface MonthTotal {
+  month: MonthKey
+  /** Quota della persona selezionata. */
+  total: number
+  /** Parte incomprimibile (spese ricorrenti). */
+  fixed: number
+  /** Parte discrezionale: è qui che vive il margine. */
+  variable: number
+  count: number
+}
+
+export function monthlySeries(visible: readonly Expense[], person: PersonId): MonthTotal[] {
+  const grouped = groupByMonth(visible)
+  const out: MonthTotal[] = []
+  for (const [month, items] of grouped) {
+    const fixed = sumBy(
+      items.filter((e) => e.recurring),
+      (e) => shareOf(e, person),
+    )
+    const total = sumBy(items, (e) => shareOf(e, person))
+    out.push({ month, total, fixed, variable: round2(total - fixed), count: items.length })
+  }
+  return out.sort((a, b) => (a.month < b.month ? -1 : 1))
+}
+
+/** Inserisce i mesi vuoti fra il primo e l'ultimo: un mese a zero deve abbassare la media. */
+export function fillMonthGaps(series: readonly MonthTotal[]): MonthTotal[] {
+  if (series.length === 0) return []
+  const first = series[0]!.month
+  const last = series[series.length - 1]!.month
+  const byMonth = new Map(series.map((s) => [s.month, s]))
+  return monthRange(first, last).map(
+    (month) => byMonth.get(month) ?? { month, total: 0, fixed: 0, variable: 0, count: 0 },
+  )
+}
+
+export function findMonth(series: readonly MonthTotal[], month: MonthKey): MonthTotal {
+  return series.find((s) => s.month === month) ?? { month, total: 0, fixed: 0, variable: 0, count: 0 }
+}
+
+export interface Average {
+  perMonth: number
+  fixedPerMonth: number
+  variablePerMonth: number
+  /** Su quanti mesi è calcolata: sotto i 3 la media dice ancora poco. */
+  months: number
+}
+
+export const EMPTY_AVERAGE: Average = { perMonth: 0, fixedPerMonth: 0, variablePerMonth: 0, months: 0 }
+
+/**
+ * Media storica. Il mese in corso va escluso: è parziale e abbasserebbe la media
+ * proprio mentre la si usa per giudicarlo.
+ */
+export function averageMonthly(
+  series: readonly MonthTotal[],
+  opts: { excludeMonth?: MonthKey; lastN?: number } = {},
+): Average {
+  let rows = fillMonthGaps(series)
+  if (opts.excludeMonth) rows = rows.filter((r) => r.month !== opts.excludeMonth)
+  if (opts.lastN && rows.length > opts.lastN) rows = rows.slice(-opts.lastN)
+  if (rows.length === 0) return EMPTY_AVERAGE
+  return {
+    perMonth: round2(sumBy(rows, (r) => r.total) / rows.length),
+    fixedPerMonth: round2(sumBy(rows, (r) => r.fixed) / rows.length),
+    variablePerMonth: round2(sumBy(rows, (r) => r.variable) / rows.length),
+    months: rows.length,
+  }
+}
+
+// ─────────────────────────────── categorie ───────────────────────────────
+
+export interface CategorySlice {
+  key: string
+  total: number
+  /** Frazione sul totale della fetta, 0–1. */
+  pct: number
+  count: number
+}
+
+function sliceBy(
+  scope: readonly Expense[],
+  person: PersonId,
+  keyOf: (e: Expense) => string | undefined,
+): CategorySlice[] {
+  const totals = new Map<string, { total: number; count: number }>()
+  for (const e of scope) {
+    const key = keyOf(e)
+    if (key === undefined) continue
+    const cur = totals.get(key) ?? { total: 0, count: 0 }
+    totals.set(key, { total: cur.total + toCents(shareOf(e, person)), count: cur.count + 1 })
+  }
+  const grand = [...totals.values()].reduce((acc, v) => acc + v.total, 0)
+  return [...totals.entries()]
+    /* Una fetta da zero non è informazione: capita con le spese di gruppo in cui
+       la quota è tutta di altri, e in un grafico resta solo come etichetta vuota. */
+    .filter(([, v]) => v.total > 0)
+    .map(([key, v]) => ({
+      key,
+      total: v.total / 100,
+      pct: grand === 0 ? 0 : v.total / grand,
+      count: v.count,
+    }))
+    .sort((a, b) => b.total - a.total)
+}
+
+export function categoryBreakdown(scope: readonly Expense[], person: PersonId): CategorySlice[] {
+  return sliceBy(scope, person, (e) => e.category)
+}
+
+export function subcategoryBreakdown(
+  scope: readonly Expense[],
+  person: PersonId,
+  category: string,
+): CategorySlice[] {
+  return sliceBy(
+    scope.filter((e) => e.category === category),
+    person,
+    (e) => e.subcategory ?? 'altro',
+  )
+}
+
+/**
+ * Composizione di un viaggio. Le spese di vacanza stanno tutte in una categoria,
+ * quindi spezzarle per categoria darebbe una fetta sola: il livello che dice
+ * qualcosa è la sottocategoria (alloggio, trasporti, attività, cibo, souvenir).
+ */
+export function tripBreakdown(scope: readonly Expense[], person: PersonId): CategorySlice[] {
+  return sliceBy(scope, person, (e) => e.subcategory ?? e.category)
+}
+
+/** Media mensile per categoria, sui mesi osservati (mese escluso a parte). */
+export function averageByCategory(
+  visible: readonly Expense[],
+  person: PersonId,
+  opts: { excludeMonth?: MonthKey } = {},
+): Map<string, number> {
+  const scope = opts.excludeMonth
+    ? visible.filter((e) => monthKeyOf(e.date) !== opts.excludeMonth)
+    : [...visible]
+  const months = fillMonthGaps(monthlySeries(scope, person)).length
+  const out = new Map<string, number>()
+  if (months === 0) return out
+  for (const slice of categoryBreakdown(scope, person)) {
+    out.set(slice.key, round2(slice.total / months))
+  }
+  return out
+}
+
+export interface CategoryComparison {
+  key: string
+  current: number
+  average: number
+  /** Scostamento assoluto: positivo = stai spendendo più della tua media. */
+  delta: number
+  /** Scostamento relativo, `null` se non c'è storia con cui confrontare. */
+  deltaPct: number | null
+}
+
+export function compareToAverage(
+  current: readonly CategorySlice[],
+  averages: Map<string, number>,
+): CategoryComparison[] {
+  const keys = new Set<string>([...current.map((c) => c.key), ...averages.keys()])
+  const out: CategoryComparison[] = []
+  for (const key of keys) {
+    const cur = current.find((c) => c.key === key)?.total ?? 0
+    const avg = averages.get(key) ?? 0
+    out.push({
+      key,
+      current: cur,
+      average: avg,
+      delta: round2(cur - avg),
+      deltaPct: toCents(avg) === 0 ? null : (cur - avg) / avg,
+    })
+  }
+  return out.sort((a, b) => b.delta - a.delta)
+}
+
+// ─────────────────────────────── proiezioni ───────────────────────────────
+
+export interface Projection {
+  /** Totale atteso a fine mese. */
+  projected: number
+  /** `chiuso` = il mese è finito, il numero è definitivo. */
+  method: 'chiuso' | 'stimato'
+  elapsedDays: number
+  totalDays: number
+  /** Parte variabile attesa a fine mese. */
+  projectedVariable: number
+  /** Fisse attese: quelle già addebitate o, se non ancora arrivate, la media storica. */
+  expectedFixed: number
+}
+
+/**
+ * Stima di fine mese. Le fisse non si proiettano linearmente (l'affitto non si
+ * paga un trentesimo al giorno): si prende il maggiore fra quelle già addebitate
+ * e la media storica, e si proietta solo la parte variabile.
+ */
+export function projectMonth(
+  month: MonthTotal,
+  today: string,
+  averageFixed: number,
+): Projection {
+  const totalDays = daysInMonth(month.month)
+  const elapsedDays = elapsedDaysInMonth(month.month, today)
+  if (elapsedDays >= totalDays) {
+    return {
+      projected: round2(month.total),
+      method: 'chiuso',
+      elapsedDays,
+      totalDays,
+      projectedVariable: round2(month.variable),
+      expectedFixed: round2(month.fixed),
+    }
+  }
+  const expectedFixed = round2(Math.max(month.fixed, averageFixed))
+  const projectedVariable = round2((month.variable / elapsedDays) * totalDays)
+  return {
+    projected: round2(expectedFixed + projectedVariable),
+    method: 'stimato',
+    elapsedDays,
+    totalDays,
+    projectedVariable,
+    expectedFixed,
+  }
+}
+
+export interface PeriodComparison {
+  current: number
+  previous: number
+  delta: number
+  deltaPct: number | null
+  currentMonths: MonthKey[]
+  previousMonths: MonthKey[]
+}
+
+function sumMonths(series: readonly MonthTotal[], months: readonly MonthKey[]): number {
+  return sumBy(
+    months.map((m) => findMonth(series, m)),
+    (m) => m.total,
+  )
+}
+
+/** Ultimi `span` mesi (mese in corso escluso) contro i `span` precedenti. */
+export function comparePeriods(
+  series: readonly MonthTotal[],
+  currentMonth: MonthKey,
+  span = 3,
+): PeriodComparison {
+  const currentMonths = Array.from({ length: span }, (_, i) => addMonths(currentMonth, -(i + 1))).reverse()
+  const previousMonths = Array.from({ length: span }, (_, i) =>
+    addMonths(currentMonth, -(span + i + 1)),
+  ).reverse()
+  const current = sumMonths(series, currentMonths)
+  const previous = sumMonths(series, previousMonths)
+  return {
+    current,
+    previous,
+    delta: round2(current - previous),
+    deltaPct: toCents(previous) === 0 ? null : (current - previous) / previous,
+    currentMonths,
+    previousMonths,
+  }
+}
+
+/** Stesso mese dell'anno scorso. */
+export function compareYearOverYear(
+  series: readonly MonthTotal[],
+  month: MonthKey,
+): { current: number; lastYear: number; deltaPct: number | null; lastYearMonth: MonthKey } {
+  const lastYearMonth = addMonths(month, -12)
+  const current = findMonth(series, month).total
+  const lastYear = findMonth(series, lastYearMonth).total
+  return {
+    current,
+    lastYear,
+    deltaPct: toCents(lastYear) === 0 ? null : (current - lastYear) / lastYear,
+    lastYearMonth,
+  }
+}
+
+export function topExpenses(scope: readonly Expense[], person: PersonId, limit = 5): Expense[] {
+  return [...scope].sort((a, b) => shareOf(b, person) - shareOf(a, person)).slice(0, limit)
+}
+
+// ─────────────────────────────── gatto ───────────────────────────────
+
+export interface CatStats {
+  /** Quota della persona selezionata su tutta la storia. */
+  share: number
+  /** Costo complessivo per la coppia. */
+  total: number
+  monthlyAvgShare: number
+  monthlyAvgTotal: number
+  series: MonthTotal[]
+  subcategories: CategorySlice[]
+  perPerson: Record<PersonId, number>
+  count: number
+  months: number
+  firstDate?: string
+  lastDate?: string
+  /** Le spese del gatto in cui la persona ha una quota, dalla più recente. */
+  expenses: Expense[]
+}
+
+export function catStats(
+  allExpenses: readonly Expense[],
+  person: PersonId,
+  catCategory: string,
+): CatStats {
+  const scope = allExpenses.filter((e) => e.category === catCategory)
+  const mine = scope.filter((e) => toCents(shareOf(e, person)) > 0)
+  const series = monthlySeries(mine, person)
+  const months = fillMonthGaps(series).length
+  const dates = scope.map((e) => e.date).sort()
+  const share = totalShare(scope, person)
+  const total = totalCouple(scope)
+  return {
+    share,
+    total,
+    monthlyAvgShare: months === 0 ? 0 : round2(share / months),
+    monthlyAvgTotal: months === 0 ? 0 : round2(total / months),
+    series,
+    subcategories: subcategoryBreakdown(scope, person, catCategory),
+    perPerson: { me: totalShare(scope, 'me'), partner: totalShare(scope, 'partner') },
+    count: scope.length,
+    months,
+    firstDate: dates[0],
+    lastDate: dates[dates.length - 1],
+    expenses: [...mine].sort(byDateDesc),
+  }
+}
+
+// ─────────────────────────────── vacanze ───────────────────────────────
+
+export interface TripStats {
+  trip: Trip
+  /** Costo complessivo del viaggio, quote di chi era con voi comprese. */
+  total: number
+  /** Quanto è costato a voi due. Coincide con `total` nei viaggi in coppia. */
+  couple: number
+  /** Quota di chi non siete voi due: > 0 solo nei viaggi di gruppo. */
+  others: number
+  /** Quanto del viaggio è stato pagato col welfare, e non con soldi vostri. */
+  welfare: number
+  /** Quota della persona selezionata. */
+  share: number
+  days: number
+  /** Quota della persona al giorno. */
+  perDayShare: number
+  /** Quanto è costato a voi due, al giorno. */
+  perDayCouple: number
+  /** Composizione per sottocategoria: alloggio, trasporti, attività, cibo, souvenir. */
+  parts: CategorySlice[]
+  count: number
+  expenses: Expense[]
+}
+
+export function tripStats(
+  allExpenses: readonly Expense[],
+  trips: readonly Trip[],
+  person: PersonId,
+): TripStats[] {
+  return trips
+    .map((trip) => {
+      const scope = allExpenses.filter((e) => e.trip === trip.id)
+      const days = daysInclusive(trip.start, trip.end)
+      const share = totalShare(scope, person)
+      const total = totalAmount(scope)
+      const couple = totalCouple(scope)
+      /* Le voci in cui la persona non ha quota sono conti di altri passati per il
+         tricount: pesano nel totale del gruppo, non nell'elenco che leggi. */
+      const mine = scope.filter((e) => toCents(shareOf(e, person)) > 0).sort(byDateDesc)
+      return {
+        trip,
+        total,
+        couple,
+        others: totalOthers(scope),
+        welfare: sumBy(scope, welfareShare),
+        share,
+        days,
+        perDayShare: round2(share / days),
+        perDayCouple: round2(couple / days),
+        parts: tripBreakdown(scope, person),
+        count: mine.length,
+        expenses: mine,
+      }
+    })
+    .sort((a, b) => (a.trip.start < b.trip.start ? 1 : -1))
+}
+
+export interface TripYear {
+  year: number
+  trips: TripStats[]
+  /** Fatturato dell'anno, quote di terzi comprese. */
+  total: number
+  /** Quanto è costato a voi due. */
+  couple: number
+  share: number
+  days: number
+}
+
+export function tripsByYear(stats: readonly TripStats[]): TripYear[] {
+  const map = new Map<number, TripStats[]>()
+  for (const s of stats) {
+    const bucket = map.get(s.trip.year)
+    if (bucket) bucket.push(s)
+    else map.set(s.trip.year, [s])
+  }
+  return [...map.entries()]
+    .map(([year, trips]) => ({
+      year,
+      trips,
+      total: sumBy(trips, (t) => t.total),
+      couple: sumBy(trips, (t) => t.couple),
+      share: sumBy(trips, (t) => t.share),
+      days: trips.reduce((acc, t) => acc + t.days, 0),
+    }))
+    .sort((a, b) => b.year - a.year)
+}
+
+/** Luoghi visitati, con quante volte e quanto spesi in totale. */
+export function tripPlaces(stats: readonly TripStats[]): { place: string; visits: number; share: number }[] {
+  const map = new Map<string, { visits: number; share: number }>()
+  for (const s of stats) {
+    const cur = map.get(s.trip.place) ?? { visits: 0, share: 0 }
+    map.set(s.trip.place, { visits: cur.visits + 1, share: cur.share + toCents(s.share) })
+  }
+  return [...map.entries()]
+    .map(([place, v]) => ({ place, visits: v.visits, share: v.share / 100 }))
+    .sort((a, b) => b.share - a.share)
+}
+
+// ─────────────────────────────── 730 ───────────────────────────────
+
+export interface Tax730Year {
+  year: number
+  items: Expense[]
+  /** Quota della persona: è quella che si porta in detrazione. */
+  share: number
+  total: number
+  withReceipt: number
+  missingReceipt: number
+  withNotes: number
+}
+
+export function tax730ByYear(allExpenses: readonly Expense[], person: PersonId): Tax730Year[] {
+  const tagged = allFor(allExpenses, person).filter((e) => e.tax730 === true)
+  const map = new Map<number, Expense[]>()
+  for (const e of tagged) {
+    const y = yearOf(e.date)
+    const bucket = map.get(y)
+    if (bucket) bucket.push(e)
+    else map.set(y, [e])
+  }
+  return [...map.entries()]
+    .map(([year, items]) => {
+      const sorted = items.sort(byDateDesc)
+      const withReceipt = sorted.filter((e) => (e.receiptLinks?.length ?? 0) > 0).length
+      return {
+        year,
+        items: sorted,
+        share: totalShare(sorted, person),
+        total: totalAmount(sorted),
+        withReceipt,
+        missingReceipt: sorted.length - withReceipt,
+        withNotes: sorted.filter((e) => (e.notes ?? '').trim().length > 0).length,
+      }
+    })
+    .sort((a, b) => b.year - a.year)
+}
+
+/**
+ * Spese che assomigliano a una detraibile ma non sono taggate: la sezione 730
+ * le propone, senza decidere per te.
+ */
+export function tax730Suggestions(
+  allExpenses: readonly Expense[],
+  person: PersonId,
+  hints: readonly string[],
+  year: number,
+): Expense[] {
+  /*
+   * Un suggerimento va per categoria («salute») o per sottocategoria
+   * («gatto/veterinario»): dentro la stessa categoria convivono spese detraibili
+   * e spese che non lo sono — il veterinario sì, la lettiera no; le visite sì, il
+   * barbiere no. Senza il livello fine la lista da controllare diventa rumore.
+   */
+  const hintSet = new Set(hints)
+  const matches = (e: Expense): boolean =>
+    hintSet.has(e.category) ||
+    (e.subcategory !== undefined && hintSet.has(`${e.category}/${e.subcategory}`))
+  return allFor(allExpenses, person)
+    .filter((e) => yearOf(e.date) === year && e.tax730 !== true && matches(e))
+    .sort(byDateDesc)
+}
+
+// ─────────────────────────────── filtri (pagina Spese) ───────────────────────────────
+
+export interface ExpenseFilter {
+  query: string
+  month: MonthKey | 'all'
+  category: string | 'all'
+  source: Source | 'all'
+  paidBy: PersonId | 'all'
+  tax730Only: boolean
+}
+
+export const EMPTY_FILTER: ExpenseFilter = {
+  query: '',
+  month: 'all',
+  category: 'all',
+  source: 'all',
+  paidBy: 'all',
+  tax730Only: false,
+}
+
+export type SortKey = 'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'
+
+export function applyFilter(scope: readonly Expense[], filter: ExpenseFilter): Expense[] {
+  const q = filter.query.trim().toLowerCase()
+  return scope.filter((e) => {
+    if (filter.month !== 'all' && monthKeyOf(e.date) !== filter.month) return false
+    if (filter.category !== 'all' && e.category !== filter.category) return false
+    if (filter.source !== 'all' && e.source !== filter.source) return false
+    if (filter.paidBy !== 'all' && e.paidBy !== filter.paidBy) return false
+    if (filter.tax730Only && e.tax730 !== true) return false
+    if (q.length > 0) {
+      const haystack = `${e.title} ${e.notes ?? ''} ${e.category} ${e.subcategory ?? ''}`.toLowerCase()
+      if (!haystack.includes(q)) return false
+    }
+    return true
+  })
+}
+
+export function sortExpenses(list: readonly Expense[], key: SortKey, person: PersonId): Expense[] {
+  const out = [...list]
+  switch (key) {
+    case 'date-desc':
+      return out.sort(byDateDesc)
+    case 'date-asc':
+      return out.sort((a, b) => -byDateDesc(a, b))
+    case 'amount-desc':
+      return out.sort((a, b) => shareOf(b, person) - shareOf(a, person))
+    case 'amount-asc':
+      return out.sort((a, b) => shareOf(a, person) - shareOf(b, person))
+  }
+}
