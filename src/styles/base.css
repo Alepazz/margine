@@ -1,0 +1,415 @@
+/* Reset minimo, tipografia e guscio dell'applicazione. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  font-size: 100%;
+}
+
+/*
+ * Una sola manopola per la scala su telefono: il contenuto è tutto in rem e
+ * cresce da qui, mentre la cornice (altezze minime tappabili, bordi, raggi,
+ * safe-area) resta in px e non si deforma. Non scendere sotto il 100%: i campi
+ * di testo andrebbero sotto i 16px effettivi e iOS riattiverebbe lo zoom.
+ */
+@media (max-width: 899px) {
+  html {
+    font-size: 108%;
+  }
+}
+
+body {
+  min-height: 100vh;
+  background-color: var(--paper);
+  /* La griglia del quaderno: presente, quasi invisibile. */
+  background-image:
+    linear-gradient(to right, var(--quadretti) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--quadretti) 1px, transparent 1px);
+  background-size: 22px 22px;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.15;
+  text-wrap: balance;
+  margin: 0;
+}
+
+h1 {
+  font-size: 1.6rem;
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-size: 1.15rem;
+}
+
+h3 {
+  font-size: 0.98rem;
+}
+
+p {
+  margin: 0;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--ink);
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  text-decoration-color: currentColor;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ─────────────────────────── guscio ─────────────────────────── */
+
+.app {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  display: none;
+  flex: 0 0 232px;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px 16px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-left: 4px;
+}
+
+/* Il filo rosso del margine: unica nota di colore della cornice. */
+.brand-rule {
+  width: 3px;
+  height: 26px;
+  border-radius: 2px;
+  background: var(--rule);
+  flex: none;
+}
+
+.brand-name {
+  font-family: var(--font-display);
+  font-size: 1.22rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.brand-sub {
+  font-size: 0.74rem;
+  color: var(--ink-3);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--r-sm);
+  color: var(--ink-2);
+  text-decoration: none;
+  font-size: 0.94rem;
+  font-weight: 500;
+}
+
+.nav-link:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.nav-link.is-active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.nav-glyph {
+  font-size: 1rem;
+  width: 1.3em;
+  text-align: center;
+}
+
+.sidebar-foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  /* Vetro: la cornice sta sopra il contenuto e lo lascia intravedere */
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* Cede spazio agli indicatori a destra invece di spingerli fuori */
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Nella testata su telefono il sottotitolo è spazio speso male */
+.topbar-brand .brand-sub {
+  display: none;
+}
+
+.topbar-spacer {
+  flex: 1 1 auto;
+}
+
+.content {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  max-width: 1120px;
+  padding: 20px 16px 96px 18px;
+  /* Il margine del quaderno, sul bordo della pagina. */
+  border-left: 2px solid var(--rule);
+}
+
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 16px;
+  margin-bottom: 18px;
+}
+
+.page-head-text {
+  min-width: 0;
+}
+
+.page-sub {
+  color: var(--ink-2);
+  font-size: 0.92rem;
+  margin-top: 2px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+/*
+ * Elenco lungo dentro una scheda: scorre per conto suo invece di allungare la
+ * pagina. Un viaggio vero fa sessantacinque voci, e la colonna accanto ne ha
+ * cinque: senza tetto la scheda diventa un nastro.
+ */
+.scroll-pane {
+  max-height: 60dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+
+@media (max-width: 899px) {
+  /*
+   * Su telefono la pagina scorre già e le colonne sono impilate: un riquadro
+   * che scorre dentro qualcosa che scorre intrappola il pollice. Qui il tetto
+   * non serve, perché la lista non ruba spazio a nessuna colonna accanto.
+   */
+  .scroll-pane {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+}
+
+/*
+ * Barra di navigazione a isola fluttuante, in vetro: staccata dai bordi e dal
+ * fondo, così il pollice la raggiunge senza sfiorare la gesture bar di iOS e la
+ * pagina continua a intravedersi sotto.
+ */
+.tabbar {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom) + 14px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(min(560px, 100vw) - 24px);
+  z-index: 30;
+  display: flex;
+  gap: 2px;
+  padding: 7px 6px;
+  border-radius: 999px;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+}
+
+.tabbar-link {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 2px;
+  border-radius: 999px;
+  color: var(--ink-3);
+  text-decoration: none;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+  transition:
+    color 0.24s var(--ease),
+    background-color 0.24s var(--ease);
+}
+
+.tabbar-link.is-active {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+}
+
+.tabbar-glyph {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+@media (min-width: 900px) {
+  .sidebar {
+    display: flex;
+  }
+
+  .tabbar {
+    display: none;
+  }
+
+  .topbar {
+    padding: 12px 24px;
+  }
+
+  .topbar-brand {
+    display: none;
+  }
+
+  /* Su schermo grande lo stato di salvataggio sta in fondo alla colonna: uno solo basta */
+  .topbar .sync-badge {
+    display: none;
+  }
+
+  .content {
+    padding: 24px 32px 64px 26px;
+  }
+
+  .grid-2 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  h1 {
+    font-size: 1.9rem;
+  }
+}

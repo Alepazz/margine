@@ -1,0 +1,298 @@
+{
+  "version": 1,
+  "people": {
+    "me": {
+      "name": "Alessio",
+      "emoji": "🧔"
+    },
+    "partner": {
+      "name": "Federica",
+      "emoji": "👩"
+    }
+  },
+  "income": {
+    "me": {
+      "configured": true,
+      "netMonthly": 2200,
+      "extraMonths": 1,
+      "annualBonusNet": 1500,
+      "mealVouchers": {
+        "valuePerDay": 8,
+        "daysPerMonth": 20
+      },
+      "otherMonthlyNet": 0,
+      "monthlySavingsTarget": 300,
+      "note": "Valori di esempio: da sostituire con quelli veri nell’intervista sulle entrate."
+    },
+    "partner": null
+  },
+  "categories": [
+    {
+      "id": "casa",
+      "label": "Casa",
+      "emoji": "🏠",
+      "slot": 0,
+      "subcategories": [
+        {
+          "id": "affitto",
+          "label": "Affitto"
+        },
+        {
+          "id": "bollette",
+          "label": "Bollette"
+        },
+        {
+          "id": "manutenzione",
+          "label": "Manutenzione"
+        },
+        {
+          "id": "arredo",
+          "label": "Arredo e casalinghi"
+        },
+        {
+          "id": "prodotti",
+          "label": "Prodotti per la casa"
+        },
+        {
+          "id": "domestico",
+          "label": "Aiuto domestico"
+        }
+      ]
+    },
+    {
+      "id": "spesa",
+      "label": "Spesa alimentare",
+      "emoji": "🛒",
+      "slot": 1
+    },
+    {
+      "id": "ristoranti",
+      "label": "Bar e ristoranti",
+      "emoji": "🍝",
+      "slot": 2,
+      "subcategories": [
+        {
+          "id": "colazione",
+          "label": "Colazioni e caffè"
+        },
+        {
+          "id": "pranzo",
+          "label": "Pranzi"
+        },
+        {
+          "id": "cena",
+          "label": "Cene"
+        },
+        {
+          "id": "aperitivi",
+          "label": "Aperitivi e drink"
+        },
+        {
+          "id": "gelato",
+          "label": "Gelati e dolci"
+        },
+        {
+          "id": "consegna",
+          "label": "Consegna a domicilio"
+        }
+      ]
+    },
+    {
+      "id": "gatto",
+      "label": "Il gatto",
+      "emoji": "🐈",
+      "slot": 3,
+      "subcategories": [
+        {
+          "id": "cibo",
+          "label": "Cibo"
+        },
+        {
+          "id": "veterinario",
+          "label": "Veterinario"
+        },
+        {
+          "id": "lettiera",
+          "label": "Lettiera"
+        },
+        {
+          "id": "accessori",
+          "label": "Accessori e giochi"
+        }
+      ]
+    },
+    {
+      "id": "trasporti",
+      "label": "Trasporti",
+      "emoji": "🚗",
+      "slot": 4,
+      "subcategories": [
+        {
+          "id": "carburante",
+          "label": "Carburante"
+        },
+        {
+          "id": "autostrada",
+          "label": "Autostrada e pedaggi"
+        },
+        {
+          "id": "parcheggi",
+          "label": "Parcheggi e lavaggi"
+        },
+        {
+          "id": "auto",
+          "label": "Bollo, assicurazione, officina"
+        },
+        {
+          "id": "mezzi",
+          "label": "Treni e mezzi"
+        }
+      ]
+    },
+    {
+      "id": "salute",
+      "label": "Salute",
+      "emoji": "💊",
+      "slot": 5,
+      "subcategories": [
+        {
+          "id": "psicologo",
+          "label": "Psicologo"
+        },
+        {
+          "id": "farmacia",
+          "label": "Farmacia"
+        },
+        {
+          "id": "visite",
+          "label": "Visite ed esami"
+        },
+        {
+          "id": "occhiali",
+          "label": "Occhiali e lenti"
+        },
+        {
+          "id": "cura",
+          "label": "Cura personale"
+        }
+      ]
+    },
+    {
+      "id": "tempolibero",
+      "label": "Tempo libero",
+      "emoji": "🎯",
+      "slot": 6,
+      "subcategories": [
+        {
+          "id": "sport",
+          "label": "Sport"
+        },
+        {
+          "id": "manga",
+          "label": "Manga e figure"
+        },
+        {
+          "id": "videogiochi",
+          "label": "Videogiochi"
+        },
+        {
+          "id": "tavolo",
+          "label": "Giochi da tavolo"
+        },
+        {
+          "id": "musica",
+          "label": "Libri, vinili, musica"
+        },
+        {
+          "id": "abbonamenti",
+          "label": "Abbonamenti"
+        },
+        {
+          "id": "spettacoli",
+          "label": "Cinema e concerti"
+        },
+        {
+          "id": "fiere",
+          "label": "Fiere ed eventi"
+        }
+      ]
+    },
+    {
+      "id": "regali",
+      "label": "Regali",
+      "emoji": "🎁",
+      "slot": 7
+    },
+    {
+      "id": "viaggi",
+      "label": "Viaggi",
+      "emoji": "✈️",
+      "subcategories": [
+        {
+          "id": "alloggio",
+          "label": "Alloggio"
+        },
+        {
+          "id": "trasporti",
+          "label": "Voli, treni, benzina"
+        },
+        {
+          "id": "attivita",
+          "label": "Attività e visite"
+        },
+        {
+          "id": "cibo",
+          "label": "Mangiare in viaggio"
+        },
+        {
+          "id": "souvenir",
+          "label": "Souvenir e regali"
+        }
+      ]
+    },
+    {
+      "id": "abbigliamento",
+      "label": "Abbigliamento",
+      "emoji": "👕"
+    },
+    {
+      "id": "telefonia",
+      "label": "Telefonia e internet",
+      "emoji": "📱"
+    },
+    {
+      "id": "tecnologia",
+      "label": "Tecnologia",
+      "emoji": "💻"
+    },
+    {
+      "id": "burocrazia",
+      "label": "Tasse e burocrazia",
+      "emoji": "📄"
+    },
+    {
+      "id": "altro",
+      "label": "Altro",
+      "emoji": "▫️"
+    }
+  ],
+  "catCategory": "gatto",
+  "tripCategory": "viaggi",
+  "fiscal": {
+    "deductibleHints": [
+      "salute/psicologo",
+      "salute/farmacia",
+      "salute/visite",
+      "salute/occhiali",
+      "gatto/veterinario",
+      "burocrazia"
+    ],
+    "driveFolderHint": "Drive → Scontrini 730 → <anno>"
+  },
+  "github": {
+    "owner": "Alepazz",
+    "repo": "margine",
+    "branch": "main",
+    "dataPath": "public/data/expenses.json.enc"
+  }
+}

@@ -1,0 +1,194 @@
+/*
+ * Identità visiva di Margine: inchiostro su carta a quadretti.
+ *
+ * L'idea è quella del quaderno: la griglia leggerissima del fondo, e il filo
+ * rosso del margine sul lato — il margine, appunto. La cromia satura è
+ * riservata ai dati: la cornice resta inchiostro e carta, così un grafico non
+ * deve competere con l'interfaccia.
+ *
+ * Tre stati di tema, non due: `data-theme` esplicito (chiaro/scuro) e nessuno
+ * stampato (impostazione di sistema, gestita da prefers-color-scheme).
+ */
+
+:root {
+  color-scheme: light;
+
+  /* ── superfici ── */
+  --paper: #f2f5f7;
+  --surface: #ffffff;
+  --surface-2: #e9eef2;
+  --surface-sunken: #eaeff3;
+
+  /* ── inchiostro ── */
+  --ink: #101820;
+  --ink-2: #48555f;
+  --ink-3: #77848d;
+
+  /* ── righe ── */
+  --line: #dce3e9;
+  --line-strong: #c3cdd5;
+  --quadretti: rgba(16, 24, 32, 0.045);
+
+  /* ── filo del margine (solo cornice, mai dati) ── */
+  --rule: #b0342b;
+
+  /* ── stato (icona + etichetta sempre accanto: il colore non basta) ── */
+  --good: #0ca30c;
+  --warn: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --good-text: #006300;
+  --critical-text: #b3261e;
+  --warn-text: #8a5a06;
+
+  /* ── serie categoriali, ordine fisso (validato su superficie #ffffff) ── */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
+  --series-rest: #9aa7b1;
+
+  /* ── rampa sequenziale (blu, chiaro → scuro) ── */
+  --seq-1: #cde2fb;
+  --seq-2: #9ec5f4;
+  --seq-3: #6da7ec;
+  --seq-4: #3987e5;
+  --seq-5: #2a78d6;
+  --seq-6: #256abf;
+  --seq-7: #184f95;
+
+  --shadow-card: 0 1px 2px rgba(16, 24, 32, 0.05), 0 8px 24px -16px rgba(16, 24, 32, 0.25);
+
+  /* ── tipografia: display per i titoli, mono per i numeri (è un registro) ── */
+  --font-display: 'Bricolage Grotesque Variable', 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-ui: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-num: 'IBM Plex Mono', ui-monospace, 'SF Mono', monospace;
+
+  /* ── raggi: stessa scala e stessi usi degli altri progetti ── */
+  --r-xl: 20px; /* fogli, finestre */
+  --r-lg: 16px; /* schede, righe di lista */
+  --r-md: 14px; /* segmentati, ricerca, toast */
+  --r-sm: 12px; /* bottoni, campi */
+  --r-xs: 9px; /* dettagli */
+
+  /* ── vetro: solo la cornice (barra in basso, testata, fogli), mai i contenuti ── */
+  --glass-bg: rgba(255, 255, 255, 0.66);
+  --glass-border: rgba(16, 24, 32, 0.1);
+  --glass-highlight: rgba(255, 255, 255, 0.8);
+  --glass-shadow: 0 8px 32px rgba(16, 24, 32, 0.16);
+  --glass-blur: blur(22px) saturate(135%);
+  --scrim: rgba(8, 12, 16, 0.45);
+
+  /* ── motion ── */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --paper: #0e1317;
+    --surface: #161d23;
+    --surface-2: #1d262d;
+    --surface-sunken: #121a1f;
+
+    --ink: #e9eff3;
+    --ink-2: #a8b6c0;
+    --ink-3: #7c8b95;
+
+    --line: #26313a;
+    --line-strong: #35424c;
+    --quadretti: rgba(233, 239, 243, 0.05);
+
+    --rule: #e86a5e;
+
+    --good: #0ca30c;
+    --warn: #fab219;
+    --serious: #ec835a;
+    --critical: #d03b3b;
+    --good-text: #3fd06a;
+    --critical-text: #f19189;
+    --warn-text: #f0bd60;
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+    --series-rest: #63737f;
+
+    --seq-1: #184f95;
+    --seq-2: #256abf;
+    --seq-3: #2a78d6;
+    --seq-4: #3987e5;
+    --seq-5: #5598e7;
+    --seq-6: #86b6ef;
+    --seq-7: #b7d3f6;
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px -18px rgba(0, 0, 0, 0.8);
+  --glass-bg: rgba(22, 29, 35, 0.62);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-highlight: rgba(255, 255, 255, 0.06);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --scrim: rgba(0, 0, 0, 0.6);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --paper: #0e1317;
+  --surface: #161d23;
+  --surface-2: #1d262d;
+  --surface-sunken: #121a1f;
+
+  --ink: #e9eff3;
+  --ink-2: #a8b6c0;
+  --ink-3: #7c8b95;
+
+  --line: #26313a;
+  --line-strong: #35424c;
+  --quadretti: rgba(233, 239, 243, 0.05);
+
+  --rule: #e86a5e;
+
+  --good: #0ca30c;
+  --warn: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+  --good-text: #3fd06a;
+  --critical-text: #f19189;
+  --warn-text: #f0bd60;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+  --series-rest: #63737f;
+
+  --seq-1: #184f95;
+  --seq-2: #256abf;
+  --seq-3: #2a78d6;
+  --seq-4: #3987e5;
+  --seq-5: #5598e7;
+  --seq-6: #86b6ef;
+  --seq-7: #b7d3f6;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px -18px rgba(0, 0, 0, 0.8);
+  --glass-bg: rgba(22, 29, 35, 0.62);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-highlight: rgba(255, 255, 255, 0.06);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --scrim: rgba(0, 0, 0, 0.6);
+}

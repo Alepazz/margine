@@ -1,0 +1,1229 @@
+/* Componenti: schede, indicatori, controlli, tabelle, grafici. */
+
+/* ─────────────────────────── schede ─────────────────────────── */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 16px;
+  box-shadow: var(--shadow-card);
+  min-width: 0;
+}
+
+.card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.card-title {
+  font-family: var(--font-display);
+  font-size: 0.97rem;
+  font-weight: 600;
+}
+
+.card-note {
+  font-size: 0.8rem;
+  color: var(--ink-3);
+}
+
+.card-foot {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 0.82rem;
+  color: var(--ink-2);
+}
+
+/* ─────────────────────────── numeri in evidenza ─────────────────────────── */
+
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 12px 14px;
+  min-width: 0;
+}
+
+.stat-label {
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stat-value {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.32rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stat-value.is-small {
+  font-size: 1.05rem;
+  letter-spacing: 0;
+}
+
+.stat-hint {
+  font-size: 0.79rem;
+  color: var(--ink-2);
+  margin-top: 2px;
+}
+
+.delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.delta.is-good {
+  color: var(--good-text);
+}
+
+.delta.is-bad {
+  color: var(--critical-text);
+}
+
+.delta.is-neutral {
+  color: var(--ink-3);
+}
+
+/* Il numero eroe: quanto margine resta. */
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hero-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.hero-value {
+  font-family: var(--font-num);
+  font-size: clamp(2.1rem, 9vw, 3rem);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.hero-value.is-ok {
+  color: var(--ink);
+}
+
+.hero-value.is-attenzione {
+  color: var(--warn-text);
+}
+
+.hero-value.is-oltre {
+  color: var(--critical-text);
+}
+
+.hero-value.is-sconosciuto {
+  color: var(--ink-3);
+}
+
+.hero-hint {
+  font-size: 0.88rem;
+  color: var(--ink-2);
+}
+
+/* ─────────────────────────── misuratore ─────────────────────────── */
+
+.meter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.meter-track {
+  position: relative;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.meter-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 7px 4px 4px 7px;
+  background: var(--seq-5);
+}
+
+.meter-fill.is-ok {
+  background: var(--good);
+}
+
+.meter-fill.is-attenzione {
+  background: var(--warn);
+}
+
+.meter-fill.is-oltre {
+  background: var(--critical);
+}
+
+.meter-fill.is-sconosciuto {
+  background: var(--series-rest);
+}
+
+/* Proiezione di fine mese: dove arriveresti a questo ritmo. */
+.meter-projection {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--ink);
+  border-radius: 1px;
+}
+
+.meter-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.74rem;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─────────────────────────── etichette ─────────────────────────── */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 0.76rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.chip.is-ok {
+  border-color: color-mix(in srgb, var(--good) 45%, var(--line));
+  color: var(--good-text);
+}
+
+.chip.is-attenzione {
+  border-color: color-mix(in srgb, var(--warn) 55%, var(--line));
+  color: var(--warn-text);
+}
+
+.chip.is-oltre {
+  border-color: color-mix(in srgb, var(--critical) 45%, var(--line));
+  color: var(--critical-text);
+}
+
+.chip.is-tax {
+  border-color: color-mix(in srgb, var(--series-7) 40%, var(--line));
+  color: var(--series-7);
+}
+
+.chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+/* ─────────────────────────── controlli ─────────────────────────── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.btn:hover {
+  background: var(--surface-2);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--ink) 86%, var(--paper));
+}
+
+.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-2);
+}
+
+.btn-ghost:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.btn-danger {
+  border-color: color-mix(in srgb, var(--critical) 40%, var(--line));
+  color: var(--critical-text);
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 0.82rem;
+}
+
+.btn-icon {
+  padding: 7px;
+  min-width: 34px;
+}
+
+/* Controllo segmentato: persona, vacanze sì/no, ordinamento. */
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.segmented-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.segmented-option[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(16, 24, 32, 0.12);
+}
+
+.avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  font-size: 0.85rem;
+  flex: none;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+
+.textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--ink-3);
+}
+
+.hint {
+  font-size: 0.8rem;
+  color: var(--ink-3);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.filters .input,
+.filters .select {
+  width: auto;
+  min-width: 120px;
+  flex: 0 1 auto;
+}
+
+.filters .input-search {
+  flex: 1 1 200px;
+  min-width: 160px;
+}
+
+/* Su schermo grande i filtri stanno tutti in vista e il pulsante non serve */
+.filters-toggle {
+  display: none;
+}
+
+/* ─────────────────────────── liste e tabelle ─────────────────────────── */
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.list-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 4px;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.list-row:last-child {
+  border-bottom: none;
+}
+
+.list-row:hover {
+  background: var(--surface-2);
+}
+
+.list-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.list-title {
+  font-size: 0.93rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-meta {
+  font-size: 0.78rem;
+  color: var(--ink-3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.list-amount {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.list-amount-sub {
+  font-size: 0.72rem;
+  color: var(--ink-3);
+  font-weight: 400;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.table th {
+  text-align: left;
+  font-size: 0.71rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 600;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.table .cell-num {
+  text-align: right;
+  font-family: var(--font-num);
+  white-space: nowrap;
+}
+
+/* ─────────────────────────── grafici ─────────────────────────── */
+
+.chart-wrap {
+  width: 100%;
+  /* Il grafico non deve mai far scorrere la pagina di lato. */
+  min-width: 0;
+}
+
+/*
+ * Recharts mette `tabindex="-1"` su ogni fetta e su ogni barra: cliccarne una la
+ * mette a fuoco e il browser disegna il suo anello azzurro attorno al
+ * **rettangolo che la contiene** — un riquadro storto appoggiato sopra la
+ * ciambella, che sembra un errore di rendering perché di fatto lo è.
+ *
+ * Toglierlo non costa accessibilità: con tabindex negativo quelle forme non
+ * stanno nell'ordine di tabulazione, quindi da tastiera non ci arrivi comunque.
+ * Il bersaglio raggiungibile è la superficie del grafico (`tabindex="0"`), e lì
+ * l'anello resta — con i colori del progetto invece di quelli del browser.
+ */
+.recharts-sector:focus,
+.recharts-rectangle:focus,
+.recharts-layer:focus,
+.recharts-dot:focus {
+  outline: none;
+}
+
+.recharts-surface:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/*
+ * Nella ciambella l'importo al centro è un fratello che sta *dopo* il grafico:
+ * senza questo vince sull'ordine di pittura e taglia in due il tooltip. Il 5 sta
+ * sotto a tutto il resto che galleggia (testata 20, barra 30, foglio 40, toast
+ * 50): un tooltip non deve mai passare sopra il foglio di dettaglio.
+ */
+.recharts-tooltip-wrapper {
+  z-index: 5;
+}
+
+.legend {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 10px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 0.85rem;
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+
+.legend-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-2);
+}
+
+.legend-value {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.84rem;
+  white-space: nowrap;
+}
+
+.legend-pct {
+  font-size: 0.76rem;
+  color: var(--ink-3);
+  width: 3.2em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tooltip {
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-card);
+  padding: 8px 10px;
+  font-size: 0.84rem;
+  max-width: 260px;
+}
+
+.tooltip-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.tooltip-row-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-2);
+  min-width: 0;
+}
+
+.tooltip-value {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Barre orizzontali: il confronto preciso accanto alla torta. */
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(88px, 30%) 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.86rem;
+}
+
+.bar-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-2);
+}
+
+.bar-track {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 3px 5px 5px 3px;
+  background: var(--seq-5);
+}
+
+.bar-value {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ─────────────────────────── varie ─────────────────────────── */
+
+.empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--ink-3);
+  font-size: 0.92rem;
+}
+
+.notice {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  font-size: 0.88rem;
+  color: var(--ink-2);
+}
+
+.notice-icon {
+  flex: none;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.notice.is-warn {
+  border-color: color-mix(in srgb, var(--warn) 45%, var(--line));
+  background: color-mix(in srgb, var(--warn) 10%, var(--surface));
+}
+
+.notice.is-bad {
+  border-color: color-mix(in srgb, var(--critical) 40%, var(--line));
+  background: color-mix(in srgb, var(--critical) 8%, var(--surface));
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 12px;
+}
+
+.tab {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tab[aria-selected='true'] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+/* Foglio di dettaglio: dal basso su telefono, al centro su desktop. */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--scrim);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  animation: sheet-fade 0.2s ease;
+}
+
+/*
+ * Il foglio non è in vetro: sopra ci si legge e ci si scrive, e una superficie
+ * semitrasparente sul fondo chiaro diventa grigio sporco. Il vetro resta alla
+ * cornice. La safe-area sta nel margine, non nel padding: dentro il padding il
+ * foglio sembrerebbe tagliato dal basso.
+ */
+.sheet {
+  width: 100%;
+  max-width: 560px;
+  max-height: 90dvh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  padding: 14px 16px 18px;
+  margin: 0 10px calc(env(safe-area-inset-bottom) + 10px);
+  box-shadow: var(--glass-shadow);
+  animation: sheet-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes sheet-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+/* Coppie etichetta/valore: reggono bene anche su schermo strettissimo */
+.kv {
+  margin: 0 0 14px;
+  padding: 0 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+
+.kv-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.92rem;
+}
+
+.kv-row:last-child {
+  border-bottom: none;
+}
+
+.kv-row dt {
+  color: var(--ink-2);
+  min-width: 0;
+}
+
+.kv-row dd {
+  margin: 0;
+  text-align: right;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.kv-tag {
+  color: var(--ink-3);
+  font-size: 0.78rem;
+}
+
+.kv-tag::before {
+  content: '· ';
+}
+
+.sheet-grip {
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-strong);
+  margin: 0 auto 12px;
+}
+
+@media (min-width: 700px) {
+  .sheet-backdrop {
+    align-items: center;
+    padding: 24px;
+  }
+
+  .sheet {
+    margin: 0;
+    max-height: 86dvh;
+  }
+
+  .sheet-grip {
+    display: none;
+  }
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  /* Sopra l'isola della barra, che arriva a ~76px dal fondo */
+  bottom: calc(env(safe-area-inset-bottom) + 92px);
+  z-index: 50;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 0.86rem;
+  box-shadow: var(--shadow-card);
+  max-width: min(92vw, 460px);
+  text-align: center;
+}
+
+@media (min-width: 900px) {
+  .toast {
+    bottom: 24px;
+  }
+}
+
+.sync-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  color: var(--ink-3);
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.sync-badge.is-error {
+  color: var(--critical-text);
+  border-color: color-mix(in srgb, var(--critical) 40%, var(--line));
+}
+
+.sync-badge.is-pending {
+  color: var(--warn-text);
+  border-color: color-mix(in srgb, var(--warn) 45%, var(--line));
+}
+
+.spin {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--ink);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ─────────────────────────── schermata di sblocco ─────────────────────────── */
+
+.gate {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.gate-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--rule);
+  border-radius: var(--r-lg);
+  padding: 24px;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.gate-title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.gate-text {
+  font-size: 0.9rem;
+  color: var(--ink-2);
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.checkbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ink);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ERGONOMIA SU TELEFONO
+   L'app si usa in piedi, con un pollice: qui i bersagli diventano grandi
+   (≥44px, la misura che Apple e Google indicano come minimo tappabile), i
+   campi di testo salgono a 16px — sotto quella misura Safari su iOS ingrandisce
+   la pagina da solo quando entri in un campo — e la barra in basso diventa
+   comoda. Questo blocco sta per ultimo di proposito: sovrascrive le misure
+   compatte del desktop senza alzare la specificità dei selettori.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 899px) {
+  .btn {
+    min-height: 46px;
+    padding: 11px 18px;
+    font-size: 0.98rem;
+    border-radius: 10px;
+  }
+
+  .btn-sm {
+    min-height: 42px;
+    padding: 9px 14px;
+    font-size: 0.9rem;
+  }
+
+  .btn-icon {
+    min-width: 46px;
+    min-height: 46px;
+    padding: 10px;
+  }
+
+  .input,
+  .select,
+  .textarea {
+    min-height: 48px;
+    /* 16px esatti: sotto, iOS fa lo zoom sul campo */
+    font-size: 16px;
+    padding: 12px 13px;
+    border-radius: 10px;
+  }
+
+  .textarea {
+    min-height: 110px;
+  }
+
+  .segmented {
+    padding: 3px;
+  }
+
+  .segmented-option {
+    min-height: 42px;
+    padding: 8px 16px;
+    font-size: 0.93rem;
+  }
+
+  .avatar {
+    width: 26px;
+    height: 26px;
+    font-size: 0.95rem;
+  }
+
+  .tab {
+    min-height: 44px;
+    padding: 10px 18px;
+    font-size: 0.95rem;
+  }
+
+  .tabs {
+    gap: 6px;
+    /* Gli anni scorrono di lato senza far scorrere la pagina */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .list-row {
+    min-height: 62px;
+    padding: 13px 6px;
+    gap: 12px;
+    border-radius: 8px;
+  }
+
+  .list-title {
+    font-size: 0.98rem;
+  }
+
+  .list-meta {
+    font-size: 0.82rem;
+  }
+
+  .list-amount {
+    font-size: 1rem;
+  }
+
+  .checkbox {
+    min-height: 44px;
+    font-size: 0.95rem;
+  }
+
+  .checkbox input {
+    width: 22px;
+    height: 22px;
+  }
+
+  .stat {
+    padding: 13px 14px;
+  }
+
+  .stat-value {
+    font-size: 1.4rem;
+  }
+
+  .stat-hint,
+  .delta {
+    font-size: 0.85rem;
+  }
+
+  .card {
+    padding: 14px;
+  }
+
+  /* Titolo e pulsanti della scheda su due righe: affiancati si scontrano */
+  .card-head {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .card-head .row {
+    flex: 1 1 100%;
+  }
+
+  .table th,
+  .table td {
+    padding: 11px 12px;
+  }
+
+  .table {
+    font-size: 0.92rem;
+  }
+
+  .bar-row {
+    grid-template-columns: minmax(74px, 34%) 1fr auto;
+    font-size: 0.9rem;
+  }
+
+  .bar-track {
+    height: 12px;
+  }
+
+  .meter-track {
+    height: 18px;
+  }
+
+  /* I filtri: ricerca a tutta riga, poi due menu per riga */
+  .filters {
+    gap: 10px;
+  }
+
+  .filters .input-search {
+    flex: 1 1 100%;
+  }
+
+  .filters .select {
+    flex: 1 1 calc(50% - 5px);
+    min-width: 0;
+  }
+
+  .filters-toggle {
+    display: inline-flex;
+    flex: 0 0 auto;
+  }
+
+  /* Il selettore del mese occupa la riga: si tocca senza mirare */
+  .month-picker {
+    width: 100%;
+  }
+
+  .month-picker .select {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+  }
+
+  .filters-more {
+    display: none;
+  }
+
+  .filters-more.is-open {
+    display: flex;
+  }
+
+  /* Nel foglio di dettaglio i pulsanti sono comodi e a tutta larghezza */
+  .sheet .btn {
+    width: 100%;
+  }
+
+  .sheet .btn-icon {
+    width: auto;
+  }
+
+  .sheet-head .btn-icon {
+    min-width: 46px;
+  }
+
+  .legend-item {
+    padding: 6px 0;
+    font-size: 0.92rem;
+  }
+
+  .legend-swatch {
+    width: 12px;
+    height: 12px;
+  }
+
+  .tabbar {
+    padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+  }
+
+  .tabbar-link {
+    min-height: 56px;
+    padding: 8px 2px;
+    font-size: 0.72rem;
+    gap: 3px;
+  }
+
+  .tabbar-glyph {
+    font-size: 1.4rem;
+  }
+
+  .content {
+    /* spazio per la barra in basso */
+    padding-bottom: 116px;
+  }
+}
