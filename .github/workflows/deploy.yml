@@ -1,7 +1,9 @@
 name: Deploy su GitHub Pages
 
 # Ogni push su main ripubblica il sito. Nel repo viaggiano solo i dati cifrati,
-# quindi la build non ha bisogno di nessun segreto.
+# quindi la build non ha bisogno di nessun segreto — ed è per questo che le action
+# stanno sul tag di major (@v7) e non su uno SHA: senza segreti da esfiltrare il
+# rischio che il pinning copre non esiste, e le patch arrivano da sole.
 on:
   push:
     branches: [main]
@@ -21,11 +23,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          # Node 24 è l'LTS attuale ed è quello su cui girano anche le action qui sotto.
+          node-version: 24
           cache: npm
 
       - run: npm ci
@@ -37,9 +40,12 @@ jobs:
 
       - run: npm run build
 
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
 
-      - uses: actions/upload-pages-artifact@v3
+      # Da v4 questa action esclude i file nascosti dall'artifact. `dist/` non ne ha
+      # (Vite scrive index.html, assets/, data/, manifest e icone), quindi va bene così;
+      # se un giorno servisse pubblicare un dotfile, l'input è `include-hidden-files`.
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
@@ -51,4 +57,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
