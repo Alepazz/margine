@@ -400,7 +400,7 @@ for (const month of MONTHS) {
       amount: money(14, 68),
       source: 'condivise',
       category: 'trasporti',
-      subcategory: pick(['autostrada', 'parcheggi', 'mezzi']),
+      subcategory: pick(['autostrada', 'parcheggi']),
     })
   }
   if (chance(0.22)) {
@@ -506,8 +506,7 @@ const HEALTH_EVENTS = [
     date: '2026-07-28',
     title: 'Abbonamento annuale mezzi pubblici',
     amount: 330,
-    category: 'trasporti',
-    subcategory: 'mezzi',
+    category: 'mezzi',
     source: 'personali',
     split: 'me',
     notes: 'Da chiedere al commercialista: l’abbonamento ai mezzi è detraibile.',
@@ -534,7 +533,7 @@ const TRIP_PLAN = {
   ],
   '2025-lofoten': [
     { title: 'Voli Milano–Bodø', amount: 462, category: 'viaggi', subcategory: 'trasporti', day: 0 },
-    { title: 'Traghetto e trasferimenti', amount: 138, category: 'trasporti', subcategory: 'mezzi', day: 0 },
+    { title: 'Traghetto e trasferimenti', amount: 138, category: 'viaggi', subcategory: 'trasporti', day: 0 },
     { title: 'Rorbu a Reine (5 notti)', amount: 780, category: 'viaggi', subcategory: 'alloggio', day: 1 },
     { title: 'Cabina a Henningsvær (3 notti)', amount: 430, category: 'viaggi', subcategory: 'alloggio', day: 6 },
     { title: 'Noleggio auto Lofoten', amount: 395, category: 'trasporti', subcategory: 'auto', day: 1 },
@@ -551,7 +550,7 @@ const TRIP_PLAN = {
     { title: 'Hotel Alfama (4 notti)', amount: 445, category: 'viaggi', subcategory: 'alloggio', day: 0 },
     { title: 'Pastéis de Belém e caffè', amount: 22, category: 'ristoranti', day: 1 },
     { title: 'Cena in Bairro Alto', amount: 76, category: 'ristoranti', day: 1 },
-    { title: 'Tram 28 e metro', amount: 28, category: 'trasporti', subcategory: 'mezzi', day: 2 },
+    { title: 'Tram 28 e metro', amount: 28, category: 'viaggi', subcategory: 'trasporti', day: 2 },
     { title: 'Ingresso Monastero dos Jerónimos', amount: 24, category: 'viaggi', subcategory: 'attivita', day: 2 },
     { title: 'Gita a Sintra', amount: 68, category: 'viaggi', subcategory: 'attivita', day: 3 },
     { title: 'Cena di pesce a Cascais', amount: 88, category: 'ristoranti', day: 3 },
@@ -643,7 +642,6 @@ const config = {
       'salute/visite',
       'salute/occhiali',
       'gatto/veterinario',
-      'burocrazia',
     ],
     driveFolderHint: 'Drive → Scontrini 730 → <anno>',
   },
@@ -652,6 +650,7 @@ const config = {
     repo: 'margine',
     branch: 'main',
     dataPath: 'public/data/expenses.json.enc',
+    configPath: 'public/data/config.json.enc',
   },
 }
 
