@@ -450,6 +450,62 @@ button.hero-value:focus-visible {
   color: var(--ink-3);
 }
 
+/*
+ * La categoria si sceglie a riquadri, non da una tendina.
+ *
+ * Con una tendina scegliere fra quattordici voci vuole tre gesti — apri, scorri,
+ * conferma — e l'icona la vedi solo dopo. A riquadri è un tocco, e l'icona è
+ * quello che riconosci prima del testo. La griglia si adatta: due colonne sul
+ * telefono, tre o quattro dove c'è posto.
+ */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 6px;
+}
+
+.tile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* 44px: il minimo che un pollice becca senza mirare. */
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 0.86rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tile:hover {
+  border-color: var(--line-strong);
+}
+
+/*
+ * Lo stato scelto non è solo colore: c'è il bordo pieno **e** il fondo. Il
+ * colore da solo non basta a chi non lo distingue.
+ */
+.tile[aria-pressed='true'] {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+  background: var(--surface);
+  font-weight: 600;
+}
+
+.tile-emoji {
+  font-size: 1.1rem;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.tile-label {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
 .filters {
   display: flex;
   flex-wrap: wrap;
@@ -1102,7 +1158,8 @@ button.hero-value:focus-visible {
   width: 100%;
   max-width: 560px;
   max-height: 90dvh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-xl);
@@ -1110,6 +1167,59 @@ button.hero-value:focus-visible {
   margin: 0 10px calc(env(safe-area-inset-bottom) + 10px);
   box-shadow: var(--glass-shadow);
   animation: sheet-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/*
+ * Il modulo di inserimento ha **altezza fissa**, e non è un dettaglio di stile.
+ *
+ * Il foglio è ancorato in basso e prima cresceva col contenuto: scegliere una
+ * vacanza o «a mano» faceva comparire dei campi, il foglio si allungava verso
+ * l'alto e ogni cosa che stavi guardando saltava di posizione sotto il dito.
+ * Superati i 90dvh accadeva il contrario — scorreva dentro di sé e perdevi il
+ * segno. Con un'altezza sola, testa e piede fermi e il solo corpo che scorre,
+ * nessuno dei due casi esiste più. È anche la forma dei moduli nativi.
+ * → ADR-0030
+ */
+.sheet.is-form {
+  height: 90dvh;
+}
+
+.sheet-body {
+  flex: 1 1 auto;
+  /* Senza, un figlio flex non scende sotto la propria altezza naturale e a
+     scorrere finisce la pagina invece del corpo. */
+  min-height: 0;
+  overflow-y: auto;
+  /* Spazio per il piede: l'ultimo campo non deve finire sotto il bordo. */
+  padding-bottom: 4px;
+}
+
+.sheet-foot {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
+  padding-top: 12px;
+  margin-top: 2px;
+  border-top: 1px solid var(--line);
+}
+
+/*
+ * Il pulsante che salva prende lo spazio; annullare è la scelta secondaria e si
+ * accontenta di quello che serve al pollice.
+ *
+ * L'ordine di queste due regole è **logica, non stile**: hanno la stessa
+ * specificità, e `.btn-primary` è anche un `.btn`. Invertite, il pulsante che
+ * salva prendeva `flex: 0 0 auto`, cresceva quanto la sua etichetta e spingeva
+ * «Annulla» fuori dal foglio.
+ */
+.sheet-foot .btn {
+  flex: 0 0 auto;
+  min-width: 96px;
+  justify-content: center;
+}
+
+.sheet-foot .btn-primary {
+  flex: 1 1 auto;
 }
 
 @keyframes sheet-fade {
@@ -1195,6 +1305,12 @@ button.hero-value:focus-visible {
   .sheet {
     margin: 0;
     max-height: 86dvh;
+  }
+
+  /* Su schermo grande un modulo alto quanto la finestra è sproporzionato: si
+     ferma prima, ma resta ad altezza fissa — è quello che serve. */
+  .sheet.is-form {
+    height: min(86dvh, 720px);
   }
 
   .sheet-grip {
@@ -1503,6 +1619,16 @@ button.hero-value:focus-visible {
   }
 
   .sheet .btn-icon {
+    width: auto;
+  }
+
+  /*
+   * Tranne dove stanno **affiancati**: il piede del modulo ne ha due, e una
+   * riga con un selettore ne ha uno accanto. A tutta larghezza si impilano — o
+   * peggio, il secondo finisce spinto fuori dal foglio.
+   */
+  .sheet-foot .btn,
+  .row-inline .btn {
     width: auto;
   }
 

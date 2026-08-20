@@ -30,7 +30,7 @@ import {
   subcategoryBreakdown,
   subsetStats,
 } from '../domain/selectors'
-import { SOURCE_LABELS, type Expense } from '../domain/types'
+import type { Expense } from '../domain/types'
 import { usePageData } from './usePageData'
 
 /* Una schermata di righe alla volta: il tricount di casa da solo ne ha novanta. */
@@ -80,7 +80,7 @@ export function Casa(): ReactNode {
   )
   const average = useMemo(() => averageMonthly(stats.series), [stats.series])
 
-  const ledgerLabel = SOURCE_LABELS[houseSource]
+  const ledgerLabel = lookup.sourceLabel(houseSource)
   const houseCategoryLabel = lookup.label(houseCategory)
 
   if (stats.count === 0 && outsideStats.count === 0) {

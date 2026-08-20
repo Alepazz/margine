@@ -17,7 +17,17 @@
  */
 
 import { toCents } from '../domain/money'
-import type { Annotation, Dataset, Expense, Settlement, Trip } from '../domain/types'
+import type {
+  Annotation,
+  AppConfig,
+  Category,
+  Dataset,
+  Expense,
+  IncomeProfile,
+  PersonId,
+  Settlement,
+  Trip,
+} from '../domain/types'
 
 const STORAGE_KEY = 'margine.outbox.v2'
 /** La coda di quando sapeva fare solo annotazioni: si converte, non si butta. */
@@ -30,8 +40,24 @@ export type Op =
   | { kind: 'update'; expenseId: string; fields: Partial<Expense> }
   | { kind: 'delete'; expenseId: string }
   | { kind: 'trip'; trip: Trip }
+  | { kind: 'trip-edit'; tripId: string; fields: Partial<Trip> }
   | { kind: 'settle'; settlement: Settlement }
   | { kind: 'unsettle'; settlementId: string }
+  /**
+   * L'elenco **intero** delle categorie, nuovo. Non un delta: la tassonomia è
+   * una lista ordinata in cui gli slot di colore devono restare coerenti fra
+   * loro, e due delta applicati in ordine diverso darebbero due liste diverse.
+   * Sostituirla per intero rende l'operazione idempotente per costruzione. → ADR-0024
+   */
+  | { kind: 'categories'; categories: Category[] }
+  /** Le spese di una categoria passano a un'altra: è la controparte di una cancellazione. */
+  | { kind: 'recategorize'; from: string; to: string }
+  | { kind: 'income'; person: PersonId; profile: IncomeProfile }
+
+/** Le operazioni che riscrivono `config.json.enc` invece di `expenses.json.enc`. */
+export function touchesConfig(entry: Op): boolean {
+  return entry.kind === 'categories' || entry.kind === 'income'
+}
 
 export type OutboxEntry = Op & { entryId: string; ts: number }
 
@@ -55,10 +81,25 @@ function isEntry(value: unknown): value is OutboxEntry {
       return typeof (v as { expense?: { id?: unknown } }).expense?.id === 'string'
     case 'trip':
       return typeof (v as { trip?: { id?: unknown } }).trip?.id === 'string'
+    case 'trip-edit':
+      return typeof (v as { tripId?: unknown }).tripId === 'string'
     case 'settle':
       return typeof (v as { settlement?: { id?: unknown } }).settlement?.id === 'string'
     case 'unsettle':
       return typeof (v as { settlementId?: unknown }).settlementId === 'string'
+    case 'categories': {
+      /* Non vuoto: una tassonomia senza categorie non è uno stato che l'app sa
+         produrre, quindi una voce così è spazzatura — e applicarla lascerebbe
+         ogni spesa senza etichetta. */
+      const list = (v as { categories?: unknown }).categories
+      return Array.isArray(list) && list.length > 0
+    }
+    case 'recategorize': {
+      const op = v as { from?: unknown; to?: unknown }
+      return typeof op.from === 'string' && typeof op.to === 'string'
+    }
+    case 'income':
+      return typeof (v as { profile?: { netMonthly?: unknown } }).profile?.netMonthly === 'number'
     default:
       return false
   }
@@ -182,6 +223,33 @@ export function applyOps(dataset: Dataset, entries: readonly OutboxEntry[]): Dat
         trips.push(entry.trip)
         break
       }
+      case 'trip-edit': {
+        const index = trips.findIndex((t) => t.id === entry.tripId)
+        if (index < 0) break
+        if (!tripsTouched) {
+          trips = [...trips]
+          tripsTouched = true
+        }
+        const current = trips[index]
+        if (!current) break
+        trips[index] = normalizeTrip({ ...current, ...entry.fields })
+        break
+      }
+      case 'recategorize': {
+        if (!expenses.some((e) => e.category === entry.from)) break
+        expenses = expenses.map((e) =>
+          e.category === entry.from
+            ? /* La sottocategoria appartiene alla categoria di partenza: portarla
+                 nella nuova la lascerebbe orfana, e l'interfaccia mostrerebbe un
+                 id grezzo al posto di un'etichetta. */
+              normalize({ ...e, category: entry.to, subcategory: undefined })
+            : e,
+        )
+        /* `map` conserva ordine e lunghezza, quindi `byId` resta valida: non si
+           ricostruisce come dopo un `delete`. */
+        expensesTouched = true
+        break
+      }
       case 'settle': {
         if (settlements.some((s) => s.id === entry.settlement.id)) break
         if (!settlementsTouched) {
@@ -204,6 +272,35 @@ export function applyOps(dataset: Dataset, entries: readonly OutboxEntry[]): Dat
   return { ...dataset, expenses, trips, settlements }
 }
 
+/**
+ * Le operazioni che riscrivono la configurazione, applicate a parte.
+ *
+ * Sono un applicatore separato e non un ramo di `applyOps` perché lavorano su un
+ * **altro file**: la configurazione e le spese vivono in due envelope cifrati
+ * distinti, e mescolarli qui vorrebbe dire riscrivere ogni volta anche quello
+ * che non è cambiato — con un IV nuovo a ogni cifratura, cioè un file diverso a
+ * ogni salvataggio anche senza modifiche.
+ */
+export function applyConfigOps(config: AppConfig, entries: readonly OutboxEntry[]): AppConfig {
+  let next = config
+  for (const entry of [...entries].sort((a, b) => a.ts - b.ts)) {
+    if (entry.kind === 'categories') {
+      next = { ...next, categories: entry.categories }
+    } else if (entry.kind === 'income') {
+      next = { ...next, income: { ...next.income, [entry.person]: entry.profile } }
+    }
+  }
+  return next
+}
+
+/** Come `normalize` per le spese: un flag falso non si scrive. */
+function normalizeTrip(trip: Trip): Trip {
+  const next: Trip = { ...trip }
+  if (next.closed !== true) delete next.closed
+  if (next.country !== undefined && next.country.trim() === '') delete next.country
+  return next
+}
+
 function applyPatch(expense: Expense, patch: Annotation): Expense {
   const next: Expense = { ...expense }
   if (patch.tax730 !== undefined) next.tax730 = patch.tax730
@@ -213,15 +310,26 @@ function applyPatch(expense: Expense, patch: Annotation): Expense {
   return normalize(next)
 }
 
-/** Togliamo i campi vuoti: il JSON resta pulito e i diff leggibili. */
+/**
+ * Togliamo i campi vuoti: il JSON resta pulito e i diff leggibili.
+ *
+ * `subcategory` e `trip` cadono anche se sono la **stringa vuota**, e non è un
+ * dettaglio: un `update` si applica come `{ ...spesa, ...campi }`, quindi un
+ * campo assente vuol dire «lascia com'era» e per cancellarlo bisogna dire
+ * qualcosa. Dire `undefined` non basta — `JSON.stringify` lo butta via, e la
+ * coda vive in localStorage: bastava un ricaricamento perché una spesa portata
+ * fuori da una vacanza si tenesse il suo `trip`, cioè un viaggio su una spesa
+ * che non è più di vacanza. La stringa vuota sopravvive al salvataggio e vuol
+ * dire «togli».
+ */
 function normalize(expense: Expense): Expense {
   const next: Expense = { ...expense }
   if (next.tax730 === false) delete next.tax730
   if (next.welfare === false) delete next.welfare
   if (next.notes !== undefined && next.notes.trim() === '') delete next.notes
   if (next.receiptLinks !== undefined && next.receiptLinks.length === 0) delete next.receiptLinks
-  if (next.subcategory === undefined) delete next.subcategory
-  if (next.trip === undefined) delete next.trip
+  if (!next.subcategory) delete next.subcategory
+  if (!next.trip) delete next.trip
   if (next.shares.others !== undefined && toCents(next.shares.others) === 0) {
     const { others: _drop, ...rest } = next.shares
     next.shares = rest
@@ -235,8 +343,18 @@ function sameLinks(a: readonly string[] | undefined, b: readonly string[] | unde
   return left.length === right.length && left.every((v, i) => v === right[i])
 }
 
-/** true quando il dataset scaricato riflette già questa operazione. */
-export function isAlreadyApplied(dataset: Dataset, entry: OutboxEntry): boolean {
+/**
+ * true quando ciò che è stato scaricato riflette già questa operazione.
+ *
+ * Vuole **entrambi** i file: da quando la coda tocca anche le categorie e le
+ * entrate, guardare solo il dataset direbbe «non ancora applicata» per sempre a
+ * un'operazione sulla configurazione, e quella voce resterebbe in coda a vita.
+ */
+export function isAlreadyApplied(
+  dataset: Dataset,
+  config: AppConfig | undefined,
+  entry: OutboxEntry,
+): boolean {
   switch (entry.kind) {
     case 'patch': {
       const expense = dataset.expenses.find((e) => e.id === entry.expenseId)
@@ -253,25 +371,54 @@ export function isAlreadyApplied(dataset: Dataset, entry: OutboxEntry): boolean 
     case 'update': {
       const expense = dataset.expenses.find((e) => e.id === entry.expenseId)
       if (!expense) return false
-      return Object.entries(entry.fields).every(
-        ([key, value]) => JSON.stringify(expense[key as keyof Expense]) === JSON.stringify(value),
+      /* Si confronta con l'**intenzione normalizzata**, non col valore grezzo:
+         `trip: ''` significa «togli il viaggio», e una spesa che non ce l'ha più
+         soddisfa quell'operazione anche se le due stringhe non si somigliano. */
+      const wanted = normalize({ ...expense, ...entry.fields })
+      return Object.keys(entry.fields).every(
+        (key) =>
+          JSON.stringify(expense[key as keyof Expense]) ===
+          JSON.stringify(wanted[key as keyof Expense]),
       )
     }
     case 'delete':
       return !dataset.expenses.some((e) => e.id === entry.expenseId)
     case 'trip':
       return dataset.trips.some((t) => t.id === entry.trip.id)
+    case 'trip-edit': {
+      const trip = dataset.trips.find((t) => t.id === entry.tripId)
+      if (!trip) return false
+      return Object.entries(entry.fields).every(
+        ([key, value]) => JSON.stringify(trip[key as keyof Trip]) === JSON.stringify(value),
+      )
+    }
     case 'settle':
       return (dataset.settlements ?? []).some((s) => s.id === entry.settlement.id)
     case 'unsettle':
       return !(dataset.settlements ?? []).some((s) => s.id === entry.settlementId)
+    case 'recategorize':
+      return !dataset.expenses.some((e) => e.category === entry.from)
+    case 'categories':
+      /* Senza configurazione non si può dire: meglio «non ancora» — una voce di
+         troppo si riapplica senza danno, una buttata via è persa. */
+      if (!config) return false
+      return JSON.stringify(config.categories) === JSON.stringify(entry.categories)
+    case 'income': {
+      if (!config) return false
+      return JSON.stringify(config.income[entry.person]) === JSON.stringify(entry.profile)
+    }
   }
 }
 
 /** Scarta le voci già pubblicate (o troppo vecchie per essere ancora in volo). */
-export function pruneSettled(state: OutboxState, dataset: Dataset, now: number): OutboxState {
+export function pruneSettled(
+  state: OutboxState,
+  dataset: Dataset,
+  config: AppConfig | undefined,
+  now: number,
+): OutboxState {
   const settled = state.settled.filter(
-    (entry) => now - entry.ts < SETTLED_TTL_MS && !isAlreadyApplied(dataset, entry),
+    (entry) => now - entry.ts < SETTLED_TTL_MS && !isAlreadyApplied(dataset, config, entry),
   )
   if (settled.length === state.settled.length) return state
   return { ...state, settled }
@@ -291,8 +438,12 @@ export function describeOps(entries: readonly OutboxEntry[]): string {
     delete: ['spesa eliminata', 'spese eliminate'],
     patch: ['annotazione', 'annotazioni'],
     trip: ['viaggio nuovo', 'viaggi nuovi'],
+    'trip-edit': ['viaggio modificato', 'viaggi modificati'],
     settle: ['rimborso registrato', 'rimborsi registrati'],
     unsettle: ['rimborso annullato', 'rimborsi annullati'],
+    categories: ['categorie aggiornate', 'categorie aggiornate'],
+    recategorize: ['categoria svuotata', 'categorie svuotate'],
+    income: ['entrate aggiornate', 'entrate aggiornate'],
   }
   const parts: string[] = []
   for (const [kind, count] of counts) {

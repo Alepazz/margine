@@ -20,11 +20,31 @@ export type Source = 'fisse' | 'personali' | 'condivise' | 'vacanze'
 
 export const SOURCES: readonly Source[] = ['fisse', 'personali', 'condivise', 'vacanze'] as const
 
+/**
+ * Nomi di ripiego, generici di proposito: i nomi **veri** dei tricount stanno in
+ * `config.sourceLabels`, che vive nei dati e non nel codice. I nomi che due
+ * persone danno ai propri tricount sono roba loro, il repo è pubblico e i dati
+ * no: qui ci sta la descrizione del tipo di tricount, non il suo nome. → ADR-0026
+ */
 export const SOURCE_LABELS: Record<Source, string> = {
   fisse: 'Spese fisse condivise',
   personali: 'Spese personali',
   condivise: 'Altre spese condivise',
   vacanze: 'Vacanze',
+}
+
+/**
+ * Il nome vero di un tricount, col generico come ripiego.
+ *
+ * Sta qui, accanto alle etichette che rimpiazza, e non nel `lookup` delle
+ * categorie: i nomi dei tricount non hanno niente a che fare coi colori dei
+ * grafici, e chi ne ha bisogno non deve costruirsi un tema per averlo.
+ */
+export function sourceLabelOf(
+  sourceLabels: Partial<Record<Source, string>> | undefined,
+  source: Source,
+): string {
+  return sourceLabels?.[source] ?? SOURCE_LABELS[source]
 }
 
 /**
@@ -104,6 +124,16 @@ export interface Trip {
    * precisione che non c'è. → ADR-0020
    */
   coords?: { lat: number; lon: number; approx?: boolean }
+  /**
+   * Vero quando il viaggio è finito: smette di comparire fra i tricount in cui
+   * si può inserire una spesa.
+   *
+   * **Non** significa «saldato»: quello è il punto di partenza in
+   * `config.balance.groups`. Una vacanza può essere finita e avere ancora un
+   * debito aperto — deve restare nel saldo e sparire dal menù, e con un campo
+   * solo una delle due cose sarebbe sbagliata. → ADR-0027
+   */
+  closed?: boolean
 }
 
 export interface Subcategory {
@@ -162,12 +192,31 @@ export interface GithubConfig {
   branch: string
   /** Percorso del dataset cifrato nel repo. */
   dataPath: string
+  /**
+   * Percorso della configurazione cifrata. Serve da quando le categorie e le
+   * entrate si modificano dall'app. Senza, quelle due cose restano in sola
+   * lettura e l'app lo dice: **non si indovina un percorso** su cui poi si
+   * committa. → ADR-0024
+   */
+  configPath?: string
 }
 
 export interface AppConfig {
   version: number
   people: Record<PersonId, Person>
   income: { me: IncomeProfile; partner: IncomeProfile | null }
+  /**
+   * I nomi veri dei tricount, come li vedi su Tricount. Stanno nei dati e non
+   * nel codice: il repo è pubblico, i dati no. Quello che manca ricade su
+   * `SOURCE_LABELS`.
+   */
+  sourceLabels?: Partial<Record<Source, string>>
+  /**
+   * Le categorie sono **dato scrivibile dall'app**: si creano, si rinominano e
+   * si cancellano da Impostazioni, e l'app riscrive `config.json.enc`. Prima
+   * erano una copia di `scripts/lib/taxonomy.mjs`, che da ora è solo il valore
+   * iniziale. → ADR-0024
+   */
   categories: Category[]
   /** Id della categoria del gatto: alimenta la pagina dedicata. */
   catCategory: string

@@ -28,8 +28,8 @@ export function usePageData(): PageData {
   const { person } = store.view
 
   const lookup = useMemo(
-    () => buildCategoryLookup(store.config.categories, chart),
-    [store.config.categories, chart],
+    () => buildCategoryLookup(store.config.categories, chart, store.config.sourceLabels),
+    [store.config.categories, store.config.sourceLabels, chart],
   )
   const visible = useMemo(() => visibleFor(expenses, store.view), [expenses, store.view])
   const all = useMemo(() => allFor(expenses, person), [expenses, person])

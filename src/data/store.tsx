@@ -17,18 +17,30 @@ import {
 
 import { currentMonthKey, monthKeyOf, type MonthKey } from '../domain/dates'
 import { DEFAULT_VIEW, monthsOf, type ViewOptions } from '../domain/selectors'
-import type { Annotation, AppConfig, Dataset, Expense, PersonId, Settlement, Trip } from '../domain/types'
+import type {
+  Annotation,
+  AppConfig,
+  Category,
+  Dataset,
+  Expense,
+  IncomeProfile,
+  PersonId,
+  Settlement,
+  Trip,
+} from '../domain/types'
 import { WrongPassphraseError, decryptEnvelope, deriveKeyCached, encryptEnvelope } from './crypto'
 import { isEnvelope, type Envelope } from './envelope'
-import { GithubError, getFile, loadToken, putFile } from './github'
+import { GithubError, commitFiles, getFile, loadToken } from './github'
 import {
   EMPTY_OUTBOX,
+  applyConfigOps,
   applyOps,
   describeOps,
   loadOutbox,
   newEntry,
   pruneSettled,
   saveOutbox,
+  touchesConfig,
   type Op,
   type OutboxEntry,
   type OutboxState,
@@ -40,8 +52,8 @@ const PASSPHRASE_KEY = 'margine.passphrase.v1'
 const PERSON_KEY = 'margine.person.v1'
 /*
  * Come parte l'app su **questo** dispositivo, non nei dati: «questo telefono
- * parte coperto» è una proprietà del telefono. Nei dati non potrebbe stare
- * comunque — l'app scrive solo `expenses.json.enc`, non la configurazione.
+ * parte coperto» è una proprietà del telefono, e il Mac di casa può volere
+ * l'opposto. Resta qui anche adesso che l'app saprebbe scriverlo nei dati.
  */
 const HIDE_INCOME_KEY = 'margine.hideIncome.v1'
 const SYNC_DEBOUNCE_MS = 1200
@@ -88,6 +100,12 @@ export interface StoreApi {
   updateExpense: (expenseId: string, fields: Partial<Expense>) => void
   deleteExpense: (expenseId: string) => void
   addTrip: (trip: Trip) => void
+  updateTrip: (tripId: string, fields: Partial<Trip>) => void
+  /** L'elenco intero delle categorie: si sostituisce, non si modifica in punta. */
+  setCategories: (categories: Category[]) => void
+  /** Sposta tutte le spese da una categoria a un'altra. */
+  recategorize: (from: string, to: string) => void
+  setIncome: (person: PersonId, profile: IncomeProfile) => void
   addSettlement: (settlement: Settlement) => void
   removeSettlement: (settlementId: string) => void
   syncNow: () => Promise<void>
@@ -188,28 +206,60 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
     setSync({ phase: 'syncing', pending: pending.length })
     try {
       for (let attempt = 0; attempt < 2; attempt += 1) {
-        const remote = await getFile(github, token)
-        if (!remote) {
-          throw new GithubError(404, `Nel repo non c'è ${github.dataPath}: fai un primo push dei dati.`)
-        }
-        const parsed: unknown = JSON.parse(remote.text)
-        if (!isEnvelope(parsed)) throw new Error('Il file nel repo non è un file cifrato di Margine.')
-
-        const key = await deriveKeyCached(passphrase, parsed.kdf)
-        const remoteDataset = normaliseDataset(await decryptEnvelope<Dataset>(parsed, key))
         const entries = outboxRef.current.pending
-        const merged = applyOps(
-          { ...remoteDataset, updatedAt: new Date().toISOString() },
-          entries,
-        )
-        const nextEnvelope = await encryptEnvelope(merged, key, parsed.kdf)
+        /*
+         * Si riscrive **solo** ciò che qualcosa ha toccato, e vale nei due versi:
+         * ogni cifratura usa un IV nuovo, quindi riscrivere un file per abitudine
+         * produce un file diverso a ogni salvataggio anche senza modifiche —
+         * 350 kB di diff per un rinomino di categoria, o un diff sulla
+         * configurazione per ogni spesa aggiunta.
+         */
+        const withConfig = entries.some(touchesConfig)
+        const withData = entries.some((entry) => !touchesConfig(entry))
+        if (withConfig && !github.configPath) {
+          throw new GithubError(
+            400,
+            'Per salvare categorie ed entrate serve `github.configPath` in config.json.',
+          )
+        }
+
+        const files: { path: string; text: string }[] = []
+        let merged: Dataset | undefined
+
+        if (withData) {
+          const remote = await getFile(github, token)
+          if (!remote) {
+            throw new GithubError(404, `Nel repo non c'è ${github.dataPath}: fai un primo push dei dati.`)
+          }
+          const parsed: unknown = JSON.parse(remote.text)
+          if (!isEnvelope(parsed)) throw new Error('Il file nel repo non è un file cifrato di Margine.')
+
+          const key = await deriveKeyCached(passphrase, parsed.kdf)
+          const remoteDataset = normaliseDataset(await decryptEnvelope<Dataset>(parsed, key))
+          merged = applyOps({ ...remoteDataset, updatedAt: new Date().toISOString() }, entries)
+          const nextEnvelope = await encryptEnvelope(merged, key, parsed.kdf)
+          files.push({ path: github.dataPath, text: `${JSON.stringify(nextEnvelope, null, 2)}\n` })
+        }
+
+        let mergedConfig: AppConfig | undefined
+        if (withConfig && github.configPath) {
+          const remoteConfig = await getFile(github, token, github.configPath)
+          if (!remoteConfig) {
+            throw new GithubError(404, `Nel repo non c'è ${github.configPath}.`)
+          }
+          const parsedConfig: unknown = JSON.parse(remoteConfig.text)
+          if (!isEnvelope(parsedConfig)) {
+            throw new Error('La configurazione nel repo non è un file cifrato di Margine.')
+          }
+          const configKey = await deriveKeyCached(passphrase, parsedConfig.kdf)
+          const decrypted = await decryptEnvelope<AppConfig>(parsedConfig, configKey)
+          mergedConfig = applyConfigOps(decrypted, entries)
+          const envelope = await encryptEnvelope(mergedConfig, configKey, parsedConfig.kdf)
+          files.push({ path: github.configPath, text: `${JSON.stringify(envelope, null, 2)}\n` })
+        }
 
         try {
-          await putFile(github, token, {
-            text: `${JSON.stringify(nextEnvelope, null, 2)}\n`,
-            sha: remote.sha,
-            message: commitMessage(entries),
-          })
+          await commitFiles(github, token, { files, message: commitMessage(entries) })
         } catch (putError) {
           const conflict =
             putError instanceof GithubError && (putError.status === 409 || putError.status === 422)
@@ -218,7 +268,11 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
         }
 
         persistOutbox({ pending: [], settled: [...outboxRef.current.settled, ...entries] })
-        setDataset(merged)
+        if (merged) setDataset(merged)
+        if (mergedConfig) {
+          configRef.current = mergedConfig
+          setConfig(mergedConfig)
+        }
         setSync({ phase: 'idle', pending: 0, lastSyncAt: Date.now() })
         return
       }
@@ -243,12 +297,17 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
   const applyUnlocked = useCallback(
     (nextConfig: AppConfig, rawDataset: Dataset) => {
       const box = loadOutbox()
-      const withLocal = applyOps(rawDataset, [...box.settled, ...box.pending])
-      const pruned = pruneSettled(box, rawDataset, Date.now())
+      const queued = [...box.settled, ...box.pending]
+      const withLocal = applyOps(rawDataset, queued)
+      /* Anche la configurazione porta l'overlay locale: una categoria appena
+         creata deve esistere già mentre il commit è ancora in volo, altrimenti
+         le spese che le assegni puntano a un id che l'app non conosce. */
+      const configWithLocal = applyConfigOps(nextConfig, queued)
+      const pruned = pruneSettled(box, rawDataset, nextConfig, Date.now())
       persistOutbox(pruned)
 
-      configRef.current = nextConfig
-      setConfig(nextConfig)
+      configRef.current = configWithLocal
+      setConfig(configWithLocal)
       setDataset(withLocal)
 
       const available = monthsOf(withLocal.expenses)
@@ -375,6 +434,17 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       }
       persistOutbox(next)
       setDataset((current) => (current ? applyOps(current, [entry]) : current))
+      if (touchesConfig(entry)) {
+        setConfig((current) => {
+          if (!current) return current
+          const nextConfig = applyConfigOps(current, [entry])
+          /* Il ref è quello che legge `flush`, che gira fuori da React: se non lo
+             si aggiorna qui, il salvataggio successivo partirebbe dalla
+             configurazione di prima. */
+          configRef.current = nextConfig
+          return nextConfig
+        })
+      }
       setSync((s) => ({ ...s, pending: next.pending.length }))
       scheduleFlush()
     },
@@ -401,6 +471,26 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
   )
 
   const addTrip = useCallback((trip: Trip) => enqueue({ kind: 'trip', trip }), [enqueue])
+
+  const updateTrip = useCallback(
+    (tripId: string, fields: Partial<Trip>) => enqueue({ kind: 'trip-edit', tripId, fields }),
+    [enqueue],
+  )
+
+  const setCategories = useCallback(
+    (categories: Category[]) => enqueue({ kind: 'categories', categories }),
+    [enqueue],
+  )
+
+  const recategorize = useCallback(
+    (from: string, to: string) => enqueue({ kind: 'recategorize', from, to }),
+    [enqueue],
+  )
+
+  const setIncome = useCallback(
+    (person: PersonId, profile: IncomeProfile) => enqueue({ kind: 'income', person, profile }),
+    [enqueue],
+  )
 
   const addSettlement = useCallback(
     (settlement: Settlement) => enqueue({ kind: 'settle', settlement }),
@@ -482,6 +572,10 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       updateExpense,
       deleteExpense,
       addTrip,
+      updateTrip,
+      setCategories,
+      recategorize,
+      setIncome,
       addSettlement,
       removeSettlement,
       syncNow: flush,
@@ -491,6 +585,10 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       addExpense,
       addSettlement,
       addTrip,
+      updateTrip,
+      setCategories,
+      recategorize,
+      setIncome,
       annotate,
       removeSettlement,
       deleteExpense,
