@@ -1,18 +1,20 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  EMPTY_FILTER,
   allFor,
   applyFilter,
   averageMonthly,
+  balanceDeltaOf,
   catStats,
   categoryBreakdown,
   comparePeriods,
   coupleBalance,
-  EMPTY_FILTER,
   fillMonthGaps,
   houseLedger,
   houseOutside,
   monthlySeries,
+  owedOf,
   projectMonth,
   subsetStats,
   tax730ByYear,
@@ -533,5 +535,82 @@ describe('il saldo tricount per tricount', () => {
       'condivise',
       'fisse',
     ])
+  })
+})
+
+describe('quanto sposta il saldo una spesa', () => {
+  it('se hai pagato tu, il partner ti deve la sua quota', () => {
+    const mia = expense({ id: 'm', date: '2026-08-10', amount: 50, paidBy: 'me' })
+    expect(balanceDeltaOf(mia)).toBe(25)
+  })
+
+  it('se ha pagato lei, il segno si gira', () => {
+    const sua = expense({ id: 's', date: '2026-08-10', amount: 50, paidBy: 'partner' })
+    expect(balanceDeltaOf(sua)).toBe(-25)
+  })
+
+  it('un conto anticipato da qualcun altro non è un debito fra voi', () => {
+    const altrui = expense({
+      id: 'o',
+      date: '2026-08-10',
+      amount: 60,
+      paidBy: 'others',
+      source: 'vacanze',
+      trip: 'creta-2025',
+      shares: { me: 20, partner: 20, others: 20 },
+    })
+    expect(balanceDeltaOf(altrui)).toBe(0)
+    expect(owedOf(altrui)).toBe(0)
+  })
+
+  /*
+   * È il numero che il foglio annuncia prima di spostare una spesa di tricount:
+   * quello che esce da un gruppo entra nell'altro, e il totale non si muove.
+   */
+  it('spostare una spesa muove quel numero da un gruppo all’altro, e il totale resta', () => {
+    const spesa = expense({ id: 'x', date: '2026-08-10', amount: 50, paidBy: 'me' })
+    const opts = { since: '2026-08-01', opening: 0 }
+    const prima = coupleBalance([spesa], [], opts)
+    const dopo = coupleBalance([{ ...spesa, source: 'fisse' }], [], opts)
+
+    expect(prima.groups.map((g) => g.key)).toEqual(['condivise'])
+    expect(dopo.groups.map((g) => g.key)).toEqual(['fisse'])
+    expect(prima.groups[0]?.balance).toBe(balanceDeltaOf(spesa))
+    expect(dopo.balance).toBe(prima.balance)
+  })
+})
+
+describe('portare una spesa in «Personale»', () => {
+  /*
+   * Il difetto che questo presidia: spostando in «Personale» una spesa
+   * anticipata dall'altra persona, e riscrivendo `paidBy` su chi guarda, il
+   * debito si azzerava. Una cena da 50 € pagata da lei e dichiarata «tutta mia»
+   * significa che gliene devo 50, non zero — e nessun rimborso è avvenuto.
+   */
+  const pagataDaLei = expense({
+    id: 'pl',
+    date: '2026-08-10',
+    amount: 50,
+    paidBy: 'partner',
+    shares: { me: 25, partner: 25 },
+  })
+
+  it('il debito cresce fino a tutto l’importo, e non si azzera', () => {
+    expect(balanceDeltaOf(pagataDaLei)).toBe(-25)
+
+    /* Come la porta il pannello: quote tutte mie, pagante intatto. */
+    const mia = { ...pagataDaLei, source: 'personali' as const, shares: { me: 50, partner: 0 } }
+    expect(balanceDeltaOf(mia)).toBe(-50)
+
+    /* Come la portava prima, riscrivendo il pagante: il debito svaniva. */
+    const sbagliata = { ...mia, paidBy: 'me' as const }
+    expect(balanceDeltaOf(sbagliata)).toBe(0)
+  })
+
+  it('e il saldo la conta, anche se è un tricount personale', () => {
+    const mia = { ...pagataDaLei, source: 'personali' as const, shares: { me: 50, partner: 0 } }
+    const saldo = coupleBalance([mia], [], { since: '2026-08-01', opening: 0 })
+    expect(saldo.balance).toBe(-50)
+    expect(saldo.groups.map((g) => g.key)).toEqual(['personali'])
   })
 })

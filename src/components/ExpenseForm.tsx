@@ -1,6 +1,12 @@
 /**
  * Inserire e correggere una spesa dal telefono.
  *
+ * L'ordine dei campi è quello in cui si pensa una spesa: **prima il tricount**,
+ * perché è lui a decidere tutto il resto — se c'è una divisione da scegliere, se
+ * esiste una quota di terzi, quali categorie hanno senso — poi cos'era, quanto,
+ * di che tipo, come si divide, e per ultima la data, che nove volte su dieci è
+ * oggi e non si tocca.
+ *
  * La divisione si sceglie con tre pulsanti invece di comporre due numeri che
  * devono sommare all'importo: in due anni di dati esistono **solo** tre modi di
  * dividere una spesa fuori dalle vacanze — tutta tua, tutta sua, metà e metà —
@@ -16,18 +22,20 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { useStore } from '../data/store'
 import { todayIso } from '../domain/dates'
 import {
+  ledgerKeyOf,
+  ledgerParts,
   presetOf,
   sharesFor,
   splitFor,
-  SOURCE_ORDER,
   validateExpense,
-  validateTrip,
   type SplitPreset,
 } from '../domain/expense-rules'
-import { newExpenseId, newTripId } from '../domain/ids'
+import { newExpenseId } from '../domain/ids'
 import { toCents } from '../domain/money'
-import { SOURCE_LABELS, type Expense, type Payer, type Source, type Trip } from '../domain/types'
-import { Segmented, useToast } from './ui'
+import type { Expense, Payer, Trip } from '../domain/types'
+import { LedgerSelect } from './LedgerSelect'
+import { TripForm } from './TripForm'
+import { Segmented, TilePicker, useToast, type TileOption } from './ui'
 
 /** Accetta la virgola: sulla tastiera del telefono è quello che esce. */
 function parseAmount(text: string): number {
@@ -63,7 +71,7 @@ export function ExpenseForm({
   const [title, setTitle] = useState(editing?.title ?? '')
   const [amount, setAmount] = useState(editing ? amountText(editing.amount) : '')
   const [date, setDate] = useState(editing?.date ?? todayIso())
-  const [source, setSource] = useState<Source>(editing?.source ?? 'condivise')
+  const [ledger, setLedger] = useState(editing ? ledgerKeyOf(editing) : 'condivise')
   const [category, setCategory] = useState(editing?.category ?? '')
   const [subcategory, setSubcategory] = useState(editing?.subcategory ?? '')
   const [preset, setPreset] = useState<SplitPreset>(editing ? presetOf(editing, person) : 'half')
@@ -80,15 +88,10 @@ export function ExpenseForm({
   )
   const [paidBy, setPaidBy] = useState<Payer>(editing?.paidBy ?? person)
   const [recurring, setRecurring] = useState(editing?.recurring ?? false)
-  const [trip, setTrip] = useState(editing?.trip ?? '')
   const [newTrip, setNewTrip] = useState(false)
-  const [tripName, setTripName] = useState('')
-  const [tripPlace, setTripPlace] = useState('')
-  const [tripCountry, setTripCountry] = useState('')
-  const [tripStart, setTripStart] = useState(todayIso())
-  const [tripEnd, setTripEnd] = useState(todayIso())
   const [touched, setTouched] = useState(false)
 
+  const { source, trip } = ledgerParts(ledger)
   const isVacation = source === 'vacanze'
   /*
    * Una spesa personale è al 100% di chi la inserisce: le 370 in archivio sono
@@ -98,8 +101,26 @@ export function ExpenseForm({
   const effectivePreset: SplitPreset = personalOnly ? 'mine' : preset
 
   const categories = config?.categories ?? []
+  const tripCategoryId = config?.tripCategory ?? ''
+
+  /*
+   * In un tricount di vacanza la categoria è una sola — «Viaggi» — quindi i
+   * riquadri mostrano direttamente le sue sottocategorie: un tocco invece di
+   * due, e la torta di ogni viaggio resta divisa per alloggio, trasporti,
+   * attività, cibo e souvenir.
+   */
+  const tripCategory = categories.find((c) => c.id === tripCategoryId)
   const chosenCategory = categories.find((c) => c.id === category)
   const subcategories = chosenCategory?.subcategories ?? []
+
+  const categoryTiles = useMemo<TileOption[]>(
+    () => categories.map((c) => ({ value: c.id, label: c.label, emoji: c.emoji })),
+    [categories],
+  )
+  const subTiles = useMemo<TileOption[]>(
+    () => subcategories.map((s) => ({ value: s.id, label: s.label })),
+    [subcategories],
+  )
 
   const parsedAmount = parseAmount(amount)
 
@@ -111,7 +132,14 @@ export function ExpenseForm({
    */
   /* Chi ha pagato serve prima delle quote: il centesimo dispari di una metà va a
      lui, e non a chi guarda. → ADR-0023 */
-  const payer = personalOnly ? person : paidBy
+  /*
+   * In «Personale» il controllo non si mostra — le 370 spese personali in
+   * archivio sono tutte di chi le ha inserite — ma correggendo una spesa il
+   * pagante **si conserva**: una spesa pagata da Federica e portata in
+   * «Personale» vuol dire «era tutta mia, e l'ha pagata lei», e riscriverle il
+   * pagante cancellerebbe il debito senza dirlo.
+   */
+  const payer = personalOnly ? (editing?.paidBy ?? person) : paidBy
 
   const shares = useMemo(() => {
     if (effectivePreset === 'custom') {
@@ -134,8 +162,11 @@ export function ExpenseForm({
       category,
       recurring,
     }
-    if (subcategory) built.subcategory = subcategory
-    if (isVacation && trip) built.trip = trip
+    /* Sempre presenti, anche vuoti: un `update` applica solo i campi che porta,
+       quindi ometterli vorrebbe dire «lascia com'erano» — e correggendo una
+       spesa di vacanza in una spesa di casa il viaggio resterebbe attaccato. */
+    built.subcategory = subcategory
+    built.trip = isVacation && trip ? trip : ''
     /* Le annotazioni già presenti non si perdono correggendo l'importo. */
     if (editing?.tax730 !== undefined) built.tax730 = editing.tax730
     if (editing?.notes !== undefined) built.notes = editing.notes
@@ -150,7 +181,6 @@ export function ExpenseForm({
     othersShare,
     parsedAmount,
     payer,
-    person,
     recurring,
     shares,
     source,
@@ -176,29 +206,37 @@ export function ExpenseForm({
 
   const tripIds = useMemo(() => new Set((dataset?.trips ?? []).map((t) => t.id)), [dataset?.trips])
 
-  const createTrip = () => {
-    const year = Number(tripStart.slice(0, 4))
-    const candidate = {
-      id: newTripId(tripName, Number.isFinite(year) ? year : new Date().getUTCFullYear(), tripIds),
-      name: tripName.trim(),
-      place: tripPlace.trim(),
-      country: tripCountry.trim() || undefined,
-      year,
-      start: tripStart,
-      end: tripEnd,
+  /**
+   * Cambiare tricount azzera quello che non vale più, invece di lasciarlo
+   * invisibile a far fallire il salvataggio.
+   */
+  const changeLedger = (next: string): void => {
+    const before = ledgerParts(ledger)
+    const after = ledgerParts(next)
+    setLedger(next)
+    setNewTrip(false)
+    if (after.source !== 'vacanze') {
+      setOthersText('')
+      if (paidBy === 'others') setPaidBy(person)
     }
-    const problems = validateTrip(candidate, tripIds)
-    if (problems.length > 0) {
-      toast.show(problems[0] ?? 'Il viaggio non è valido.')
-      return
+    /* Entrando o uscendo dalle vacanze la categoria cambia mondo: «Viaggi» non
+       ha senso a casa, e «Spesa alimentare» non è una fetta di un viaggio. */
+    if ((before.source === 'vacanze') !== (after.source === 'vacanze')) {
+      setCategory(after.source === 'vacanze' ? tripCategoryId : '')
+      setSubcategory('')
     }
-    addTrip(candidate as Trip)
-    setTrip(candidate.id)
+  }
+
+  const createTrip = (candidate: Trip): void => {
+    addTrip(candidate)
+    setLedger(`vacanze/${candidate.id}`)
+    setCategory(tripCategoryId)
+    setSubcategory('')
     setNewTrip(false)
     toast.show(`Viaggio «${candidate.name}» creato.`)
   }
 
-  const save = () => {
+  const save = (): void => {
     setTouched(true)
     if (errors.length > 0) return
     if (editing) {
@@ -223,7 +261,7 @@ export function ExpenseForm({
       }}
     >
       <div
-        className="sheet"
+        className="sheet is-form"
         role="dialog"
         aria-modal="true"
         aria-label={editing ? 'Correggi la spesa' : 'Nuova spesa'}
@@ -236,22 +274,54 @@ export function ExpenseForm({
           </button>
         </div>
 
-        <div className="stack" style={{ gap: 12 }}>
-          <div className="field">
-            <label className="label" htmlFor="ef-title">
-              Cos'era
-            </label>
-            <input
-              id="ef-title"
-              className="input"
-              value={title}
-              placeholder="Spesa Esselunga"
-              autoComplete="off"
-              onChange={(event) => setTitle(event.target.value)}
-            />
-          </div>
+        <div className="sheet-body">
+          <div className="stack" style={{ gap: 12 }}>
+            <div className="field">
+              <label className="label" htmlFor="ef-ledger">
+                In quale tricount
+              </label>
+              {newTrip ? (
+                <TripForm
+                  takenIds={tripIds}
+                  onCreate={createTrip}
+                  onCancel={() => setNewTrip(false)}
+                  onProblem={(message) => toast.show(message)}
+                />
+              ) : (
+                <div className="row row-inline" style={{ gap: 6 }}>
+                  <LedgerSelect
+                    id="ef-ledger"
+                    value={ledger}
+                    trips={dataset?.trips ?? []}
+                    sourceLabels={config?.sourceLabels}
+                    onChange={changeLedger}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => setNewTrip(true)}
+                    title="Apri un tricount per una vacanza nuova"
+                  >
+                    Nuova vacanza
+                  </button>
+                </div>
+              )}
+            </div>
 
-          <div className="form-row">
+            <div className="field">
+              <label className="label" htmlFor="ef-title">
+                Cos'era
+              </label>
+              <input
+                id="ef-title"
+                className="input"
+                value={title}
+                placeholder="Spesa Esselunga"
+                autoComplete="off"
+                onChange={(event) => setTitle(event.target.value)}
+              />
+            </div>
+
             <div className="field">
               <label className="label" htmlFor="ef-amount">
                 Quanto
@@ -265,6 +335,146 @@ export function ExpenseForm({
                 onChange={(event) => setAmount(event.target.value)}
               />
             </div>
+
+            {isVacation && tripCategory ? (
+              <div className="field">
+                <span className="label">Di che tipo</span>
+                <TilePicker
+                  ariaLabel="Tipo di spesa del viaggio"
+                  options={(tripCategory.subcategories ?? []).map((s) => ({
+                    value: s.id,
+                    label: s.label,
+                  }))}
+                  value={subcategory || undefined}
+                  onChange={(next) => {
+                    setCategory(tripCategoryId)
+                    setSubcategory(next ?? '')
+                  }}
+                />
+              </div>
+            ) : (
+              <>
+                <div className="field">
+                  <span className="label">Categoria</span>
+                  <TilePicker
+                    ariaLabel="Categoria della spesa"
+                    options={categoryTiles}
+                    value={category || undefined}
+                    onChange={(next) => {
+                      setCategory(next ?? '')
+                      setSubcategory('')
+                    }}
+                  />
+                </div>
+                {subTiles.length > 0 ? (
+                  <div className="field">
+                    <span className="label">Di che tipo</span>
+                    <TilePicker
+                      ariaLabel="Tipo dentro la categoria"
+                      options={subTiles}
+                      value={subcategory || undefined}
+                      onChange={(next) => setSubcategory(next ?? '')}
+                    />
+                  </div>
+                ) : null}
+              </>
+            )}
+
+            {personalOnly ? (
+              <p className="hint">
+                Una spesa personale è tutta tua, quindi la divisione non si sceglie.
+                {payer !== person
+                  ? ` L'ha anticipata ${
+                      payer === 'others' ? 'qualcuno del gruppo' : config.people[payer].name
+                    }, e resta così: quel debito non sparisce spostando la spesa qui.`
+                  : ''}
+              </p>
+            ) : (
+              <>
+                <div className="field">
+                  <span className="label">Come si divide</span>
+                  <Segmented<SplitPreset>
+                    ariaLabel="Divisione della spesa"
+                    value={preset}
+                    onChange={(next) => {
+                      setPreset(next)
+                      if (next === 'custom') {
+                        /* Si parte dalla divisione corrente invece che da zero:
+                           quasi sempre si vuole spostare qualche euro, non rifarla. */
+                        setMineText(amountText(person === 'me' ? shares.me : shares.partner))
+                        setTheirsText(amountText(person === 'me' ? shares.partner : shares.me))
+                      }
+                    }}
+                    options={[
+                      { value: 'half', label: SPLIT_LABELS.half },
+                      { value: 'mine', label: SPLIT_LABELS.mine },
+                      { value: 'theirs', label: SPLIT_LABELS.theirs },
+                      { value: 'custom', label: SPLIT_LABELS.custom },
+                    ]}
+                  />
+                </div>
+
+                {preset === 'custom' ? (
+                  <div className="form-row">
+                    <div className="field">
+                      <label className="label" htmlFor="ef-mine">
+                        Quota {config.people[person].name}
+                      </label>
+                      <input
+                        id="ef-mine"
+                        className="input"
+                        inputMode="decimal"
+                        value={mineText}
+                        onChange={(event) => setMineText(event.target.value)}
+                      />
+                    </div>
+                    <div className="field">
+                      <label className="label" htmlFor="ef-theirs">
+                        Quota {config.people[other].name}
+                      </label>
+                      <input
+                        id="ef-theirs"
+                        className="input"
+                        inputMode="decimal"
+                        value={theirsText}
+                        onChange={(event) => setTheirsText(event.target.value)}
+                      />
+                    </div>
+                    {isVacation ? (
+                      <div className="field">
+                        <label className="label" htmlFor="ef-others">
+                          Quota di chi era con voi
+                        </label>
+                        <input
+                          id="ef-others"
+                          className="input"
+                          inputMode="decimal"
+                          value={othersText}
+                          onChange={(event) => setOthersText(event.target.value)}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <div className="field">
+                  <span className="label">Chi ha pagato</span>
+                  <Segmented<Payer>
+                    ariaLabel="Chi ha anticipato la spesa"
+                    value={paidBy}
+                    onChange={setPaidBy}
+                    options={[
+                      { value: 'me', label: config.people.me.name },
+                      { value: 'partner', label: config.people.partner.name },
+                      ...(isVacation
+                        ? [{ value: 'others' as Payer, label: 'Qualcuno del gruppo' }]
+                        : []),
+                    ]}
+                  />
+                </div>
+              </>
+            )}
+
             <div className="field">
               <label className="label" htmlFor="ef-date">
                 Quando
@@ -277,279 +487,35 @@ export function ExpenseForm({
                 onChange={(event) => setDate(event.target.value)}
               />
             </div>
-          </div>
 
-          <div className="field">
-            <label className="label" htmlFor="ef-source">
-              In quale registro
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={recurring}
+                onChange={(event) => setRecurring(event.target.checked)}
+              />
+              Spesa fissa, torna ogni mese
             </label>
-            <select
-              id="ef-source"
-              className="select"
-              value={source}
-              onChange={(event) => {
-                const next = event.target.value as Source
-                setSource(next)
-                /* Cambiando registro le scelte che non valgono più si azzerano,
-                   invece di restare invisibili e far fallire il salvataggio. */
-                if (next !== 'vacanze') {
-                  setTrip('')
-                  setNewTrip(false)
-                  setOthersText('')
-                  if (paidBy === 'others') setPaidBy(person)
-                }
-              }}
-            >
-              {SOURCE_ORDER.map((value) => (
-                <option key={value} value={value}>
-                  {SOURCE_LABELS[value]}
-                </option>
-              ))}
-            </select>
-          </div>
 
-          {isVacation ? (
-            <div className="field">
-              <span className="label">Quale viaggio</span>
-              {newTrip ? (
-                <div className="stack" style={{ gap: 8 }}>
-                  <div className="form-row">
-                    <input
-                      className="input"
-                      value={tripName}
-                      placeholder="Nome (Sicilia)"
-                      aria-label="Nome del viaggio"
-                      onChange={(event) => setTripName(event.target.value)}
-                    />
-                    <input
-                      className="input"
-                      value={tripPlace}
-                      placeholder="Posto (Palermo)"
-                      aria-label="Posto"
-                      onChange={(event) => setTripPlace(event.target.value)}
-                    />
-                  </div>
-                  <input
-                    className="input"
-                    value={tripCountry}
-                    placeholder="Paese (facoltativo)"
-                    aria-label="Paese"
-                    onChange={(event) => setTripCountry(event.target.value)}
-                  />
-                  <div className="form-row">
-                    <input
-                      className="input"
-                      type="date"
-                      value={tripStart}
-                      aria-label="Data di partenza"
-                      onChange={(event) => setTripStart(event.target.value)}
-                    />
-                    <input
-                      className="input"
-                      type="date"
-                      value={tripEnd}
-                      aria-label="Data di ritorno"
-                      onChange={(event) => setTripEnd(event.target.value)}
-                    />
-                  </div>
-                  <div className="row" style={{ gap: 6 }}>
-                    <button type="button" className="btn btn-primary btn-sm" onClick={createTrip}>
-                      Crea il viaggio
-                    </button>
-                    <button type="button" className="btn btn-sm" onClick={() => setNewTrip(false)}>
-                      Annulla
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="row" style={{ gap: 6 }}>
-                  <select
-                    className="select"
-                    style={{ flex: '1 1 auto' }}
-                    value={trip}
-                    aria-label="Viaggio"
-                    onChange={(event) => setTrip(event.target.value)}
-                  >
-                    <option value="">Scegli…</option>
-                    {(dataset?.trips ?? [])
-                      .slice()
-                      .sort((a, b) => (a.start < b.start ? 1 : -1))
-                      .map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name} {t.year}
-                        </option>
-                      ))}
-                  </select>
-                  <button type="button" className="btn btn-sm" onClick={() => setNewTrip(true)}>
-                    Nuovo
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : null}
-
-          <div className="form-row">
-            <div className="field">
-              <label className="label" htmlFor="ef-category">
-                Categoria
-              </label>
-              <select
-                id="ef-category"
-                className="select"
-                value={category}
-                onChange={(event) => {
-                  setCategory(event.target.value)
-                  setSubcategory('')
-                }}
-              >
-                <option value="">Scegli…</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.emoji ? `${c.emoji} ` : ''}
-                    {c.label}
-                  </option>
+            {showErrors ? (
+              <div className="stack" style={{ gap: 2 }}>
+                {errors.map((message) => (
+                  <p className="delta is-bad" key={message}>
+                    {message}
+                  </p>
                 ))}
-              </select>
-            </div>
-            {subcategories.length > 0 ? (
-              <div className="field">
-                <label className="label" htmlFor="ef-sub">
-                  Di che tipo
-                </label>
-                <select
-                  id="ef-sub"
-                  className="select"
-                  value={subcategory}
-                  onChange={(event) => setSubcategory(event.target.value)}
-                >
-                  <option value="">Nessuna</option>
-                  {subcategories.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
               </div>
             ) : null}
           </div>
+        </div>
 
-          {personalOnly ? (
-            <p className="hint">
-              Una spesa personale è tutta tua: divisione e chi ha pagato non si scelgono.
-            </p>
-          ) : (
-            <>
-              <div className="field">
-                <span className="label">Come si divide</span>
-                <Segmented<SplitPreset>
-                  ariaLabel="Divisione della spesa"
-                  value={preset}
-                  onChange={(next) => {
-                    setPreset(next)
-                    if (next === 'custom') {
-                      /* Si parte dalla divisione corrente invece che da zero:
-                         quasi sempre si vuole spostare qualche euro, non rifarla. */
-                      setMineText(amountText(person === 'me' ? shares.me : shares.partner))
-                      setTheirsText(amountText(person === 'me' ? shares.partner : shares.me))
-                    }
-                  }}
-                  options={[
-                    { value: 'half', label: SPLIT_LABELS.half },
-                    { value: 'mine', label: SPLIT_LABELS.mine },
-                    { value: 'theirs', label: SPLIT_LABELS.theirs },
-                    { value: 'custom', label: SPLIT_LABELS.custom },
-                  ]}
-                />
-              </div>
-
-              {preset === 'custom' ? (
-                <div className="form-row">
-                  <div className="field">
-                    <label className="label" htmlFor="ef-mine">
-                      Quota {config.people[person].name}
-                    </label>
-                    <input
-                      id="ef-mine"
-                      className="input"
-                      inputMode="decimal"
-                      value={mineText}
-                      onChange={(event) => setMineText(event.target.value)}
-                    />
-                  </div>
-                  <div className="field">
-                    <label className="label" htmlFor="ef-theirs">
-                      Quota {config.people[other].name}
-                    </label>
-                    <input
-                      id="ef-theirs"
-                      className="input"
-                      inputMode="decimal"
-                      value={theirsText}
-                      onChange={(event) => setTheirsText(event.target.value)}
-                    />
-                  </div>
-                  {isVacation ? (
-                    <div className="field">
-                      <label className="label" htmlFor="ef-others">
-                        Quota di chi era con voi
-                      </label>
-                      <input
-                        id="ef-others"
-                        className="input"
-                        inputMode="decimal"
-                        value={othersText}
-                        onChange={(event) => setOthersText(event.target.value)}
-                      />
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-
-              <div className="field">
-                <span className="label">Chi ha pagato</span>
-                <Segmented<Payer>
-                  ariaLabel="Chi ha anticipato la spesa"
-                  value={paidBy}
-                  onChange={setPaidBy}
-                  options={[
-                    { value: 'me', label: config.people.me.name },
-                    { value: 'partner', label: config.people.partner.name },
-                    ...(isVacation
-                      ? [{ value: 'others' as Payer, label: 'Qualcuno del gruppo' }]
-                      : []),
-                  ]}
-                />
-              </div>
-            </>
-          )}
-
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={recurring}
-              onChange={(event) => setRecurring(event.target.checked)}
-            />
-            Spesa fissa, torna ogni mese
-          </label>
-
-          {showErrors ? (
-            <div className="stack" style={{ gap: 2 }}>
-              {errors.map((message) => (
-                <p className="delta is-bad" key={message}>
-                  {message}
-                </p>
-              ))}
-            </div>
-          ) : null}
-
-          <div className="row" style={{ gap: 8 }}>
-            <button type="button" className="btn btn-primary" onClick={save}>
-              {editing ? 'Salva le correzioni' : 'Aggiungi la spesa'}
-            </button>
-            <button type="button" className="btn" onClick={onClose}>
-              Annulla
-            </button>
-          </div>
+        <div className="sheet-foot">
+          <button type="button" className="btn btn-primary" onClick={save}>
+            {editing ? 'Salva le correzioni' : 'Aggiungi la spesa'}
+          </button>
+          <button type="button" className="btn" onClick={onClose}>
+            Annulla
+          </button>
         </div>
       </div>
     </div>

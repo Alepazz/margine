@@ -14,13 +14,12 @@ import { Card, Notice, ShowMore, StatTile, useToast } from '../components/ui'
 import { formatDate, todayIso } from '../domain/dates'
 import { newSettlementId } from '../domain/ids'
 import { formatEuro, toCents } from '../domain/money'
+import { ledgerLabel } from '../domain/expense-rules'
 import { coupleBalance } from '../domain/selectors'
-import { SOURCE_LABELS, SOURCES, type Settlement, type Source } from '../domain/types'
+import type { Settlement } from '../domain/types'
 import { usePageData } from './usePageData'
 
 const MOVEMENTS_SHOWN = 25
-const TRIP_PREFIX = 'vacanze/'
-const SOURCE_KEYS: ReadonlySet<string> = new Set<string>(SOURCES)
 
 /**
  * «Devi a Alessio» è sbagliato, «devi ad Alessio» no. La d eufonica davanti a
@@ -44,16 +43,11 @@ export function Saldo(): ReactNode {
     [config.balance, dataset.expenses, dataset.settlements],
   )
 
-  /* Il nome leggibile di un tricount: le vacanze ne hanno uno per viaggio, e il
-     nome sta nei dati del viaggio, non nella chiave. */
-  const groupLabel = (key: string): string => {
-    if (key.startsWith(TRIP_PREFIX)) {
-      const id = key.slice(TRIP_PREFIX.length)
-      return dataset.trips.find((trip) => trip.id === id)?.name ?? id
-    }
-    if (SOURCE_KEYS.has(key)) return SOURCE_LABELS[key as Source]
-    return key
-  }
+  /* Il nome leggibile di un tricount, dalla stessa funzione che usa il pannello
+     che sposta una spesa: le vacanze ne hanno uno per viaggio, e quel nome sta
+     nei dati del viaggio e non nella chiave. */
+  const groupLabel = (key: string): string =>
+    ledgerLabel(key, dataset.trips, config.sourceLabels)
 
   /*
    * Il calcolo ha un segno fisso — positivo = `partner` deve a `me` — e qui si

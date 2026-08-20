@@ -1,13 +1,17 @@
 /**
- * Impostazioni: profilo entrate, tema, accesso in scrittura al repo, dati.
+ * Impostazioni: profilo entrate, tema, accesso in scrittura al repo, dati,
+ * categorie.
  *
- * Il profilo entrate si legge qui ma si modifica nella sessione mensile: sta
- * dentro il file cifrato, non nel browser, così è lo stesso su tutti i device.
+ * Entrate e categorie si **modificano qui**: stanno nel file cifrato della
+ * configurazione, che l'app sa riscrivere come riscrive le spese. Prima erano in
+ * sola lettura e cambiarle voleva dire aprire il computer di casa. → ADR-0024
  */
 
 import { useState, type ReactNode } from 'react'
 
+import { CategoryEditor } from '../components/CategoryEditor'
 import { ThemeChooser } from '../components/Controls'
+import { IncomeEditor } from '../components/IncomeEditor'
 import { Card, Notice, Segmented, StatTile, VEIL, useToast } from '../components/ui'
 import { clearToken, loadToken, saveToken, testAccess } from '../data/github'
 import { formatDate } from '../domain/dates'
@@ -35,6 +39,7 @@ export function Impostazioni(): ReactNode {
   const person = view.person
   const profile = person === 'me' ? config.income.me : config.income.partner
   const [token, setToken] = useState(loadToken() ?? '')
+  const [editingIncome, setEditingIncome] = useState(false)
   const [checking, setChecking] = useState(false)
   const [checkResult, setCheckResult] = useState<string | null>(null)
 
@@ -57,18 +62,30 @@ export function Impostazioni(): ReactNode {
           title={`Profilo entrate — ${config.people[person].name}`}
           note="Serve a trasformare le spese in margine"
           action={
-            profile?.configured ? (
-              <button type="button" className="btn btn-sm" onClick={toggleHideIncome}>
-                {hideIncome ? 'Mostra' : 'Nascondi'}
-              </button>
-            ) : null
+            editingIncome ? null : (
+              <div className="row" style={{ gap: 6 }}>
+                <button type="button" className="btn btn-sm" onClick={() => setEditingIncome(true)}>
+                  {profile?.configured ? 'Modifica' : 'Imposta'}
+                </button>
+                {profile?.configured ? (
+                  <button type="button" className="btn btn-sm" onClick={toggleHideIncome}>
+                    {hideIncome ? 'Mostra' : 'Nascondi'}
+                  </button>
+                ) : null}
+              </div>
+            )
           }
         >
-          {!profile || !profile.configured ? (
+          {editingIncome ? (
+            <IncomeEditor
+              person={person}
+              profile={profile}
+              onDone={() => setEditingIncome(false)}
+            />
+          ) : !profile || !profile.configured ? (
             <Notice tone="warn">
-              Non è ancora impostato. Nella prossima sessione mensile bastano quattro numeri:
-              stipendio netto, valore e numero dei buoni pasto, mensilità aggiuntive (13ª, 14ª) ed
-              eventuale bonus annuo netto. Finché manca, l'app mostra le spese ma non il margine.
+              Non è ancora impostato. Bastano lo stipendio netto e l'obiettivo di risparmio: tocca
+              «Imposta». Finché manca, l'app mostra le spese ma non il margine.
             </Notice>
           ) : (
             <>
@@ -102,8 +119,8 @@ export function Impostazioni(): ReactNode {
               </div>
               {profile.note ? <div className="card-foot">{profile.note}</div> : null}
               <div className="card-foot">
-                Cambia lo stipendio? Dillo nella prossima sessione: si aggiorna{' '}
-                <code>data/config.json</code> e si ricifra. Non serve toccare il codice.
+                Cambia lo stipendio? Tocca «Modifica»: si salva nella configurazione cifrata e vale
+                su tutti i dispositivi.
               </div>
             </>
           )}
@@ -279,30 +296,11 @@ export function Impostazioni(): ReactNode {
           )}
         </Card>
 
-        <Card title="Categorie" note="Colore fisso per categoria, in ogni grafico">
-          <div className="stack" style={{ gap: 4 }}>
-            {config.categories.map((category) => (
-              <div className="row" key={category.id} style={{ justifyContent: 'space-between' }}>
-                <span className="row" style={{ gap: 8 }}>
-                  <span
-                    className="legend-swatch"
-                    style={{ background: lookup.color(category.id) }}
-                    aria-hidden="true"
-                  />
-                  <span>
-                    {category.emoji ? `${category.emoji} ` : ''}
-                    {category.label}
-                  </span>
-                </span>
-                <span className="hint">
-                  {lookup.hasSlot(category.id) ? 'colore proprio' : 'confluisce in «Altre voci»'}
-                  {category.subcategories?.length
-                    ? ` · ${category.subcategories.length} sottocategorie`
-                    : ''}
-                </span>
-              </div>
-            ))}
-          </div>
+        <Card
+          title="Categorie"
+          note="Le tinte sono otto e sono già tutte assegnate: dare un colore a una categoria vuol dire toglierlo a un'altra, e chi lo cede finisce in «Altre voci»"
+        >
+          <CategoryEditor lookup={lookup} />
         </Card>
       </div>
     </>

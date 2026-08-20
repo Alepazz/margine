@@ -17,8 +17,8 @@
  */
 
 import { toCents } from './money'
-import type { Category, Expense, Payer, PersonId, Source } from './types'
-import { SOURCES } from './types'
+import type { Category, Expense, Payer, PersonId, Source, Trip } from './types'
+import { SOURCES, sourceLabelOf } from './types'
 
 const DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/
 const PAYERS = new Set(['me', 'partner', 'others'])
@@ -226,5 +226,80 @@ export function sharesFor(
   return person === 'me' ? { me: mine, partner: theirs } : { me: theirs, partner: mine }
 }
 
-/** Le origini in cui si può inserire una spesa, in ordine di uso reale. */
-export const SOURCE_ORDER: readonly Source[] = ['condivise', 'personali', 'fisse', 'vacanze']
+/** I tricount fissi del menù, nell'ordine in cui si usano. `vacanze` non c'è: lì ci sono i viaggi. */
+export const LEDGER_SOURCES: readonly Source[] = ['condivise', 'personali', 'fisse']
+
+/**
+ * I tricount fra cui scegliere, come lista piatta: i tre fissi più le vacanze
+ * **aperte**, dalla più recente.
+ *
+ * `current` è il tricount della spesa che si sta correggendo, e c'è per una
+ * ragione precisa: una spesa di due anni fa appartiene a una vacanza conclusa,
+ * e un menù che non la contiene non può rappresentare il valore che ha. La
+ * conseguenza sarebbe che aprire quella spesa la sposterebbe di tricount da
+ * sola, senza che nessuno l'abbia chiesto. → ADR-0027
+ */
+export function ledgerOptions(
+  trips: readonly Trip[],
+  opts: { current?: string } = {},
+): { key: string; trip?: Trip; closed: boolean }[] {
+  const out: { key: string; trip?: Trip; closed: boolean }[] = LEDGER_SOURCES.map((source) => ({
+    key: source,
+    closed: false,
+  }))
+
+  const ordered = [...trips].sort((a, b) => (a.start < b.start ? 1 : -1))
+  for (const trip of ordered) {
+    const key = `vacanze/${trip.id}`
+    if (trip.closed === true && key !== opts.current) continue
+    out.push({ key, trip, closed: trip.closed === true })
+  }
+  return out
+}
+
+/**
+ * Il tricount in cui sta una spesa, come **una scelta sola**.
+ *
+ * Su Tricount i gruppi sono una lista piatta e ogni vacanza è un gruppo a sé:
+ * chiedere prima il «registro» e poi il viaggio è una domanda in più che nella
+ * testa di chi inserisce non esiste.
+ *
+ * La chiave — `fisse` | `personali` | `condivise` | `vacanze/<idViaggio>` — è
+ * **la stessa** con cui il saldo raggruppa i tricount: `coupleBalance` chiama
+ * `ledgerKeyOf` e le chiavi di `balance.groups` sono queste. Un formato nuovo
+ * sarebbe un secondo modo di dire la stessa cosa, e i due divergerebbero al
+ * primo viaggio con un id strano. → ADR-0026
+ */
+export type LedgerKey = string
+
+/** Da una chiave di tricount ai due campi che finiscono nella spesa. */
+export function ledgerParts(key: LedgerKey): { source: Source; trip?: string } {
+  if (key.startsWith('vacanze/')) {
+    const trip = key.slice('vacanze/'.length)
+    return trip ? { source: 'vacanze', trip } : { source: 'vacanze' }
+  }
+  return { source: key as Source }
+}
+
+/** E il verso opposto, dalla spesa alla chiave. */
+export function ledgerKeyOf(expense: { source: Source; trip?: string }): LedgerKey {
+  return expense.source === 'vacanze' && expense.trip ? `vacanze/${expense.trip}` : expense.source
+}
+
+/**
+ * Il nome leggibile di un tricount, da mostrare.
+ *
+ * Per una vacanza il nome sta nei dati del viaggio e non nella chiave, quindi
+ * serve l'elenco dei viaggi. Sta qui, in un posto solo, perché lo vogliono la
+ * pagina Saldo e il pannello che sposta una spesa: scritto due volte, il giorno
+ * che un viaggio viene rinominato uno dei due mostrerebbe ancora l'id.
+ */
+export function ledgerLabel(
+  key: LedgerKey,
+  trips: readonly Trip[],
+  sourceLabels: Partial<Record<Source, string>> | undefined,
+): string {
+  const { source, trip } = ledgerParts(key)
+  if (trip) return trips.find((candidate) => candidate.id === trip)?.name ?? trip
+  return SOURCES.includes(source) ? sourceLabelOf(sourceLabels, source) : key
+}

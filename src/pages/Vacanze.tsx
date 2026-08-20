@@ -11,7 +11,8 @@ import { CategoryDonut, type DonutSlice } from '../components/charts/CategoryDon
 import { Globe, type GlobeMark } from '../components/charts/Globe'
 import { ExpenseList } from '../components/ExpenseList'
 import { ExpenseSheet } from '../components/ExpenseSheet'
-import { Card, Notice, StatTile } from '../components/ui'
+import { TripForm } from '../components/TripForm'
+import { Card, Notice, StatTile, useToast } from '../components/ui'
 import { formatDate } from '../domain/dates'
 import { formatEuro } from '../domain/money'
 import { tripPlaces, tripStats, tripsByYear } from '../domain/selectors'
@@ -19,11 +20,14 @@ import type { Expense } from '../domain/types'
 import { usePageData } from './usePageData'
 
 export function Vacanze(): ReactNode {
-  const { config, dataset, view, lookup, chart } = usePageData()
+  const { config, dataset, view, lookup, chart, addTrip, updateTrip } = usePageData()
+  const toast = useToast()
   const person = view.person
   const [selectedTrip, setSelectedTrip] = useState<string | null>(null)
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
+  const [creating, setCreating] = useState(false)
   const detail = useRef<HTMLElement | null>(null)
+  const tripIds = useMemo(() => new Set(dataset.trips.map((t) => t.id)), [dataset.trips])
 
   /*
    * Il dettaglio di un viaggio si apre sotto l'elenco, cioè mille pixel più in
@@ -92,10 +96,34 @@ export function Vacanze(): ReactNode {
             <h1>🌍 Vacanze</h1>
           </div>
         </div>
-        <Notice>
-          Nessun viaggio ancora registrato. Al prossimo import si aggiungono i viaggi con luogo,
-          anno e date, e questa pagina si popola da sé.
-        </Notice>
+        <Card
+          title="Nessun viaggio ancora"
+          note="Aprine uno adesso, oppure lascia che sia il prossimo import a portarli"
+          action={
+            creating ? null : (
+              <button type="button" className="btn btn-sm" onClick={() => setCreating(true)}>
+                Nuova vacanza
+              </button>
+            )
+          }
+        >
+          {creating ? (
+            <TripForm
+              takenIds={tripIds}
+              onCreate={(candidate) => {
+                addTrip(candidate)
+                setCreating(false)
+                toast.show(`Vacanza «${candidate.name}» aperta.`)
+              }}
+              onCancel={() => setCreating(false)}
+              onProblem={(message) => toast.show(message)}
+            />
+          ) : (
+            <p className="empty">
+              Un viaggio nuovo diventa subito un tricount in cui inserire spese.
+            </p>
+          )}
+        </Card>
       </>
     )
   }
@@ -192,7 +220,32 @@ export function Vacanze(): ReactNode {
           </Card>
         ) : null}
 
-        <Card title="Quanto è costato ogni viaggio" note="Tocca un viaggio per aprirlo">
+        <Card
+          title="Quanto è costato ogni viaggio"
+          note="Tocca un viaggio per aprirlo"
+          action={
+            creating ? null : (
+              <button type="button" className="btn btn-sm" onClick={() => setCreating(true)}>
+                Nuova vacanza
+              </button>
+            )
+          }
+        >
+          {creating ? (
+            <div style={{ marginBottom: 12 }}>
+              <TripForm
+                takenIds={tripIds}
+                onCreate={(candidate) => {
+                  addTrip(candidate)
+                  setCreating(false)
+                  setSelectedTrip(candidate.id)
+                  toast.show(`Vacanza «${candidate.name}» aperta.`)
+                }}
+                onCancel={() => setCreating(false)}
+                onProblem={(message) => toast.show(message)}
+              />
+            </div>
+          ) : null}
           <div className="stack" style={{ gap: 6 }}>
             {shown.map((entry) => (
               <button
@@ -218,6 +271,7 @@ export function Vacanze(): ReactNode {
                     </span>
                     <span aria-hidden="true">·</span>
                     <span>{entry.count} voci</span>
+                    {entry.trip.closed ? <span className="chip">conclusa</span> : null}
                   </span>
                 </span>
                 <span className="list-amount">
@@ -254,11 +308,42 @@ export function Vacanze(): ReactNode {
             }
             note={`${formatDate(trip.trip.start)} — ${formatDate(trip.trip.end)} · ${trip.days} giorni`}
             action={
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelectedTrip(null)}>
-                Chiudi
-              </button>
+              <div className="row" style={{ gap: 6 }}>
+                {/*
+                 * «Conclusa» toglie la vacanza dal menù dove si inserisce una
+                 * spesa, e non c'entra col saldo: una vacanza finita può avere
+                 * ancora un debito aperto, e deve restare nel Saldo mentre
+                 * sparisce da qui. → ADR-0027
+                 */}
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => {
+                    const closed = trip.trip.closed !== true
+                    updateTrip(trip.trip.id, { closed })
+                    toast.show(
+                      closed
+                        ? 'Vacanza conclusa: non comparirà fra i tricount in cui inserire una spesa.'
+                        : 'Vacanza riaperta.',
+                    )
+                  }}
+                >
+                  {trip.trip.closed ? 'Riapri' : 'È conclusa'}
+                </button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelectedTrip(null)}>
+                  Chiudi
+                </button>
+              </div>
             }
           >
+            {trip.trip.closed ? (
+              <div style={{ marginBottom: 12 }}>
+                <Notice icon="✓">
+                  Vacanza conclusa: resta qui e nel saldo, ma non si possono più aggiungere spese
+                  (riaprila per farlo).
+                </Notice>
+              </div>
+            ) : null}
             <div className="kpi-row" style={{ marginBottom: 14 }}>
               {/* Senza centesimi: su telefono «[cifra rimossa]» non ci sta nella piastrella
                   e viene troncato. I centesimi esatti stanno nelle righe qui sotto. */}

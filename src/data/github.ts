@@ -8,7 +8,7 @@
  */
 
 import type { GithubConfig } from '../domain/types'
-import { fromBase64, toBase64 } from './envelope'
+import { fromBase64 } from './envelope'
 
 const API = 'https://api.github.com'
 const TOKEN_KEY = 'margine.gh.token.v1'
@@ -47,8 +47,12 @@ function apiHeaders(token: string, accept = 'application/vnd.github+json'): Head
   }
 }
 
-function contentsUrl(cfg: GithubConfig): string {
-  return `${API}/repos/${cfg.owner}/${cfg.repo}/contents/${cfg.dataPath}`
+function repoUrl(cfg: GithubConfig): string {
+  return `${API}/repos/${cfg.owner}/${cfg.repo}`
+}
+
+function contentsUrl(cfg: GithubConfig, path: string = cfg.dataPath): string {
+  return `${repoUrl(cfg)}/contents/${path}`
 }
 
 async function failure(response: Response): Promise<GithubError> {
@@ -85,9 +89,13 @@ export interface RemoteFile {
   text: string
 }
 
-/** Legge il file dal repo. `null` se non esiste ancora. */
-export async function getFile(cfg: GithubConfig, token: string): Promise<RemoteFile | null> {
-  const url = `${contentsUrl(cfg)}?ref=${encodeURIComponent(cfg.branch)}`
+/** Legge un file dal repo. `null` se non esiste ancora. */
+export async function getFile(
+  cfg: GithubConfig,
+  token: string,
+  path: string = cfg.dataPath,
+): Promise<RemoteFile | null> {
+  const url = `${contentsUrl(cfg, path)}?ref=${encodeURIComponent(cfg.branch)}`
   const response = await fetch(url, { headers: apiHeaders(token), cache: 'no-store' })
   if (response.status === 404) return null
   if (!response.ok) throw await failure(response)
@@ -108,24 +116,86 @@ export async function getFile(cfg: GithubConfig, token: string): Promise<RemoteF
   return { sha: body.sha, text: await raw.text() }
 }
 
-export async function putFile(
+// ─────────────────────── più file, un commit solo ───────────────────────
+
+/**
+ * Scrive più file in **un commit unico**, con la Git Data API.
+ *
+ * La Contents API scrive un file per chiamata, quindi due file sono due commit —
+ * e fra i due c'è un istante in cui il repo è incoerente con sé stesso. Non è
+ * teoria: cancellare una categoria cambia insieme `config.json.enc` (la
+ * categoria non c'è più) ed `expenses.json.enc` (le trenta spese sono state
+ * spostate), e chi scarica l'app in quell'istante vede spese che puntano a una
+ * categoria inesistente, o una categoria svuotata che invece ha ancora le sue
+ * spese. Con quattro chiamate in più il commit è uno e quell'istante non esiste.
+ * → ADR-0025
+ *
+ * Il verso opposto — un file solo — passa da qui ugualmente: due strade per
+ * scrivere sarebbero due comportamenti da tenere allineati.
+ */
+export async function commitFiles(
   cfg: GithubConfig,
   token: string,
-  args: { text: string; sha: string | null; message: string },
+  args: { files: readonly { path: string; text: string }[]; message: string },
 ): Promise<{ sha: string }> {
-  const response = await fetch(contentsUrl(cfg), {
-    method: 'PUT',
-    headers: { ...apiHeaders(token), 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      message: args.message,
-      content: toBase64(new TextEncoder().encode(args.text)),
-      branch: cfg.branch,
-      ...(args.sha ? { sha: args.sha } : {}),
-    }),
+  if (args.files.length === 0) throw new GithubError(400, 'Nessun file da scrivere.')
+
+  const json = { ...apiHeaders(token), 'Content-Type': 'application/json' }
+  const post = async <T>(path: string, body: unknown): Promise<T> => {
+    const response = await fetch(`${repoUrl(cfg)}${path}`, {
+      method: 'POST',
+      headers: json,
+      body: JSON.stringify(body),
+    })
+    if (!response.ok) throw await failure(response)
+    return (await response.json()) as T
+  }
+
+  const refPath = `/git/ref/heads/${encodeURIComponent(cfg.branch)}`
+  const refResponse = await fetch(`${repoUrl(cfg)}${refPath}`, {
+    headers: apiHeaders(token),
+    cache: 'no-store',
   })
-  if (!response.ok) throw await failure(response)
-  const body = (await response.json()) as { content?: { sha?: string } }
-  return { sha: body.content?.sha ?? '' }
+  if (!refResponse.ok) throw await failure(refResponse)
+  const ref = (await refResponse.json()) as { object?: { sha?: string } }
+  const head = ref.object?.sha
+  if (!head) throw new GithubError(500, `Il branch ${cfg.branch} non ha una testa leggibile.`)
+
+  const blobs = await Promise.all(
+    args.files.map((file) =>
+      post<{ sha: string }>('/git/blobs', { content: file.text, encoding: 'utf-8' }),
+    ),
+  )
+
+  const tree = await post<{ sha: string }>('/git/trees', {
+    base_tree: head,
+    tree: args.files.map((file, index) => ({
+      path: file.path,
+      mode: '100644',
+      type: 'blob',
+      sha: blobs[index]?.sha,
+    })),
+  })
+
+  const commit = await post<{ sha: string }>('/git/commits', {
+    message: args.message,
+    tree: tree.sha,
+    parents: [head],
+  })
+
+  /*
+   * `force: false`: se un altro dispositivo ha committato mentre lavoravamo, il
+   * ref non è più un avanzamento del nostro padre e GitHub rifiuta con 422. È lo
+   * stesso rilevamento di conflitto dello `sha` della Contents API, e chi chiama
+   * lo tratta allo stesso modo — rilegge e riprova.
+   */
+  const update = await fetch(`${repoUrl(cfg)}/git/refs/heads/${encodeURIComponent(cfg.branch)}`, {
+    method: 'PATCH',
+    headers: json,
+    body: JSON.stringify({ sha: commit.sha, force: false }),
+  })
+  if (!update.ok) throw await failure(update)
+  return { sha: commit.sha }
 }
 
 export interface AccessCheck {

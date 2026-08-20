@@ -17,6 +17,7 @@ import {
   type MonthKey,
 } from './dates'
 import { round2, sumBy, toCents } from './money'
+import { ledgerKeyOf } from './expense-rules'
 import type { Expense, PersonId, Settlement, Source, Trip } from './types'
 
 export interface ViewOptions {
@@ -600,11 +601,29 @@ export interface BalanceStart {
   note?: string
 }
 
-/** A quale tricount appartiene una spesa: le vacanze ne hanno uno per viaggio. */
-export function balanceGroupOf(expense: Expense): string {
-  return expense.source === 'vacanze' && expense.trip
-    ? `vacanze/${expense.trip}`
-    : expense.source
+/**
+ * La quota che l'altra persona deve per quella spesa. Zero se il conto l'ha
+ * anticipato qualcuno fuori dalla coppia: non è un debito fra voi due.
+ */
+export function owedOf(expense: Expense): number {
+  if (expense.paidBy === 'others') return 0
+  return expense.paidBy === 'me' ? expense.shares.partner : expense.shares.me
+}
+
+/**
+ * Quanto quella spesa sposta il saldo, col segno fisso del calcolo: positivo =
+ * `partner` deve a `me`.
+ *
+ * Serve due volte, e la seconda è la ragione per cui è una funzione: spostare
+ * una spesa da un tricount a un altro muove **questo** numero da un gruppo
+ * all'altro, e il foglio lo dice prima di farlo.
+ */
+export function balanceDeltaOf(expense: Expense): number {
+  const owed = owedOf(expense)
+  /* Senza questo `-0` esce da qui e diventa «−0,00 €» a schermo, che è un segno
+     meno davanti al niente. */
+  if (toCents(owed) === 0) return 0
+  return expense.paidBy === 'me' ? owed : -owed
 }
 
 interface Bucket {
@@ -660,9 +679,9 @@ export function coupleBalance(
   for (const key of Object.keys(opts.groups ?? {})) bucketOf(key)
 
   for (const expense of allExpenses) {
-    const key = balanceGroupOf(expense)
+    const key = ledgerKeyOf(expense)
     const bucket = bucketOf(key)
-    const owed = expense.paidBy === 'me' ? expense.shares.partner : expense.shares.me
+    const owed = owedOf(expense)
     if (expense.paidBy !== 'others' && toCents(owed) !== 0) bucket.history += 1
 
     /* Il punto di partenza è compreso: quello che c'era fino a quel giorno sta

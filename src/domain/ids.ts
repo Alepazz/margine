@@ -22,25 +22,44 @@ export function newSettlementId(date: string): string {
   return `rimborso-${date}-${randomHex(3)}`
 }
 
-/**
- * Id di un viaggio: leggibile, perché compare nei dati in chiaro durante la
- * sessione mensile e ci si deve capire a occhio di che viaggio si parla.
- */
-export function newTripId(name: string, year: number, taken: ReadonlySet<string>): string {
-  const slug =
-    name
+/** Da un nome a uno slug leggibile: senza accenti, senza spazi, minuscolo. */
+function slugify(text: string, fallback: string, max: number): string {
+  return (
+    text
       .toLowerCase()
       .normalize('NFD')
       .replace(/[̀-ͯ]/g, '')
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
-      .slice(0, 24) || 'viaggio'
-  const base = `${slug}-${year}`
+      .slice(0, max) || fallback
+  )
+}
+
+/** Il primo `base`, `base-2`, `base-3`… che non sia già preso. */
+function firstFree(base: string, taken: ReadonlySet<string>): string {
   if (!taken.has(base)) return base
-  /* Due viaggi nello stesso posto e nello stesso anno: succede. */
   for (let n = 2; n < 100; n += 1) {
     const candidate = `${base}-${n}`
     if (!taken.has(candidate)) return candidate
   }
   return `${base}-${randomHex(2)}`
+}
+
+/**
+ * Id di un viaggio: leggibile, perché compare nei dati in chiaro durante la
+ * sessione mensile e ci si deve capire a occhio di che viaggio si parla.
+ */
+export function newTripId(name: string, year: number, taken: ReadonlySet<string>): string {
+  /* Due viaggi nello stesso posto e nello stesso anno: succede. */
+  return firstFree(`${slugify(name, 'viaggio', 24)}-${year}`, taken)
+}
+
+/**
+ * Id di una categoria creata dall'app.
+ *
+ * Non porta l'anno come i viaggi: una categoria non ha una data, e l'id resta
+ * scritto in ogni spesa che la usa — `spesa-2026` invecchierebbe male.
+ */
+export function newCategoryId(label: string, taken: ReadonlySet<string>): string {
+  return firstFree(slugify(label, 'categoria', 20), taken)
 }

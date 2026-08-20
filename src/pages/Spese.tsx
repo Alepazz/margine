@@ -24,7 +24,7 @@ import {
   type ExpenseFilter,
   type SortKey,
 } from '../domain/selectors'
-import { SOURCES, SOURCE_LABELS, type Expense, type PersonId, type Source } from '../domain/types'
+import { SOURCES, type Expense, type PersonId, type Source } from '../domain/types'
 import { usePageData } from './usePageData'
 
 const PAGE_SIZE = 80
@@ -130,7 +130,7 @@ export function Spese(): ReactNode {
             <option value="all">Tutti i tricount</option>
             {SOURCES.map((source) => (
               <option key={source} value={source}>
-                {SOURCE_LABELS[source]}
+                {lookup.sourceLabel(source)}
               </option>
             ))}
           </select>

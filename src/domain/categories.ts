@@ -9,7 +9,7 @@
  */
 
 import type { CategorySlice } from './selectors'
-import { SOURCE_LABELS, type Category, type Source } from './types'
+import { sourceLabelOf, type Category, type Source } from './types'
 import type { ChartTheme } from '../theme/palette'
 
 export const REST_KEY = '__altre__'
@@ -33,15 +33,21 @@ export interface CategoryLookup {
 export function buildCategoryLookup(
   categories: readonly Category[],
   theme: ChartTheme,
+  /** I nomi veri dei tricount, dai dati. Quello che manca ricade sul generico. */
+  sourceLabels: Partial<Record<Source, string>> = {},
 ): CategoryLookup {
   const byId = new Map(categories.map((c) => [c.id, c]))
 
+  /*
+   * Solo uno `slot` dichiarato dà un colore. Prima, una categoria senza slot lo
+   * ereditava dalla propria posizione nell'elenco: finché le prime otto lo
+   * avevano tutte dichiarato era codice morto, ma da quando le categorie si
+   * creano dall'app una categoria nuova inserita fra le prime otto avrebbe
+   * preso in silenzio la tinta di un'altra. → ADR-0029
+   */
   const slotOf = (id: string): number | undefined => {
-    const category = byId.get(id)
-    if (!category) return undefined
-    if (typeof category.slot === 'number') return category.slot
-    const index = categories.findIndex((c) => c.id === id)
-    return index >= 0 && index < theme.series.length ? index : undefined
+    const slot = byId.get(id)?.slot
+    return typeof slot === 'number' ? slot : undefined
   }
 
   return {
@@ -62,8 +68,50 @@ export function buildCategoryLookup(
       const sub = byId.get(categoryId)?.subcategories?.find((s) => s.id === subId)
       return sub?.label ?? subId
     },
-    sourceLabel: (source) => SOURCE_LABELS[source],
+    sourceLabel: (source) => sourceLabelOf(sourceLabels, source),
   }
+}
+
+/** Quante tinte categoriali esistono. Non è un numero da alzare a occhio: → ADR-0029 */
+export const SLOT_COUNT = 8
+
+/**
+ * Assegna uno slot di colore a una categoria, **scambiandolo** con chi lo aveva.
+ *
+ * Lo scambio non è un vezzo: due categorie sullo stesso slot avrebbero la stessa
+ * tinta in tutti i grafici, e nel grafico a barre impilate diventerebbero due
+ * segmenti confinanti identici. Chi cede lo slot prende quello che aveva l'altra
+ * — spesso nessuno, e allora finisce in «Altre voci», che è la verità.
+ */
+export function withSlot(
+  categories: readonly Category[],
+  id: string,
+  slot: number | undefined,
+): Category[] {
+  const target = categories.find((c) => c.id === id)
+  if (!target) return [...categories]
+  const previous = target.slot
+  const holder = slot === undefined ? undefined : categories.find((c) => c.slot === slot && c.id !== id)
+
+  return categories.map((category) => {
+    const next = { ...category }
+    if (category.id === id) {
+      if (slot === undefined) delete next.slot
+      else next.slot = slot
+    } else if (holder && category.id === holder.id) {
+      if (previous === undefined) delete next.slot
+      else next.slot = previous
+    }
+    return next
+  })
+}
+
+/**
+ * Le categorie che una spesa può ancora usare dopo aver cancellato `id`, e dove
+ * si possono spostare le sue spese.
+ */
+export function categoriesWithout(categories: readonly Category[], id: string): Category[] {
+  return categories.filter((category) => category.id !== id)
 }
 
 /**

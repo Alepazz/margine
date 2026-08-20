@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { presetOf, sharesFor, splitFor } from './expense-rules'
+import { ledgerKeyOf, ledgerOptions, ledgerParts, presetOf, sharesFor, splitFor } from './expense-rules'
 import { toCents } from './money'
-import type { Expense, Payer, PersonId } from './types'
+import type { Expense, Payer, PersonId, Source, Trip } from './types'
 
 describe('come si divide una spesa', () => {
   it('«tutta mia» parla di chi guarda, non di una chiave fissa', () => {
@@ -108,5 +108,61 @@ describe('la traduzione fra chi guarda e le chiavi fisse', () => {
   it('scambia le quote solo per chi non è «me»', () => {
     expect(sharesFor('me', 10, 20)).toEqual({ me: 10, partner: 20 })
     expect(sharesFor('partner', 10, 20)).toEqual({ me: 20, partner: 10 })
+  })
+})
+
+describe('la chiave del tricount', () => {
+  const trip = (id: string, start: string, closed?: boolean): Trip => ({
+    id,
+    name: id,
+    place: id,
+    year: Number(start.slice(0, 4)),
+    start,
+    end: start,
+    ...(closed ? { closed } : {}),
+  })
+
+  it('va e torna: chiave → campi → chiave', () => {
+    for (const key of ['fisse', 'personali', 'condivise', 'vacanze/creta-2025']) {
+      expect(ledgerKeyOf(ledgerParts(key) as { source: Source; trip?: string })).toBe(key)
+    }
+  })
+
+  it('una spesa di vacanza senza viaggio non finge di averne uno', () => {
+    expect(ledgerKeyOf({ source: 'vacanze' })).toBe('vacanze')
+    expect(ledgerParts('vacanze')).toEqual({ source: 'vacanze' })
+  })
+
+  it('offre i tre tricount fissi più le vacanze aperte, dalla più recente', () => {
+    const options = ledgerOptions([
+      trip('vecchia-2024', '2024-05-01'),
+      trip('nuova-2026', '2026-07-01'),
+    ])
+    expect(options.map((o) => o.key)).toEqual([
+      'condivise',
+      'personali',
+      'fisse',
+      'vacanze/nuova-2026',
+      'vacanze/vecchia-2024',
+    ])
+  })
+
+  it('nasconde le vacanze concluse', () => {
+    const options = ledgerOptions([trip('finita-2024', '2024-05-01', true)])
+    expect(options.map((o) => o.key)).not.toContain('vacanze/finita-2024')
+  })
+
+  /*
+   * Il difetto che questo presidia: aprendo in correzione una spesa di una
+   * vacanza conclusa, un menù che non contiene il suo tricount mostrerebbe il
+   * primo della lista — e salvare la sposterebbe in un altro tricount senza che
+   * nessuno l'abbia chiesto.
+   */
+  it('ma tiene quella della spesa che si sta correggendo, marcata', () => {
+    const options = ledgerOptions([trip('finita-2024', '2024-05-01', true)], {
+      current: 'vacanze/finita-2024',
+    })
+    const found = options.find((o) => o.key === 'vacanze/finita-2024')
+    expect(found?.closed).toBe(true)
   })
 })

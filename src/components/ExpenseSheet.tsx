@@ -7,11 +7,14 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { useStore } from '../data/store'
-import { ExpenseForm } from './ExpenseForm'
 import type { CategoryLookup } from '../domain/categories'
 import { formatDate } from '../domain/dates'
-import { formatEuro } from '../domain/money'
+import { formatEuro, toCents } from '../domain/money'
+import { balanceDeltaOf } from '../domain/selectors'
+import { ledgerKeyOf, ledgerLabel, ledgerParts } from '../domain/expense-rules'
 import type { Expense } from '../domain/types'
+import { ExpenseForm } from './ExpenseForm'
+import { LedgerSelect } from './LedgerSelect'
 import { useToast } from './ui'
 
 /**
@@ -56,6 +59,118 @@ function TagToggle({
   )
 }
 
+/**
+ * Spostare una spesa da un tricount a un altro, che è quello che si vuole
+ * quando ci si accorge di aver scelto il gruppo sbagliato.
+ *
+ * Non è un cambio di etichetta: sposta un debito da un saldo a un altro, e sono
+ * saldi che si confrontano uno per uno con Tricount. Per questo il pannello dice
+ * **quanto** sposta prima di spostarlo, e per questo tre casi non passano
+ * silenziosamente:
+ *
+ * - fuori da una vacanza la quota di chi era con voi non esiste: se c'è, lo
+ *   spostamento si rifiuta invece di buttarla via;
+ * - in «Personale» una spesa è al 100% di una persona, quindi le quote si
+ *   rifanno — tenerle divise creerebbe un debito dentro un tricount che per
+ *   costruzione non ne ha;
+ * - `trip` si mette e si toglie insieme alla vacanza, altrimenti la validazione
+ *   rifiuta il salvataggio con un messaggio che non c'entra niente.
+ */
+function MovePanel({ expense, onDone }: { expense: Expense; onDone: () => void }): ReactNode {
+  const { config, dataset, updateExpense, view } = useStore()
+  const toast = useToast()
+  const current = ledgerKeyOf(expense)
+  const [target, setTarget] = useState(current)
+
+  const parts = ledgerParts(target)
+  const othersShare = expense.shares.others ?? 0
+  const blocked =
+    parts.source !== 'vacanze' && toCents(othersShare) > 0
+      ? 'Questa spesa ha una quota di chi era con voi, che esiste solo in vacanza: correggi le quote prima di spostarla.'
+      : null
+
+  const delta = balanceDeltaOf(expense)
+  const label = (key: string): string =>
+    ledgerLabel(key, dataset?.trips ?? [], config?.sourceLabels)
+
+  /**
+   * Come diventa la spesa dopo lo spostamento.
+   *
+   * `paidBy` **non si tocca**, ed è la correzione di un difetto vero: forzarlo su
+   * chi guarda cancellava il debito. Una spesa condivisa da 50 € pagata da
+   * Federica e portata in «Personale» vuol dire «era tutta mia, e l'ha pagata
+   * lei»: il debito passa da 25 a 50 €, non a zero. Chi ha pagato è un fatto
+   * accaduto, non una conseguenza del tricount in cui la spesa finisce.
+   */
+  const fieldsFor = (): Partial<Expense> => {
+    const fields: Partial<Expense> = { source: parts.source }
+    fields.trip = parts.source === 'vacanze' ? (parts.trip ?? '') : ''
+    if (parts.source === 'personali') {
+      const whole = expense.amount
+      fields.shares = view.person === 'me' ? { me: whole, partner: 0 } : { me: 0, partner: whole }
+    }
+    return fields
+  }
+
+  const after: Expense = { ...expense, ...fieldsFor() }
+  const deltaAfter = balanceDeltaOf(after)
+
+  const move = (): void => {
+    if (blocked || target === current) return
+    updateExpense(expense.id, fieldsFor())
+    toast.show(`Spostata in «${label(target)}».`)
+    onDone()
+  }
+
+  return (
+    <div className="stack" style={{ gap: 8 }}>
+      <div className="field">
+        <label className="label" htmlFor="move-ledger">
+          Sposta in
+        </label>
+        <LedgerSelect
+          id="move-ledger"
+          value={target}
+          trips={dataset?.trips ?? []}
+          sourceLabels={config?.sourceLabels}
+          onChange={setTarget}
+        />
+      </div>
+
+      {blocked ? (
+        <p className="delta is-bad">{blocked}</p>
+      ) : target !== current ? (
+        <p className="hint">
+          {toCents(delta) === 0 && toCents(deltaAfter) === 0
+            ? 'Il saldo non si muove: questa spesa non crea un debito fra voi.'
+            : toCents(delta) === toCents(deltaAfter)
+              ? `Sposta ${formatEuro(Math.abs(delta))} di debito da «${label(current)}» a «${label(target)}».`
+              : /* Le quote si rifanno, quindi il debito non si sposta uguale: dirlo
+                   prima, perché è il numero che poi si confronta con Tricount. */
+                `Il debito passa da «${label(current)}» a «${label(target)}» e cambia: qui vale ${formatEuro(
+                  Math.abs(delta),
+                )}, là diventa ${formatEuro(Math.abs(deltaAfter))}.`}
+          {parts.source === 'personali' ? ' In «Personale» la spesa diventa tutta tua.' : ''}
+        </p>
+      ) : null}
+
+      <div className="row" style={{ gap: 8 }}>
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          disabled={blocked !== null || target === current}
+          onClick={move}
+        >
+          Sposta
+        </button>
+        <button type="button" className="btn btn-sm" onClick={onDone}>
+          Annulla
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function isValidLink(value: string): boolean {
   try {
     const url = new URL(value)
@@ -77,6 +192,7 @@ export function ExpenseSheet({
   const { config, dataset, annotate, deleteExpense, view } = useStore()
   const toast = useToast()
   const [editing, setEditing] = useState(false)
+  const [moving, setMoving] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   /*
@@ -267,6 +383,9 @@ export function ExpenseSheet({
               <button type="button" className="btn" onClick={() => setEditing(true)}>
                 Modifica
               </button>
+              <button type="button" className="btn" onClick={() => setMoving((on) => !on)}>
+                Sposta di tricount
+              </button>
               <button
                 type="button"
                 className="btn btn-ghost"
@@ -276,6 +395,8 @@ export function ExpenseSheet({
               </button>
             </div>
           )}
+
+          {moving && !confirmingDelete ? <MovePanel expense={expense} onDone={() => setMoving(false)} /> : null}
 
           <TagToggle
             title="Spesa da 730"

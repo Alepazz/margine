@@ -252,6 +252,57 @@ export function Segmented<T extends string>({
   )
 }
 
+export interface TileOption {
+  value: string
+  label: string
+  emoji?: string
+}
+
+/**
+ * Scelta a riquadri con icona e testo: la categoria di una spesa, e il tipo
+ * dentro la categoria.
+ *
+ * È il fratello a griglia di `Segmented`, che sopra le quattro voci non regge:
+ * quattordici categorie in una barra sola diventerebbero quattordici colonne da
+ * ventisette pixel. Qui vanno a capo, e ogni riquadro resta un bersaglio da 44px.
+ */
+export function TilePicker({
+  options,
+  value,
+  onChange,
+  ariaLabel,
+}: {
+  options: readonly TileOption[]
+  /** `undefined` = niente scelto. Un riquadro già scelto, ritoccato, deseleziona. */
+  value: string | undefined
+  onChange: (value: string | undefined) => void
+  ariaLabel: string
+}): ReactNode {
+  return (
+    <div className="tiles" role="group" aria-label={ariaLabel}>
+      {options.map((option) => {
+        const chosen = option.value === value
+        return (
+          <button
+            key={option.value}
+            type="button"
+            className="tile"
+            aria-pressed={chosen}
+            onClick={() => onChange(chosen ? undefined : option.value)}
+          >
+            {option.emoji ? (
+              <span className="tile-emoji" aria-hidden="true">
+                {option.emoji}
+              </span>
+            ) : null}
+            <span className="tile-label">{option.label}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─────────────────────────── toast ───────────────────────────
 
 interface ToastApi {
