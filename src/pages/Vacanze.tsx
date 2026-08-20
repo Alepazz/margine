@@ -4,11 +4,11 @@
  * due viaggi di durata diversa.
  */
 
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { BarList } from '../components/charts/BarList'
 import { CategoryDonut, type DonutSlice } from '../components/charts/CategoryDonut'
-import { PersonSwitch } from '../components/Controls'
+import { Globe, type GlobeMark } from '../components/charts/Globe'
 import { ExpenseList } from '../components/ExpenseList'
 import { ExpenseSheet } from '../components/ExpenseSheet'
 import { Card, Notice, StatTile } from '../components/ui'
@@ -23,6 +23,22 @@ export function Vacanze(): ReactNode {
   const person = view.person
   const [selectedTrip, setSelectedTrip] = useState<string | null>(null)
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
+  const detail = useRef<HTMLElement | null>(null)
+
+  /*
+   * Il dettaglio di un viaggio si apre sotto l'elenco, cioè mille pixel più in
+   * basso: senza portarlo a vista, toccare un puntino sul mappamondo sembra non
+   * fare niente. Si scorre solo se non è già dove si sta guardando, altrimenti
+   * la pagina saltella a ogni tocco.
+   */
+  useEffect(() => {
+    if (!selectedTrip) return
+    const node = detail.current
+    if (!node) return
+    const top = node.getBoundingClientRect().top
+    if (top >= 0 && top < window.innerHeight * 0.6) return
+    node.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [selectedTrip])
 
   const stats = useMemo(
     () => tripStats(dataset.expenses, dataset.trips, person),
@@ -38,6 +54,22 @@ export function Vacanze(): ReactNode {
   const places = useMemo(() => tripPlaces(shown), [shown])
 
   const trip = shown.find((t) => t.trip.id === selectedTrip) ?? null
+
+  /* Solo i viaggi che sanno dove sono: gli altri restano nell'elenco sotto. */
+  const marks = useMemo<GlobeMark[]>(
+    () =>
+      shown
+        .filter((entry) => entry.trip.coords)
+        .map((entry) => ({
+          trip: entry.trip,
+          lat: entry.trip.coords?.lat ?? 0,
+          lon: entry.trip.coords?.lon ?? 0,
+          approx: entry.trip.coords?.approx === true,
+          label: entry.trip.name,
+        })),
+    [shown],
+  )
+  const senzaPosto = shown.filter((entry) => !entry.trip.coords)
 
   /* Una sola famiglia di voci: rampa a un colore, come per il gatto, non tinte diverse. */
   const tripSlices = useMemo<DonutSlice[]>(
@@ -77,9 +109,6 @@ export function Vacanze(): ReactNode {
             {shown.length} {shown.length === 1 ? 'viaggio' : 'viaggi'} · quota di{' '}
             {config.people[person].name}
           </p>
-        </div>
-        <div className="row" style={{ marginLeft: 'auto' }}>
-          <PersonSwitch />
         </div>
       </div>
 
@@ -137,6 +166,32 @@ export function Vacanze(): ReactNode {
           />
         </div>
 
+        {marks.length > 0 ? (
+          <Card
+            title="Dove siete stati"
+            note={`${marks.length} ${marks.length === 1 ? 'viaggio' : 'viaggi'} sul mappamondo · trascina per girarlo, pizzica per avvicinarlo, tocca un puntino per aprirlo`}
+          >
+            <Globe
+              marks={marks}
+              selected={selectedTrip}
+              onSelect={(id) => setSelectedTrip((current) => (current === id ? null : id))}
+            />
+            <div className="card-foot">
+              {/* I nomi si leggono dai dati: scriverli a mano qui vorrebbe dire
+                  che il componente conosce i viaggi di qualcuno in particolare. */}
+              {marks.some((m) => m.approx)
+                ? `Il cerchio intorno a un puntino vuol dire posizione approssimata — una regione o un paese non hanno un punto, quindi sta al centro: ${marks
+                    .filter((m) => m.approx)
+                    .map((m) => m.label)
+                    .join(', ')}. Si corregge nelle coordinate del viaggio.`
+                : 'Ogni puntino è un viaggio.'}
+              {senzaPosto.length > 0
+                ? ` ${senzaPosto.length} ${senzaPosto.length === 1 ? 'viaggio non ha' : 'viaggi non hanno'} coordinate e ${senzaPosto.length === 1 ? 'sta' : 'stanno'} solo nell'elenco qui sotto.`
+                : ''}
+            </div>
+          </Card>
+        ) : null}
+
         <Card title="Quanto è costato ogni viaggio" note="Tocca un viaggio per aprirlo">
           <div className="stack" style={{ gap: 6 }}>
             {shown.map((entry) => (
@@ -190,6 +245,8 @@ export function Vacanze(): ReactNode {
 
         {trip ? (
           <Card
+            className="scroll-target"
+            ref={detail}
             title={
               trip.trip.place === trip.trip.name
                 ? trip.trip.name

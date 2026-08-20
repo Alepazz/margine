@@ -12,6 +12,20 @@ const PEOPLE = ['me', 'partner']
 const PAYERS = ['me', 'partner', 'others']
 const DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/
 
+/**
+ * La forma non basta: `2026-02-31` supera la regex e non esiste. Il calendario
+ * lo sa solo `Date`, quindi si costruisce la data e si controlla che non sia
+ * stata riportata avanti da sé.
+ */
+function isDate(value) {
+  if (!DATE_RE.test(value ?? '')) return false
+  const [year, month, day] = value.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return (
+    date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+  )
+}
+
 const cents = (value) => Math.round(value * 100)
 
 export function validateDataset(dataset, config) {
@@ -38,11 +52,35 @@ export function validateDataset(dataset, config) {
     for (const field of ['name', 'place', 'start', 'end']) {
       if (!trip[field]) errors.push(`${where}: manca «${field}».`)
     }
-    if (trip.start && !DATE_RE.test(trip.start)) errors.push(`${where}: data di inizio non valida (${trip.start}).`)
-    if (trip.end && !DATE_RE.test(trip.end)) errors.push(`${where}: data di fine non valida (${trip.end}).`)
+    if (trip.start && !isDate(trip.start)) errors.push(`${where}: data di inizio non valida (${trip.start}).`)
+    if (trip.end && !isDate(trip.end)) errors.push(`${where}: data di fine non valida (${trip.end}).`)
     if (trip.start && trip.end && trip.end < trip.start) errors.push(`${where}: finisce prima di cominciare.`)
     if (trip.start && trip.year !== Number(trip.start.slice(0, 4))) {
       warnings.push(`${where}: l'anno (${trip.year}) non coincide con la data di inizio (${trip.start}).`)
+    }
+  }
+
+  /*
+   * I rimborsi fra le due persone. Non sono spese e non entrano in nessun
+   * totale: spostano solo il saldo. Il campo può mancare nei file scritti prima
+   * di ADR-0019, e allora è una lista vuota.
+   */
+  const settlements = Array.isArray(dataset.settlements) ? dataset.settlements : []
+  const seenSettlements = new Set()
+  for (const settlement of settlements) {
+    const where = `rimborso ${settlement.id ?? '(senza id)'}`
+    if (!settlement.id) errors.push(`${where}: manca l'id.`)
+    else if (seenSettlements.has(settlement.id)) errors.push(`id di rimborso duplicato: ${settlement.id}.`)
+    else seenSettlements.add(settlement.id)
+
+    if (!isDate(settlement.date)) errors.push(`${where}: data non valida (${settlement.date}).`)
+    if (!PEOPLE.includes(settlement.from)) errors.push(`${where}: «from» non valido (${settlement.from}).`)
+    if (!PEOPLE.includes(settlement.to)) errors.push(`${where}: «to» non valido (${settlement.to}).`)
+    if (settlement.from === settlement.to) errors.push(`${where}: da e verso la stessa persona.`)
+    if (typeof settlement.amount !== 'number' || !Number.isFinite(settlement.amount)) {
+      errors.push(`${where}: importo non valido.`)
+    } else if (settlement.amount <= 0) {
+      errors.push(`${where}: importo non positivo (${settlement.amount}).`)
     }
   }
 
@@ -53,7 +91,7 @@ export function validateDataset(dataset, config) {
     else if (seenIds.has(expense.id)) errors.push(`id duplicato: ${expense.id}.`)
     else seenIds.add(expense.id)
 
-    if (!DATE_RE.test(expense.date ?? '')) errors.push(`${where}: data non valida (${expense.date}).`)
+    if (!isDate(expense.date)) errors.push(`${where}: data non valida (${expense.date}).`)
     if (typeof expense.title !== 'string' || expense.title.trim() === '') {
       errors.push(`${where}: manca la descrizione.`)
     }
@@ -143,7 +181,59 @@ export function validateDataset(dataset, config) {
     }
   }
 
+  checkBalanceGroups(dataset, config, errors, warnings)
+
   return { errors, warnings, report: buildReport(dataset) }
+}
+
+/**
+ * I punti di partenza del saldo, uno per tricount.
+ *
+ * Una chiave scritta male — `vacanze/creta2025` invece di `vacanze/creta-2025` —
+ * creerebbe un tricount fantasma con un saldo dichiarato e lascerebbe quello
+ * vero non dichiarato, **in silenzio**: il totale cambierebbe e niente lo
+ * direbbe. Qui la chiave si confronta con i tricount che esistono davvero.
+ * → ADR-0022
+ */
+function checkBalanceGroups(dataset, config, errors, warnings) {
+  const groups = config?.balance?.groups
+  if (!groups) return
+
+  const known = new Set(SOURCES)
+  for (const trip of dataset.trips) known.add(`vacanze/${trip.id}`)
+
+  for (const [key, start] of Object.entries(groups)) {
+    const where = `balance.groups.${key}`
+    if (!known.has(key)) {
+      errors.push(
+        `${where}: non è un tricount che esiste. Attesi: ${[...known].sort().join(', ')}.`,
+      )
+      continue
+    }
+    if (typeof start?.opening !== 'number' || !Number.isFinite(start.opening)) {
+      errors.push(`${where}: «opening» deve essere un numero.`)
+    }
+    if (typeof start?.since !== 'string' || !isDate(start.since)) {
+      errors.push(`${where}: «since» deve essere una data AAAA-MM-GG vera.`)
+    }
+  }
+
+  /* Un tricount con dei debiti e senza punto di partenza non è un errore — la
+     pagina lo dichiara — ma vale la pena dirlo qui, dove si guarda una volta al
+     mese. */
+  const owing = new Set()
+  for (const expense of dataset.expenses) {
+    if (expense.paidBy === 'others') continue
+    const owed = expense.paidBy === 'me' ? expense.shares.partner : expense.shares.me
+    if (Math.round(owed * 100) === 0) continue
+    owing.add(expense.source === 'vacanze' && expense.trip ? `vacanze/${expense.trip}` : expense.source)
+  }
+  const missing = [...owing].filter((key) => !groups[key]).sort()
+  if (missing.length > 0) {
+    warnings.push(
+      `balance.groups: ${missing.length} tricount senza punto di partenza (${missing.join(', ')}): il saldo li conta dalla data di ripiego, quindi non è confrontabile con Tricount.`,
+    )
+  }
 }
 
 /** Totali per mese e per origine: sono i numeri da confrontare con Tricount. */

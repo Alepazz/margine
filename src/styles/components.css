@@ -146,6 +146,29 @@
   color: var(--ink-3);
 }
 
+/*
+ * Il numero grande è anche il comando che oscura i guadagni: si tocca dov'è già
+ * l'occhio, e la testata non deve trovare posto per una quarta icona. Resta un
+ * bottone spogliato — nessuna cornice, nessun colore proprio — perché la sua
+ * apparenza deve restare quella del numero.
+ */
+button.hero-value {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+}
+
+button.hero-value:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
 .hero-hint {
   font-size: 0.88rem;
   color: var(--ink-2);
@@ -189,6 +212,20 @@
 
 .meter-fill.is-sconosciuto {
   background: var(--series-rest);
+}
+
+/*
+ * Guadagni oscurati: la barra è piena e neutra. Un riempimento parziale **è**
+ * la quota spesa, quindi mostrarlo vanificherebbe l'oscuramento; una barra
+ * vuota invece direbbe il falso, cioè «non hai speso niente». Piena e senza
+ * tinta di stato si legge come decorazione, che è quello che è.
+ */
+.meter-fill.is-hidden {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--line-strong) 0 4px,
+    var(--surface-sunken) 4px 8px
+  );
 }
 
 /* Proiezione di fine mese: dove arriveresti a questo ritmo. */
@@ -318,6 +355,8 @@
 /* Controllo segmentato: persona, vacanze sì/no, ordinamento. */
 .segmented {
   display: inline-flex;
+  /* Non sborda mai dal contenitore, qualunque siano le etichette. */
+  max-width: 100%;
   padding: 2px;
   gap: 2px;
   background: var(--surface-2);
@@ -344,6 +383,19 @@
   background: var(--surface);
   color: var(--ink);
   box-shadow: 0 1px 2px rgba(16, 24, 32, 0.12);
+}
+
+/*
+ * Quattro voci o più: si stringono e, se proprio non ci stanno, si accorciano
+ * con i puntini. Meglio un'etichetta abbreviata che una quarta scelta tagliata
+ * fuori dallo schermo, che di fatto non esiste.
+ */
+.segmented.is-tight .segmented-option {
+  flex: 0 1 auto;
+  min-width: 0;
+  justify-content: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .avatar {
@@ -449,6 +501,17 @@
 
 .list-row:hover {
   background: var(--surface-2);
+}
+
+/*
+ * Righe che non si aprono: i movimenti del saldo sono un registro, non un
+ * elenco navigabile. Restano nella stessa forma per non inventare un secondo
+ * modo di disegnare una lista, ma senza fingere di essere toccabili.
+ */
+.list-row.is-static,
+.list-row.is-static:hover {
+  cursor: default;
+  background: transparent;
 }
 
 .list-main {
@@ -761,6 +824,261 @@
   color: var(--paper);
 }
 
+/*
+ * Chi guarda, nella testata dell'applicazione: una lente globale, quindi un
+ * posto solo invece di sei copie nelle testate di pagina.
+ */
+.person-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  width: auto;
+}
+
+.person-button-name {
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+/*
+ * Una casella che si accende, non due pulsanti affiancati: due opzioni per dire
+ * una cosa che ha due stati occupavano una riga intera.
+ */
+.chip-toggle {
+  cursor: pointer;
+  padding: 4px 10px;
+  min-height: 32px;
+  font-size: 0.8rem;
+}
+
+.chip-toggle.is-on {
+  border-color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  color: var(--ink);
+}
+
+.chip-toggle:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* ────────────────── modulo di inserimento ────────────────── */
+
+/*
+ * Campi appaiati quando ci stanno, uno sotto l'altro quando no. `1fr` e non
+ * `auto`: due colonne di larghezza diversa fanno ballare le etichette.
+ */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+@media (min-width: 420px) {
+  .form-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/*
+ * Il pulsante che aggiunge, al centro dell'isola. Rialzato e pieno: è l'unica
+ * azione della barra, tutto il resto è navigazione, e la differenza si deve
+ * vedere senza leggere.
+ */
+.tabbar-add {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 52px;
+  height: 52px;
+  margin: 0 2px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 1.6rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 14px -4px rgba(16, 24, 32, 0.5);
+  transition: transform 0.16s var(--ease);
+}
+
+.tabbar-add:active {
+  transform: scale(0.94);
+}
+
+.tabbar-add:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+/* ────────────────── menu delle altre viste ────────────────── */
+
+.menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* Bersaglio pieno: in un elenco si tocca la riga, non la parola. */
+  min-height: 52px;
+  padding: 8px 12px;
+  border-radius: var(--r-md);
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.menu-item:hover {
+  background: var(--surface-2);
+  text-decoration: none;
+}
+
+.menu-item.is-active {
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+}
+
+.menu-glyph {
+  font-size: 1.25rem;
+  line-height: 1;
+  width: 1.6rem;
+  text-align: center;
+}
+
+/* Sei su una vista che vive nel menu: il pulsante nella testata lo dice. */
+.topbar-more.is-active {
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  color: var(--ink);
+}
+
+/* ────────────────── mappamondo ────────────────── */
+
+.globe {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  /* I pulsanti dell'avvicinamento stanno sopra la tela, non sotto il globo. */
+  position: relative;
+}
+
+/*
+ * Avvicinare e allontanare con un pulsante, non solo col pizzico: il pizzico non
+ * esiste col mouse e non si raggiunge con la tastiera.
+ */
+.globe-zoom {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.globe-zoom .btn {
+  /* Bersaglio pieno per il pollice, senza diventare un bottone da modulo. */
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.globe-canvas {
+  /*
+   * `touch-action: none` è obbligatorio: senza, il trascinamento sul globo
+   * scorre la pagina invece di girare la sfera, e su telefono il gesto non
+   * funziona affatto.
+   */
+  touch-action: none;
+  cursor: grab;
+  display: block;
+}
+
+.globe-canvas:active {
+  cursor: grabbing;
+}
+
+/* ────────────────── striscia dei mesi ────────────────── */
+
+/*
+ * Scelta del mese col pollice. Le schede sono grandi come un bersaglio vero
+ * (≥44px) e portano già il totale, così scegliere il mese e vedere com'è andato
+ * sono lo stesso gesto. La barra di scorrimento sparisce: su telefono non si
+ * trascina, e su desktop la fila è comunque corta.
+ */
+.month-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  padding: 2px 2px 8px;
+  scrollbar-width: none;
+}
+
+.month-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.month-chip {
+  flex: 0 0 auto;
+  min-height: 44px;
+  scroll-snap-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 6px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 0.2s var(--ease),
+    border-color 0.2s var(--ease);
+}
+
+.month-chip-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.month-chip-total {
+  font-family: var(--font-num);
+  font-size: 0.88rem;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.month-chip.is-active {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+/* Sul fondo scuro della scheda scelta l'inchiostro non si legge: si inverte. */
+.month-chip.is-active .month-chip-name,
+.month-chip.is-active .month-chip-total {
+  color: var(--paper);
+}
+
+.month-chip:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
 /* Foglio di dettaglio: dal basso su telefono, al centro su desktop. */
 .sheet-backdrop {
   position: fixed;
@@ -856,7 +1174,8 @@
 }
 
 .kv-tag::before {
-  content: '· ';
+  /* Spazio anche prima del punto: senza, l'etichetta si incolla al titolo. */
+  content: ' · ';
 }
 
 .sheet-grip {
@@ -1050,6 +1369,11 @@
     font-size: 0.93rem;
   }
 
+  .segmented.is-tight .segmented-option {
+    padding: 8px 9px;
+    font-size: 0.86rem;
+  }
+
   .avatar {
     width: 26px;
     height: 26px;
@@ -1165,17 +1489,6 @@
     flex: 0 0 auto;
   }
 
-  /* Il selettore del mese occupa la riga: si tocca senza mirare */
-  .month-picker {
-    width: 100%;
-  }
-
-  .month-picker .select {
-    flex: 1 1 auto;
-    width: auto;
-    min-width: 0;
-  }
-
   .filters-more {
     display: none;
   }
@@ -1207,23 +1520,27 @@
     height: 12px;
   }
 
-  .tabbar {
-    padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+  /* Il nome sta già nella riga di contesto: nella testata basta l'avatar. */
+  .person-button-name {
+    display: none;
   }
 
-  .tabbar-link {
-    min-height: 56px;
-    padding: 8px 2px;
-    font-size: 0.72rem;
-    gap: 3px;
+  /*
+   * Cinque elementi nella testata a 390px stavano dentro **al pixel**: 298 di
+   * contenuto più 60 di spazi facevano esattamente i 358 utili, e su un telefono
+   * da 375px il nome dell'app si sarebbe tagliato. Spazi più stretti e il
+   * pulsante della persona ridotto a un bersaglio tondo come gli altri.
+   */
+  .topbar {
+    gap: 8px;
   }
 
-  .tabbar-glyph {
-    font-size: 1.4rem;
+  .person-button {
+    padding: 6px;
+    min-width: 34px;
   }
 
-  .content {
-    /* spazio per la barra in basso */
-    padding-bottom: 116px;
+  .page-head.is-tight h1 {
+    font-size: 1.25rem;
   }
 }

@@ -1,9 +1,13 @@
-/** Controlli di vista: chi guarda, quale mese, vacanze dentro o fuori, tema, stato di sincronia. */
+/**
+ * Controlli di vista: chi guarda, vacanze dentro o fuori, tema, stato di sincronia.
+ *
+ * Il mese non si sceglie più da qui: sta in `MonthStrip`, che è una fila di
+ * schede grandi come un bersaglio vero al posto di un menù a tendina.
+ */
 
 import type { ReactNode } from 'react'
 
 import { useStore } from '../data/store'
-import { monthLabel } from '../domain/dates'
 import { PERSON_IDS, type PersonId } from '../domain/types'
 import { useTheme, type ThemeMode } from '../theme/theme'
 import { Segmented } from './ui'
@@ -33,73 +37,62 @@ export function PersonSwitch(): ReactNode {
   )
 }
 
-export function MonthPicker(): ReactNode {
-  const { months, month, setMonth } = useStore()
-  if (months.length === 0) return null
-  const index = months.indexOf(month)
+/**
+ * Chi guarda, nella testata dell'applicazione.
+ *
+ * Sta qui e non nelle pagine perché è una lente **globale**: vale per ogni
+ * schermata e resta scelta fra una sessione e l'altra, come il tema. Era
+ * ripetuta in sei testate di pagina, e sei copie dello stesso comando sono sei
+ * righe rubate al contenuto.
+ *
+ * Le persone sono due, quindi è un interruttore e non un menù. Su telefono
+ * mostra solo l'avatar: il nome è già scritto nella riga di contesto della
+ * pagina, e nella testata sarebbero cinquanta pixel spesi per ripeterlo.
+ */
+export function PersonButton(): ReactNode {
+  const { config, view, setPerson } = useStore()
+  if (!config) return null
+  const current = view.person
+  const next: PersonId = current === 'me' ? 'partner' : 'me'
+  const label = `Stai guardando ${config.people[current].name}, tocca per passare a ${config.people[next].name}`
 
   return (
-    <div className="row month-picker" style={{ gap: 4 }}>
-      <button
-        type="button"
-        className="btn btn-icon btn-ghost"
-        aria-label="Mese precedente"
-        disabled={index <= 0}
-        onClick={() => {
-          const prev = months[index - 1]
-          if (prev) setMonth(prev)
-        }}
-      >
-        ‹
-      </button>
-      <label className="sr-only" htmlFor="month-select">
-        Mese
-      </label>
-      <select
-        id="month-select"
-        className="select"
-        style={{ width: 'auto', minWidth: 140 }}
-        value={month}
-        onChange={(event) => setMonth(event.target.value)}
-      >
-        {[...months].reverse().map((m) => (
-          <option key={m} value={m}>
-            {monthLabel(m)}
-          </option>
-        ))}
-      </select>
-      <button
-        type="button"
-        className="btn btn-icon btn-ghost"
-        aria-label="Mese successivo"
-        disabled={index < 0 || index >= months.length - 1}
-        onClick={() => {
-          const next = months[index + 1]
-          if (next) setMonth(next)
-        }}
-      >
-        ›
-      </button>
-    </div>
+    <button
+      type="button"
+      className="btn btn-ghost person-button"
+      onClick={() => setPerson(next)}
+      aria-label={label}
+      title={label}
+    >
+      <span className="avatar" aria-hidden="true">
+        {config.people[current].emoji}
+      </span>
+      <span className="person-button-name">{config.people[current].name}</span>
+    </button>
   )
 }
 
 /**
  * Le vacanze restano fuori dalle statistiche mensili: una settimana di viaggio
  * non deve far sembrare fuori media un mese normale.
+ *
+ * È una casella, non due pulsanti: due opzioni affiancate occupavano una riga
+ * intera per dire una cosa che ha due stati.
  */
 export function VacationToggle(): ReactNode {
   const { view, setIncludeVacations } = useStore()
+  const on = view.includeVacations
   return (
-    <Segmented<'off' | 'on'>
-      ariaLabel="Vacanze nelle statistiche"
-      value={view.includeVacations ? 'on' : 'off'}
-      onChange={(value) => setIncludeVacations(value === 'on')}
-      options={[
-        { value: 'off', label: 'Senza vacanze', title: 'Le spese di viaggio restano fuori' },
-        { value: 'on', label: 'Con vacanze', title: 'Includi le spese di viaggio' },
-      ]}
-    />
+    <button
+      type="button"
+      className={`chip chip-toggle${on ? ' is-on' : ''}`}
+      aria-pressed={on}
+      title={on ? 'Le spese di viaggio sono dentro le statistiche' : 'Le spese di viaggio restano fuori'}
+      onClick={() => setIncludeVacations(!on)}
+    >
+      <span aria-hidden="true">{on ? '☑' : '☐'}</span>
+      vacanze incluse
+    </button>
   )
 }
 

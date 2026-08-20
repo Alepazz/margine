@@ -49,6 +49,7 @@ const TRIPS = [
     year: 2024,
     start: '2024-10-26',
     end: '2024-10-28',
+    coords: { lat: 51.2, lon: 10.4, approx: true },   // centro del paese: non c'è una città
   },
   {
     id: 'parigi-2025',
@@ -58,6 +59,7 @@ const TRIPS = [
     year: 2025,
     start: '2025-04-26',
     end: '2025-05-01',
+    coords: { lat: 48.86, lon: 2.35 },
   },
   {
     id: 'ortona-2025',
@@ -67,6 +69,7 @@ const TRIPS = [
     year: 2025,
     start: '2025-07-21',
     end: '2025-07-23',
+    coords: { lat: 42.35, lon: 14.4 },
   },
   {
     id: 'creta-2025',
@@ -76,6 +79,7 @@ const TRIPS = [
     year: 2025,
     start: '2025-08-17',
     end: '2025-08-25',
+    coords: { lat: 35.24, lon: 24.81, approx: true }, // centro dell'isola
   },
   {
     id: 'sud-italia-2026',
@@ -85,6 +89,7 @@ const TRIPS = [
     year: 2026,
     start: '2026-07-15',
     end: '2026-07-24',
+    coords: { lat: 39.5, lon: 16.2, approx: true },   // fra Campania e Calabria
   },
 ]
 
@@ -291,8 +296,17 @@ function classify(description, isTrip) {
   return { category: 'altro', subcategory: undefined, recurring: false }
 }
 
-/** Le quote dei terzi si sommano in un unico totale anonimo. */
-function sharesOf(entry) {
+/**
+ * Le quote dei terzi si sommano in un unico totale anonimo.
+ *
+ * Sul **centesimo dispari** l'export di Tricount non concorda con Tricount
+ * stesso: il campo `shares` lo dà sempre allo stesso membro, mentre il saldo
+ * che l'app mostra a schermo lo dà a **chi ha pagato**. Su un solo tricount
+ * questo faceva 81 centesimi di divario, e la differenza si riproduce al
+ * centesimo. Qui si adotta la regola del saldo, che è il numero su cui poi ci si
+ * salda davvero. → ADR-0023
+ */
+function sharesOf(entry, payer) {
   let me = 0
   let partner = 0
   let others = 0
@@ -300,6 +314,14 @@ function sharesOf(entry) {
     if (ME.has(name)) me += cents(value)
     else if (PARTNER.has(name)) partner += cents(value)
     else others += cents(value)
+  }
+  const total = cents(entry.total)
+  /* Solo le divisioni a metà: dove le quote sono 100/0 o a mano, non c'è nessun
+     centesimo di resto da assegnare e l'export dice il vero. */
+  if (others === 0 && me + partner === total && total % 2 !== 0 && Math.abs(me - partner) === 1) {
+    const low = Math.floor(total / 2)
+    me = payer === 'me' ? total - low : low
+    partner = total - me
   }
   const shares = { me: me / 100, partner: partner / 100 }
   if (others > 0) shares.others = others / 100
@@ -368,7 +390,7 @@ function main() {
         date: entry.date,
         title,
         amount: entry.total,
-        shares: sharesOf(entry),
+        shares: sharesOf(entry, paidBy),
         paidBy,
         source: tricount.source,
         category,

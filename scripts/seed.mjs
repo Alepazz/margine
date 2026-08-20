@@ -10,10 +10,18 @@
  */
 
 import { PATHS, exists, log, writeJson } from './lib/io.mjs'
-import { CATEGORIES as TAXONOMY, CAT_CATEGORY, TRIP_CATEGORY } from './lib/taxonomy.mjs'
+import {
+  CATEGORIES as TAXONOMY,
+  CAT_CATEGORY,
+  HOUSE_CATEGORY,
+  HOUSE_SOURCE,
+  TRIP_CATEGORY,
+} from './lib/taxonomy.mjs'
 import { sharesFor } from './lib/money.mjs'
 
 const TODAY = '2026-08-19'
+/** Da dove parte il saldo nei dati di esempio: dieci giorni prima di «oggi». */
+const BALANCE_SINCE = '2026-08-09'
 const FIRST_MONTH = '2025-01'
 
 // ─────────────────────── generatore deterministico ───────────────────────
@@ -81,6 +89,7 @@ const TRIPS = [
     year: 2025,
     start: '2025-05-24',
     end: '2025-06-01',
+    coords: { lat: 37.6, lon: 14.0, approx: true },
   },
   {
     id: '2025-lofoten',
@@ -90,6 +99,7 @@ const TRIPS = [
     year: 2025,
     start: '2025-08-09',
     end: '2025-08-18',
+    coords: { lat: 68.2, lon: 14.0, approx: true },
   },
   {
     id: '2026-lisbona',
@@ -99,6 +109,7 @@ const TRIPS = [
     year: 2026,
     start: '2026-03-12',
     end: '2026-03-16',
+    coords: { lat: 38.72, lon: -9.14 },
   },
   {
     id: '2026-dolomiti',
@@ -108,6 +119,7 @@ const TRIPS = [
     year: 2026,
     start: '2026-07-04',
     end: '2026-07-11',
+    coords: { lat: 46.4, lon: 11.8, approx: true },
   },
 ]
 
@@ -603,6 +615,27 @@ const config = {
   categories: CATEGORIES,
   catCategory: CAT_CATEGORY,
   tripCategory: TRIP_CATEGORY,
+  houseSource: HOUSE_SOURCE,
+  houseCategory: HOUSE_CATEGORY,
+  balance: {
+    /* Qualche giorno indietro, non oggi: con la data di oggi non ci sarebbe
+       nessun movimento e la pagina del saldo non mostrerebbe niente di quello
+       che sa fare. La data è INCLUSIVA. */
+    since: BALANCE_SINCE,
+    opening: 0,
+    note: 'Residuo non attribuibile a un tricount: nei dati di esempio è zero. La data è di ripiego per i tricount che non dichiarano la propria, ed è INCLUSIVA.',
+    /*
+     * Un punto di partenza per tricount, come nella realtà: su Tricount ci si
+     * salda un gruppo alla volta. Ne sono dichiarati due su quattro di proposito,
+     * così i dati di esempio mostrano anche l'avviso su quelli che mancano.
+     * → ADR-0022
+     */
+    groups: {
+      fisse: { since: BALANCE_SINCE, opening: 12.5, note: 'Punto di partenza di esempio.' },
+      /* La chiave di una vacanza porta il prefisso: un tricount per viaggio. */
+      'vacanze/2025-sicilia': { since: TODAY, opening: 0, note: 'Saldata, di esempio.' },
+    },
+  },
   fiscal: {
     deductibleHints: [
       'salute/psicologo',
@@ -627,6 +660,8 @@ const dataset = {
   updatedAt: `${TODAY}T09:00:00.000Z`,
   expenses,
   trips: TRIPS,
+  /* I rimborsi si registrano dall'app: nei dati di esempio si parte da zero. */
+  settlements: [],
 }
 
 writeJson(`${PATHS.dataExample}/expenses.json`, dataset)

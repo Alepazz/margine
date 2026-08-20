@@ -11,10 +11,11 @@ import { CategoryDonut, type DonutSlice } from '../components/charts/CategoryDon
 import { Sparkline } from '../components/charts/Sparkline'
 import { StackedMonths, type StackRow, type StackSeries } from '../components/charts/StackedMonths'
 import { TrendChart } from '../components/charts/TrendChart'
-import { MonthPicker, PersonSwitch, VacationToggle } from '../components/Controls'
+import { VacationToggle } from '../components/Controls'
 import { ExpenseList } from '../components/ExpenseList'
 import { ExpenseSheet } from '../components/ExpenseSheet'
 import { MarginMeter } from '../components/MarginMeter'
+import { MonthStrip } from '../components/MonthStrip'
 import { Card, DeltaLabel, Notice, StatTile } from '../components/ui'
 import {
   MAX_STACK_SERIES,
@@ -24,7 +25,7 @@ import {
   stackSeriesKeys,
 } from '../domain/categories'
 import { currentMonthKey, monthLabel, monthLabelShort } from '../domain/dates'
-import { EMPTY_INCOME, computeMargin } from '../domain/income'
+import { EMPTY_INCOME, computeMargin, marginView } from '../domain/income'
 import { formatEuro, relativeChange, toCents } from '../domain/money'
 import {
   averageByCategory,
@@ -48,7 +49,19 @@ const TREND_MONTHS = 18
 const STACK_MONTHS = 12
 
 export function Home(): ReactNode {
-  const { chart, config, view, month, setMonth, lookup, visible, series, today } = usePageData()
+  const {
+    chart,
+    config,
+    view,
+    month,
+    setMonth,
+    lookup,
+    visible,
+    series,
+    today,
+    hideIncome,
+    toggleHideIncome,
+  } = usePageData()
   const [selected, setSelected] = useState<Expense | null>(null)
   const person = view.person
 
@@ -65,6 +78,12 @@ export function Home(): ReactNode {
 
   const profile = person === 'me' ? config.income.me : (config.income.partner ?? EMPTY_INCOME)
   const margin = useMemo(() => computeMargin(monthTotal, projection, profile), [monthTotal, profile, projection])
+  /*
+   * Al componente arriva la vista, non il risultato: a guadagni oscurati i
+   * campi segreti sono già `null` e non c'è nessun numero da velare a schermo.
+   * → ADR-0015
+   */
+  const marginShown = useMemo(() => marginView(margin, { hideIncome }), [hideIncome, margin])
 
   const slices = useMemo<DonutSlice[]>(
     () => labelSlices(foldSlices(categoryBreakdown(monthExpenses, person), lookup), lookup),
@@ -128,27 +147,28 @@ export function Home(): ReactNode {
 
   return (
     <>
-      <div className="page-head">
-        <div className="page-head-text">
-          <h1>{monthLabel(month)}</h1>
-          <p className="page-sub">
-            {config.people[person].name} · {monthTotal.count}{' '}
-            {monthTotal.count === 1 ? 'spesa' : 'spese'}
-            {view.includeVacations ? ' · vacanze incluse' : ''}
-          </p>
-        </div>
-        <div className="row" style={{ marginLeft: 'auto' }}>
-          <MonthPicker />
-        </div>
-      </div>
-
-      <div className="row" style={{ marginBottom: 16, gap: 8 }}>
-        <PersonSwitch />
+      {/*
+        Una riga sola invece di cinque blocchi impilati. Il titolo, il contesto e
+        l'unico interruttore che riguarda questa pagina stanno insieme; chi
+        guarda è passato nella testata dell'app, e il mese lo dice la striscia.
+      */}
+      <div className="page-head is-tight">
+        <h1>{monthLabel(month)}</h1>
+        <p className="page-sub">
+          {config.people[person].name} · {monthTotal.count}{' '}
+          {monthTotal.count === 1 ? 'spesa' : 'spese'}
+        </p>
         <VacationToggle />
       </div>
 
+      {/* La striscia sta in testa alla pagina, non accanto al grafico: è il
+          comando principale del Riepilogo, e cercarlo cinque schede più in
+          basso per cambiare mese sarebbe peggio del menù che sostituisce.
+          `filled` va bene com'è: ha già `month` e `total`. */}
+      <MonthStrip items={filled} selected={month} onSelect={setMonth} />
+
       <div className="stack">
-        {!margin.known ? (
+        {!marginShown.known ? (
           <Notice tone="warn">
             Il profilo entrate non è ancora compilato, quindi il margine non si può calcolare.{' '}
             <Link to="/impostazioni">Vedi come impostarlo</Link>.
@@ -156,7 +176,13 @@ export function Home(): ReactNode {
         ) : null}
 
         <Card>
-          <MarginMeter result={margin} projection={projection} />
+          <MarginMeter
+            view={marginShown}
+            projection={projection}
+            /* Un solo anno precedente esiste nei dati: è un riferimento, non una media. */
+            lastYear={toCents(yoy.lastYear) > 0 ? { month: yoy.lastYearMonth, total: yoy.lastYear } : null}
+            onToggleHidden={toggleHideIncome}
+          />
         </Card>
 
         <div className="kpi-row">
@@ -245,14 +271,10 @@ export function Home(): ReactNode {
 
         <Card
           title="Andamento mensile"
-          note={`Quota di ${config.people[person].name}, ultimi ${Math.min(TREND_MONTHS, trendPoints.length)} mesi · tocca un mese per aprirlo`}
+          note={`Quota di ${config.people[person].name}, ultimi ${Math.min(TREND_MONTHS, trendPoints.length)} mesi`}
         >
-          <TrendChart
-            points={trendPoints}
-            average={average.perMonth}
-            highlightMonth={month}
-            onSelectMonth={setMonth}
-          />
+          {/* Solo da leggere: il mese si sceglie dalla striscia in testa alla pagina. */}
+          <TrendChart points={trendPoints} average={average.perMonth} highlightMonth={month} />
         </Card>
 
         <Card title="Composizione della spesa" note={`Categorie mese per mese, ultimi ${STACK_MONTHS} mesi`}>

@@ -7,10 +7,14 @@ import {
   catStats,
   categoryBreakdown,
   comparePeriods,
+  coupleBalance,
   EMPTY_FILTER,
   fillMonthGaps,
+  houseLedger,
+  houseOutside,
   monthlySeries,
   projectMonth,
+  subsetStats,
   tax730ByYear,
   tax730Suggestions,
   tripStats,
@@ -301,5 +305,233 @@ describe('filtri', () => {
   it('combina più filtri', () => {
     const filtered = applyFilter(DATA, { ...EMPTY_FILTER, month: '2026-08', tax730Only: true })
     expect(filtered.map((e) => e.id)).toEqual(['e'])
+  })
+})
+
+describe('la casa: due insiemi che non coincidono', () => {
+  const CASA: Expense[] = [
+    // dentro il tricount di casa
+    expense({ id: 'h1', date: '2026-06-01', amount: 800, source: 'fisse', category: 'casa', subcategory: 'affitto', recurring: true }),
+    expense({ id: 'h2', date: '2026-06-05', amount: 120, source: 'fisse', category: 'casa', subcategory: 'bollette', recurring: true }),
+    // nel tricount di casa ma casa non è: è il caso vero della telefonia
+    expense({ id: 'h3', date: '2026-06-07', amount: 30, source: 'fisse', category: 'telefonia', recurring: true }),
+    // casa, ma registrata nell'altro tricount condiviso
+    expense({ id: 'h4', date: '2026-06-11', amount: 40, source: 'condivise', category: 'casa', subcategory: 'prodotti' }),
+    // né l'uno né l'altro
+    expense({ id: 'h5', date: '2026-06-12', amount: 25, source: 'condivise', category: 'spesa' }),
+  ]
+
+  it('il tricount comprende anche ciò che casa non è', () => {
+    const ledger = houseLedger(CASA, 'fisse')
+    expect(ledger.map((e) => e.id)).toEqual(['h1', 'h2', 'h3'])
+  })
+
+  it('le spese di casa fuori dal tricount non finiscono contate due volte', () => {
+    const outside = houseOutside(CASA, 'fisse', 'casa')
+    expect(outside.map((e) => e.id)).toEqual(['h4'])
+    // h1 e h2 sono casa, ma stanno nel tricount: qui non ci devono essere
+    const ledger = houseLedger(CASA, 'fisse')
+    const doppie = outside.filter((e) => ledger.some((l) => l.id === e.id))
+    expect(doppie).toEqual([])
+  })
+
+  it('somma le quote del sottoinsieme, non gli importi interi', () => {
+    const stats = subsetStats(houseLedger(CASA, 'fisse'), 'me')
+    // metà di 800 + 120 + 30
+    expect(stats.share).toBe(475)
+    expect(stats.total).toBe(950)
+    expect(stats.count).toBe(3)
+  })
+})
+
+describe('il saldo fra le due persone', () => {
+  const OPTS = { since: '2026-08-01', opening: 0 }
+
+  const SPESE: Expense[] = [
+    // prima del punto di partenza: sta già dentro `opening`, non si conta
+    expense({ id: 's0', date: '2026-07-20', amount: 100, paidBy: 'me' }),
+    // ho anticipato io: lei mi deve la sua metà
+    expense({ id: 's1', date: '2026-08-05', amount: 100, paidBy: 'me' }),
+    // ha anticipato lei: le devo la mia metà
+    expense({ id: 's2', date: '2026-08-06', amount: 40, paidBy: 'partner' }),
+    // tutta mia, pagata da me: nessun debito
+    expense({ id: 's3', date: '2026-08-07', amount: 30, paidBy: 'me', shares: { me: 30, partner: 0 } }),
+  ]
+
+  it('conta solo ciò che è dopo il punto di partenza', () => {
+    const saldo = coupleBalance(SPESE, [], OPTS)
+    // 50 che mi deve − 20 che le devo
+    expect(saldo.balance).toBe(30)
+    expect(saldo.frontedByMe).toBe(50)
+    expect(saldo.frontedByPartner).toBe(20)
+    expect(saldo.movements.map((m) => m.id)).toEqual(['s2', 's1'])
+  })
+
+  it('parte dal saldo dichiarato invece che dall’inizio dei tempi', () => {
+    expect(coupleBalance(SPESE, [], { ...OPTS, opening: 240 }).balance).toBe(270)
+  })
+
+  it('un rimborso avvicina il saldo a zero', () => {
+    const rimborso = { id: 'r1', date: '2026-08-10', from: 'partner' as const, to: 'me' as const, amount: 30 }
+    const saldo = coupleBalance(SPESE, [rimborso], OPTS)
+    expect(saldo.balance).toBe(0)
+    expect(saldo.settled).toBe(30)
+  })
+
+  it('NON esclude il welfare: la quota dell’altra persona è debito comunque', () => {
+    /* Il welfare toglie la spesa dal budget di chi l'ha anticipata, ma la metà
+       dell'altra rientra in contanti: filtrarla qui perderebbe il debito. */
+    const conWelfare: Expense[] = [
+      expense({ id: 'w1', date: '2026-08-08', amount: 502, paidBy: 'me', welfare: true }),
+    ]
+    expect(coupleBalance(conWelfare, [], OPTS).balance).toBe(251)
+  })
+
+  it('tiene fuori dal saldo di coppia quello che ha anticipato un terzo', () => {
+    const conTerzi: Expense[] = [
+      expense({
+        id: 't1',
+        date: '2026-08-09',
+        amount: 90,
+        paidBy: 'others',
+        source: 'vacanze',
+        trip: 'x',
+        shares: { me: 30, partner: 30, others: 30 },
+      }),
+    ]
+    const saldo = coupleBalance(conTerzi, [], OPTS)
+    expect(saldo.balance).toBe(0)
+    expect(saldo.outsideCouple).toBe(60)
+    expect(saldo.movements).toEqual([])
+  })
+
+  it('il segno è fisso: positivo vuol dire che il partner deve a me', () => {
+    const soloLei: Expense[] = [expense({ id: 'x1', date: '2026-08-11', amount: 20, paidBy: 'partner' })]
+    expect(coupleBalance(soloLei, [], OPTS).balance).toBe(-10)
+  })
+})
+
+describe('il saldo tricount per tricount', () => {
+  /*
+   * Le stesse spese, in tricount diversi. È il caso che ha fatto nascere la
+   * separazione: un numero solo per tutta la coppia non si confronta con niente
+   * di quello che si vede su Tricount, che tiene un saldo per gruppo. → ADR-0022
+   */
+  const SPESE: Expense[] = [
+    expense({ id: 'f1', date: '2026-08-05', amount: 30, paidBy: 'me', source: 'fisse' }),
+    expense({ id: 'c1', date: '2026-08-06', amount: 50, paidBy: 'partner', source: 'condivise' }),
+    expense({
+      id: 'v1',
+      date: '2026-08-07',
+      amount: 100,
+      paidBy: 'me',
+      source: 'vacanze',
+      trip: 'creta-2025',
+    }),
+  ]
+
+  it('separa i tricount, e le vacanze una per viaggio', () => {
+    const saldo = coupleBalance(SPESE, [], { since: '2026-08-01', opening: 0 })
+    expect(saldo.groups.map((g) => g.key).sort()).toEqual([
+      'condivise',
+      'fisse',
+      'vacanze/creta-2025',
+    ])
+    const per = (key: string) => saldo.groups.find((g) => g.key === key)
+    expect(per('fisse')?.balance).toBe(15)
+    expect(per('condivise')?.balance).toBe(-25)
+    expect(per('vacanze/creta-2025')?.balance).toBe(50)
+    /* Il totale resta la somma: separare non deve cambiare quanto vi dovete. */
+    expect(saldo.balance).toBe(40)
+  })
+
+  it('ogni tricount ha il suo punto di partenza e la sua data', () => {
+    const saldo = coupleBalance(SPESE, [], {
+      since: '2026-08-01',
+      opening: 0,
+      groups: {
+        /* Dichiarato dopo la spesa: quella sta già dentro il numero di partenza. */
+        fisse: { since: '2026-08-31', opening: 16.93 },
+        condivise: { since: '2026-08-01', opening: 0 },
+      },
+    })
+    const per = (key: string) => saldo.groups.find((g) => g.key === key)
+    expect(per('fisse')?.balance).toBe(16.93)
+    expect(per('fisse')?.movements).toBe(0)
+    expect(per('condivise')?.balance).toBe(-25)
+    /* Non dichiarato: il suo numero non è confrontabile con Tricount. */
+    expect(per('vacanze/creta-2025')?.declared).toBe(false)
+    expect(saldo.undeclared).toEqual(['vacanze/creta-2025'])
+    expect(saldo.balance).toBe(16.93 - 25 + 50)
+  })
+
+  it('il residuo generale entra una volta sola, non una per tricount', () => {
+    /*
+     * La trappola di questo modello: se ogni gruppo eredita l'`opening`
+     * generale, tre tricount lo contano tre volte e il saldo triplica in
+     * silenzio. `opening` è un residuo del rapporto, non il valore di partenza
+     * dei gruppi.
+     */
+    const saldo = coupleBalance(SPESE, [], { since: '2026-08-01', opening: 100 })
+    expect(saldo.groups).toHaveLength(3)
+    expect(saldo.balance).toBe(140)
+    for (const group of saldo.groups) expect(group.opening).toBe(0)
+  })
+
+  it('un tricount dichiarato esiste anche se non si è mosso: «in pari» è un fatto', () => {
+    const saldo = coupleBalance([], [], {
+      since: '2026-08-01',
+      opening: 0,
+      groups: { 'vacanze/sud-italia-2026': { since: '2026-08-20', opening: 0 } },
+    })
+    expect(saldo.groups.map((g) => g.key)).toEqual(['vacanze/sud-italia-2026'])
+    expect(saldo.groups[0]?.declared).toBe(true)
+    expect(saldo.undeclared).toEqual([])
+  })
+
+  it('un tricount con una storia ma senza punto di partenza compare, marcato', () => {
+    /*
+     * Il difetto da cui nasce questo test: le quattro vacanze vecchie non hanno
+     * movimenti recenti, e venivano omesse del tutto — cinquecento euro spariti
+     * in silenzio da un totale che sembrava completo.
+     */
+    const vecchia: Expense[] = [
+      expense({
+        id: 'g1',
+        date: '2024-10-27',
+        amount: 200,
+        paidBy: 'me',
+        source: 'vacanze',
+        trip: 'germania-2024',
+      }),
+    ]
+    const saldo = coupleBalance(vecchia, [], { since: '2026-08-16', opening: 0 })
+    expect(saldo.groups.map((g) => g.key)).toEqual(['vacanze/germania-2024'])
+    expect(saldo.groups[0]?.declared).toBe(false)
+    expect(saldo.groups[0]?.movements).toBe(0)
+    expect(saldo.undeclared).toEqual(['vacanze/germania-2024'])
+  })
+
+  it('le spese personali non fanno una riga: non hanno mai una quota dell’altro', () => {
+    const personali: Expense[] = [
+      expense({
+        id: 'p1',
+        date: '2026-08-05',
+        amount: 20,
+        paidBy: 'me',
+        source: 'personali',
+        shares: { me: 20, partner: 0 },
+      }),
+    ]
+    expect(coupleBalance(personali, [], { since: '2026-08-01', opening: 0 }).groups).toEqual([])
+  })
+
+  it('ogni movimento sa da quale tricount viene', () => {
+    const saldo = coupleBalance(SPESE, [], { since: '2026-08-01', opening: 0 })
+    expect(saldo.movements.map((m) => m.group)).toEqual([
+      'vacanze/creta-2025',
+      'condivise',
+      'fisse',
+    ])
   })
 })

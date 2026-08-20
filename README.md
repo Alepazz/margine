@@ -41,10 +41,11 @@ Per provarla dal telefono sulla rete di casa: `npm run dev -- --host` e apri l'i
 | `npm run seed` | Rigenera i dati di esempio in `data-example/` (copia in `data/` solo se è vuota) |
 | `npm run from-tricount` | Converte gli export JSON in `data/raw/` in file per `data/incoming/`, e stampa le voci che nessuna regola ha categorizzato (`-- --dry-run` per non scrivere) |
 | `npm run validate` | Controlla i dati in chiaro e stampa i totali per mese, da riconciliare con Tricount |
-| `npm run import` | Fonde `data/incoming/*.json` nel master, valida e ripubblica cifrato |
+| `npm run import` | Fonde `data/incoming/*.json` nel master, valida e ripubblica cifrato. Le voci che sembrano già presenti (stesso importo, data a meno di un giorno) restano fuori e vengono elencate: `-- --doppie` le importa comunque |
 | `npm run encrypt` | Cifra `data/` in `public/data/` |
 | `npm run decrypt -- --yes` | Ricostruisce `data/` dai file cifrati (dopo un cambio di Mac, o per riprendere le annotazioni scritte dall'app) |
 | `npm run icon` | Rigenera `public/icon-512.png` |
+| `npm run globe` | Rigenera il contorno delle terre del mappamondo in `src/domain/globe-land.ts` |
 
 ## Com'è fatta
 
@@ -53,7 +54,7 @@ src/
   domain/      logica pura: modello, denaro, calendario, statistiche, margine
   data/         cifratura, coda delle annotazioni, API GitHub, stato dell'app
   components/   guscio, grafici, foglio di dettaglio
-  pages/        Riepilogo · Spese · Gatto · Vacanze · 730 · Impostazioni
+  pages/        Riepilogo · Spese · Casa · Gatto · Vacanze · 730 · Saldo · Impostazioni
   styles/       tokens.css (colori, raggi, vetro) · base.css · components.css
 scripts/       seed, validazione, cifratura, import mensile
 data/          master in chiaro — MAI nel repo (.gitignore)
@@ -77,18 +78,22 @@ Regole che tengono insieme il tutto (e che è meglio non rompere per distrazione
 
 Nel repo finiscono **solo** i file cifrati. Il master in chiaro e la passphrase restano sul Mac.
 
-## Scrivere le annotazioni 730 dall'app
+## Scrivere dall'app
 
-Per salvare tag, note e link agli scontrini serve un token GitHub, una volta per dispositivo:
+Dall'app si aggiunge una spesa col **+** al centro della barra, si corregge o si elimina dal foglio di dettaglio, si crea un viaggio, si registra un rimborso nella pagina Saldo, e si segna una spesa per il 730. Ogni modifica compare subito e viene committata nel repo in sottofondo, riscrivendo il file cifrato.
+
+Serve un token GitHub, una volta per dispositivo:
 
 1. GitHub → Settings → Developer settings → **Personal access tokens → Fine-grained tokens** → Generate new token.
 2. Repository access: **solo** questo repo. Permissions → Repository permissions → **Contents: Read and write**.
 3. Copia il token in Margine → Impostazioni → «Scrittura nel repo», poi «Verifica accesso».
 
-Il token resta in questo browser, non entra mai nel repo. Quando scade, il salvataggio fallisce con un messaggio esplicito e le modifiche restano in coda: nulla va perso. [ADR-0005](docs/adr/0005-annotazioni-730-via-api-github.md)
+Il token resta in questo browser, non entra mai nel repo. Quando scade, il salvataggio fallisce con un messaggio esplicito e le modifiche restano in coda: nulla va perso. [ADR-0005](docs/adr/0005-annotazioni-730-via-api-github.md), [ADR-0018](docs/adr/0018-l-app-scrive-le-spese-non-solo-le-annotazioni.md)
+
+Senza token l'app funziona comunque: le modifiche restano su quel dispositivo, e il contatore nella testata dice quante sono in attesa.
 
 ## Note
 
 - L'app è in italiano, compresi i commenti nel codice e la documentazione.
-- Il bundle è ~210 kB compressi, quasi tutto Recharts: accettabile per un'app personale, primo candidato se un giorno servisse alleggerire.
+- Il bundle è ~245 kB compressi: quasi tutto Recharts, più ~30 kB di contorni delle terre per il mappamondo. Accettabile per un'app personale, e Recharts resta il primo candidato se un giorno servisse alleggerire.
 - I font sono self-hosted: nessuna chiamata a Google Fonts.

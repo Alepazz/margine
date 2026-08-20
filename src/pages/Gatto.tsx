@@ -5,7 +5,6 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { BarList } from '../components/charts/BarList'
 import { CategoryDonut, type DonutSlice } from '../components/charts/CategoryDonut'
 import { TrendChart } from '../components/charts/TrendChart'
-import { PersonSwitch } from '../components/Controls'
 import { ExpenseList } from '../components/ExpenseList'
 import { ExpenseSheet } from '../components/ExpenseSheet'
 import { Card, Notice, StatTile } from '../components/ui'
@@ -74,9 +73,6 @@ export function Gatto(): ReactNode {
             {config.people[person].name}
           </p>
         </div>
-        <div className="row" style={{ marginLeft: 'auto' }}>
-          <PersonSwitch />
-        </div>
       </div>
 
       <div className="stack">
@@ -140,6 +136,7 @@ export function Gatto(): ReactNode {
             onSelect={setSelected}
             showSource={false}
             detail="subcategory"
+            pageSize={12}
           />
         </Card>
       </div>

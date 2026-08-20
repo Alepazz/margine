@@ -17,7 +17,7 @@ import {
   type MonthKey,
 } from './dates'
 import { round2, sumBy, toCents } from './money'
-import type { Expense, PersonId, Source, Trip } from './types'
+import type { Expense, PersonId, Settlement, Source, Trip } from './types'
 
 export interface ViewOptions {
   person: PersonId
@@ -430,7 +430,12 @@ export function topExpenses(scope: readonly Expense[], person: PersonId, limit =
 
 // ─────────────────────────────── gatto ───────────────────────────────
 
-export interface CatStats {
+/**
+ * Statistiche di un sottoinsieme qualunque di spese: il gatto, il tricount di
+ * casa, le spese di casa che stanno fuori da quel tricount. Il criterio con cui
+ * si sceglie il sottoinsieme sta fuori — qui si conta soltanto.
+ */
+export interface SubsetStats {
   /** Quota della persona selezionata su tutta la storia. */
   share: number
   /** Costo complessivo per la coppia. */
@@ -438,22 +443,20 @@ export interface CatStats {
   monthlyAvgShare: number
   monthlyAvgTotal: number
   series: MonthTotal[]
-  subcategories: CategorySlice[]
   perPerson: Record<PersonId, number>
   count: number
   months: number
   firstDate?: string
   lastDate?: string
-  /** Le spese del gatto in cui la persona ha una quota, dalla più recente. */
+  /** Le spese in cui la persona ha una quota, dalla più recente. */
   expenses: Expense[]
 }
 
-export function catStats(
-  allExpenses: readonly Expense[],
-  person: PersonId,
-  catCategory: string,
-): CatStats {
-  const scope = allExpenses.filter((e) => e.category === catCategory)
+export interface CatStats extends SubsetStats {
+  subcategories: CategorySlice[]
+}
+
+export function subsetStats(scope: readonly Expense[], person: PersonId): SubsetStats {
   const mine = scope.filter((e) => toCents(shareOf(e, person)) > 0)
   const series = monthlySeries(mine, person)
   const months = fillMonthGaps(series).length
@@ -466,13 +469,290 @@ export function catStats(
     monthlyAvgShare: months === 0 ? 0 : round2(share / months),
     monthlyAvgTotal: months === 0 ? 0 : round2(total / months),
     series,
-    subcategories: subcategoryBreakdown(scope, person, catCategory),
     perPerson: { me: totalShare(scope, 'me'), partner: totalShare(scope, 'partner') },
     count: scope.length,
     months,
     firstDate: dates[0],
     lastDate: dates[dates.length - 1],
     expenses: [...mine].sort(byDateDesc),
+  }
+}
+
+export function catStats(
+  allExpenses: readonly Expense[],
+  person: PersonId,
+  catCategory: string,
+): CatStats {
+  const scope = allExpenses.filter((e) => e.category === catCategory)
+  return {
+    ...subsetStats(scope, person),
+    subcategories: subcategoryBreakdown(scope, person, catCategory),
+  }
+}
+
+/*
+ * ─────────────────────────── la casa ───────────────────────────
+ *
+ * Il tricount «Spese Casa» e la categoria «casa» **non coincidono**, e la
+ * pagina Casa mostra i due insiemi separati invece di far finta che siano uno.
+ * Nel tricount ci sono 40 voci di telefonia e 6 di trasporti, che casa non
+ * sono; e 58 voci di categoria casa stanno nell'altro tricount condiviso.
+ * Fondere i due insiemi vorrebbe dire mentire su uno dei due.
+ */
+
+/** Il tricount di casa così com'è, telefonia e auto comprese. */
+export function houseLedger(allExpenses: readonly Expense[], houseSource: Source): Expense[] {
+  return allExpenses.filter((e) => e.source === houseSource)
+}
+
+/** Spese di casa registrate altrove: stessa categoria, tricount diverso. */
+export function houseOutside(
+  allExpenses: readonly Expense[],
+  houseSource: Source,
+  houseCategory: string,
+): Expense[] {
+  return allExpenses.filter((e) => e.category === houseCategory && e.source !== houseSource)
+}
+
+/*
+ * ─────────────────── il saldo fra le due persone ───────────────────
+ *
+ * Il segno è **fisso**, non dipende da chi guarda: positivo = `partner` deve a
+ * `me`. La pagina lo gira per chi sta guardando; il calcolo no, altrimenti due
+ * viste dello stesso dato darebbero due verità.
+ *
+ * Tre trappole, tutte con un test che le presidia:
+ *
+ * 1. **Il welfare non si filtra.** `fundedByWelfare()` toglie la spesa dal
+ *    *budget* di chi l'ha anticipata, ma la quota dell'altra persona è debito
+ *    eccome: quella la rimborsa in contanti. Passare qui le spese già filtrate
+ *    da `visibleFor()` perderebbe 502 € di soli alberghi del Sud Italia.
+ * 2. **Gli anticipi di terzi restano fuori.** Se ha pagato qualcuno del gruppo,
+ *    il debito è verso di lui, non fra voi due: 32 spese, 683 € di quote vostre.
+ * 3. **Il saldo non tocca il margine.** Le spese contano già solo la propria
+ *    quota, quindi quando il rimborso arriva il conto torna esattamente a quella:
+ *    contarlo come entrata sarebbe contarlo due volte. → ADR-0019
+ */
+
+export interface BalanceMovement {
+  id: string
+  date: string
+  title: string
+  /** Quanto ha spostato il saldo: positivo = `partner` deve di più a `me`. */
+  delta: number
+  kind: 'expense' | 'settlement'
+  /** Il tricount da cui viene: `condivise`, `vacanze/creta-2025`… */
+  group: string
+}
+
+/**
+ * Il saldo di **un** tricount.
+ *
+ * Tricount tiene un saldo per gruppo, e ci si salda un gruppo alla volta: la
+ * vacanza in Sud Italia può essere pari mentre le spese di casa non lo sono. Un
+ * numero solo per tutta la coppia non è confrontabile con niente di ciò che si
+ * vede nell'app di partenza. → ADR-0022
+ */
+export interface BalanceGroup {
+  /** `fisse` | `condivise` | `personali` | `vacanze/<idViaggio>` */
+  key: string
+  /** Positivo = `partner` deve a `me`. */
+  balance: number
+  opening: number
+  since: string
+  /**
+   * false = questo tricount non ha un punto di partenza suo, quindi il numero
+   * non è confrontabile con Tricount: è solo «cosa è successo dopo la data
+   * generale». La pagina lo dice invece di far finta.
+   */
+  declared: boolean
+  frontedByMe: number
+  frontedByPartner: number
+  movements: number
+}
+
+export interface CoupleBalance {
+  /** Positivo = `partner` deve a `me`. Somma dei tricount più il residuo. */
+  balance: number
+  /** Un saldo per tricount, dal più mosso. */
+  groups: BalanceGroup[]
+  /** I tricount senza punto di partenza dichiarato: il totale è parziale. */
+  undeclared: string[]
+  /** Residuo non attribuibile a nessun tricount, dichiarato in configurazione. */
+  opening: number
+  since: string
+  /** Quote di `partner` anticipate da `me`, dal punto di partenza in poi. */
+  frontedByMe: number
+  /** Quote di `me` anticipate da `partner`. */
+  frontedByPartner: number
+  /** Rimborsi registrati, in valore assoluto. */
+  settled: number
+  /** Quote vostre che ha anticipato qualcun altro: non sono un debito fra voi. */
+  outsideCouple: number
+  /** Cosa ha mosso il saldo, dal più recente. */
+  movements: BalanceMovement[]
+}
+
+/** Da dove parte il saldo di un tricount. */
+export interface BalanceStart {
+  since: string
+  opening: number
+  note?: string
+}
+
+/** A quale tricount appartiene una spesa: le vacanze ne hanno uno per viaggio. */
+export function balanceGroupOf(expense: Expense): string {
+  return expense.source === 'vacanze' && expense.trip
+    ? `vacanze/${expense.trip}`
+    : expense.source
+}
+
+interface Bucket {
+  opening: number
+  since: string
+  declared: boolean
+  frontedByMe: number
+  frontedByPartner: number
+  movements: number
+  /**
+   * Quante spese di quel tricount hanno una quota dell'altra persona, **da
+   * sempre** — non solo dopo il punto di partenza. Serve a distinguere un
+   * tricount che tace perché è a posto da uno che tace perché nessuno ha
+   * dichiarato da dove parte: il secondo va detto, non omesso.
+   */
+  history: number
+}
+
+export function coupleBalance(
+  allExpenses: readonly Expense[],
+  settlements: readonly Settlement[],
+  opts: { since: string; opening: number; groups?: Record<string, BalanceStart> },
+): CoupleBalance {
+  const movements: BalanceMovement[] = []
+  const buckets = new Map<string, Bucket>()
+  let settled = 0
+  let outsideCouple = 0
+
+  /**
+   * Il punto di partenza di un tricount. Quello generale fa da data di ripiego,
+   * ma **non presta il suo `opening`**: ereditarlo per gruppo lo conterebbe una
+   * volta per tricount. Il residuo generale entra nel totale una volta sola.
+   */
+  const bucketOf = (key: string): Bucket => {
+    const existing = buckets.get(key)
+    if (existing) return existing
+    const declared = opts.groups?.[key]
+    const fresh: Bucket = {
+      opening: declared ? toCents(declared.opening) : 0,
+      since: declared ? declared.since : opts.since,
+      declared: declared !== undefined,
+      frontedByMe: 0,
+      frontedByPartner: 0,
+      movements: 0,
+      history: 0,
+    }
+    buckets.set(key, fresh)
+    return fresh
+  }
+
+  /* I tricount con un punto di partenza dichiarato esistono anche se dopo quella
+     data non è successo niente: «pari e patta» è un'informazione. */
+  for (const key of Object.keys(opts.groups ?? {})) bucketOf(key)
+
+  for (const expense of allExpenses) {
+    const key = balanceGroupOf(expense)
+    const bucket = bucketOf(key)
+    const owed = expense.paidBy === 'me' ? expense.shares.partner : expense.shares.me
+    if (expense.paidBy !== 'others' && toCents(owed) !== 0) bucket.history += 1
+
+    /* Il punto di partenza è compreso: quello che c'era fino a quel giorno sta
+       già dentro l'`opening` di quel tricount. */
+    if (expense.date <= bucket.since) continue
+
+    if (expense.paidBy === 'others') {
+      outsideCouple += toCents(expense.shares.me) + toCents(expense.shares.partner)
+      continue
+    }
+
+    if (toCents(owed) === 0) continue
+
+    const delta = expense.paidBy === 'me' ? toCents(owed) : -toCents(owed)
+    if (expense.paidBy === 'me') bucket.frontedByMe += toCents(owed)
+    else bucket.frontedByPartner += toCents(owed)
+    bucket.movements += 1
+
+    movements.push({
+      id: expense.id,
+      date: expense.date,
+      title: expense.title,
+      delta: delta / 100,
+      kind: 'expense',
+      group: key,
+    })
+  }
+
+  let settlementDelta = 0
+  for (const settlement of settlements) {
+    /* Un rimborso non appartiene a un tricount: è denaro che passa di mano. Vale
+       dalla data generale in poi, e sposta il totale, non un gruppo. */
+    if (settlement.date <= opts.since) continue
+    const cents = toCents(settlement.amount)
+    settled += cents
+    /* Se `partner` rimborsa `me`, il suo debito scende. */
+    const delta = settlement.from === 'partner' ? -cents : cents
+    settlementDelta += delta
+    movements.push({
+      id: settlement.id,
+      date: settlement.date,
+      title: settlement.note?.trim() || 'Rimborso',
+      delta: delta / 100,
+      kind: 'settlement',
+      group: 'rimborsi',
+    })
+  }
+
+  const groups: BalanceGroup[] = []
+  let frontedByMe = 0
+  let frontedByPartner = 0
+  let groupTotal = 0
+  for (const [key, bucket] of buckets) {
+    const balance = bucket.opening + bucket.frontedByMe - bucket.frontedByPartner
+    /*
+     * Si tace solo di un tricount che **non ha mai** avuto una quota dell'altra
+     * persona — le spese personali, per costruzione. Un tricount con una storia
+     * ma senza punto di partenza dichiarato compare eccome, marcato: ometterlo
+     * farebbe sembrare completo un totale che non lo è, e quattro vacanze vecchie
+     * spariscono in silenzio portandosi via cinquecento euro.
+     */
+    if (!bucket.declared && bucket.history === 0) continue
+    groupTotal += balance
+    frontedByMe += bucket.frontedByMe
+    frontedByPartner += bucket.frontedByPartner
+    groups.push({
+      key,
+      balance: balance / 100,
+      opening: bucket.opening / 100,
+      since: bucket.since,
+      declared: bucket.declared,
+      frontedByMe: bucket.frontedByMe / 100,
+      frontedByPartner: bucket.frontedByPartner / 100,
+      movements: bucket.movements,
+    })
+  }
+
+  const balance = toCents(opts.opening) + groupTotal + settlementDelta
+
+  return {
+    balance: balance / 100,
+    groups: groups.sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance)),
+    undeclared: groups.filter((g) => !g.declared).map((g) => g.key),
+    opening: opts.opening,
+    since: opts.since,
+    frontedByMe: frontedByMe / 100,
+    frontedByPartner: frontedByPartner / 100,
+    settled: settled / 100,
+    outsideCouple: outsideCouple / 100,
+    movements: movements.sort((a, b) => (a.date === b.date ? 0 : a.date < b.date ? 1 : -1)),
   }
 }
 

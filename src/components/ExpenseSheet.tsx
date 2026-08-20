@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { useStore } from '../data/store'
+import { ExpenseForm } from './ExpenseForm'
 import type { CategoryLookup } from '../domain/categories'
 import { formatDate } from '../domain/dates'
 import { formatEuro } from '../domain/money'
@@ -73,8 +74,10 @@ export function ExpenseSheet({
   lookup: CategoryLookup
   onClose: () => void
 }): ReactNode {
-  const { config, dataset, annotate, view } = useStore()
+  const { config, dataset, annotate, deleteExpense, view } = useStore()
   const toast = useToast()
+  const [editing, setEditing] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   /*
    * La spesa si rilegge dallo store a ogni render invece di fidarsi della prop:
@@ -146,6 +149,12 @@ export function ExpenseSheet({
   const removeLink = (link: string) => {
     annotate(expense.id, { receiptLinks: links.filter((l) => l !== link) })
     toast.show('Link rimosso.')
+  }
+
+  /* Il modulo prende il posto del foglio invece di impilarsi sopra: due fogli
+     uno sull'altro non si capisce più quale si sta chiudendo. */
+  if (editing) {
+    return <ExpenseForm expense={expense} onClose={() => setEditing(false)} />
   }
 
   return (
@@ -231,6 +240,43 @@ export function ExpenseSheet({
         </dl>
 
         <div className="stack" style={{ gap: 12 }}>
+          {confirmingDelete ? (
+            <div className="stack" style={{ gap: 8 }}>
+              <p className="delta is-bad">
+                Eliminare «{expense.title}»? È definitivo: la spesa sparisce dai dati e dai conti.
+              </p>
+              <div className="row" style={{ gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={() => {
+                    deleteExpense(expense.id)
+                    toast.show('Spesa eliminata.')
+                    onClose()
+                  }}
+                >
+                  Sì, elimina
+                </button>
+                <button type="button" className="btn" onClick={() => setConfirmingDelete(false)}>
+                  Annulla
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="row" style={{ gap: 8 }}>
+              <button type="button" className="btn" onClick={() => setEditing(true)}>
+                Modifica
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setConfirmingDelete(true)}
+              >
+                Elimina
+              </button>
+            </div>
+          )}
+
           <TagToggle
             title="Spesa da 730"
             on={expense.tax730 === true}

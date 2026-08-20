@@ -1,7 +1,12 @@
 /**
  * Andamento mensile: una serie sola, quindi nessuna leggenda (il titolo la
  * nomina) e la media storica come linea di riferimento. Il mese selezionato è
- * marcato per enfasi, e cliccando un mese lo si seleziona.
+ * marcato per enfasi.
+ *
+ * **Non si clicca.** Selezionare il mese da qui è stato tolto: diciotto mesi in
+ * 340px fanno diciassette pixel per mese, meno di metà polpastrello, e in più
+ * il tocco cambiava valori sopra e sotto senza dire di averlo fatto. Il mese si
+ * sceglie dalla striscia in testa alla pagina. Il tooltip resta: leggere va bene.
  */
 
 import type { ReactNode } from 'react'
@@ -33,13 +38,11 @@ export function TrendChart({
   average,
   highlightMonth,
   height = 210,
-  onSelectMonth,
 }: {
   points: readonly TrendPoint[]
   average?: number
   highlightMonth?: MonthKey
   height?: number
-  onSelectMonth?: (month: MonthKey) => void
 }): ReactNode {
   const theme = useChartTheme()
 
@@ -53,15 +56,7 @@ export function TrendChart({
   return (
     <div className="chart-wrap" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart
-          data={points as TrendPoint[]}
-          margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
-          onClick={(state: unknown) => {
-            if (!onSelectMonth) return
-            const label = (state as { activeLabel?: unknown } | null)?.activeLabel
-            if (typeof label === 'string') onSelectMonth(label)
-          }}
-        >
+        <AreaChart data={points as TrendPoint[]} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
           <defs>
             <linearGradient id="trend-fill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={line} stopOpacity={0.22} />

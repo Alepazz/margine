@@ -7,8 +7,8 @@
 
 import { useState, type ReactNode } from 'react'
 
-import { PersonSwitch, ThemeChooser } from '../components/Controls'
-import { Card, Notice, StatTile, useToast } from '../components/ui'
+import { ThemeChooser } from '../components/Controls'
+import { Card, Notice, Segmented, StatTile, VEIL, useToast } from '../components/ui'
 import { clearToken, loadToken, saveToken, testAccess } from '../data/github'
 import { formatDate } from '../domain/dates'
 import { incomeBreakdown } from '../domain/income'
@@ -16,7 +16,21 @@ import { formatEuro } from '../domain/money'
 import { usePageData } from './usePageData'
 
 export function Impostazioni(): ReactNode {
-  const { config, dataset, view, lookup, sync, syncNow, lock, reload, hasStoredPassphrase } = usePageData()
+  const {
+    config,
+    dataset,
+    view,
+    lookup,
+    sync,
+    syncNow,
+    lock,
+    reload,
+    hasStoredPassphrase,
+    hideIncome,
+    hideIncomeByDefault,
+    toggleHideIncome,
+    setHideIncomeByDefault,
+  } = usePageData()
   const toast = useToast()
   const person = view.person
   const profile = person === 'me' ? config.income.me : config.income.partner
@@ -25,6 +39,9 @@ export function Impostazioni(): ReactNode {
   const [checkResult, setCheckResult] = useState<string | null>(null)
 
   const breakdown = profile ? incomeBreakdown(profile) : null
+  /* Qui i numeri sono i guadagni nella loro forma più nuda: si coprono tutti. */
+  const money = (value: number): string =>
+    hideIncome ? VEIL : formatEuro(value, { decimals: 0 })
 
   return (
     <>
@@ -33,15 +50,19 @@ export function Impostazioni(): ReactNode {
           <h1>Impostazioni</h1>
           <p className="page-sub">Entrate, aspetto, scrittura nel repo, stato dei dati</p>
         </div>
-        <div className="row" style={{ marginLeft: 'auto' }}>
-          <PersonSwitch />
-        </div>
       </div>
 
       <div className="stack">
         <Card
           title={`Profilo entrate — ${config.people[person].name}`}
           note="Serve a trasformare le spese in margine"
+          action={
+            profile?.configured ? (
+              <button type="button" className="btn btn-sm" onClick={toggleHideIncome}>
+                {hideIncome ? 'Mostra' : 'Nascondi'}
+              </button>
+            ) : null
+          }
         >
           {!profile || !profile.configured ? (
             <Notice tone="warn">
@@ -52,24 +73,30 @@ export function Impostazioni(): ReactNode {
           ) : (
             <>
               <div className="kpi-row">
-                <StatTile label="Stipendio netto" value={formatEuro(breakdown?.stipendio ?? 0, { decimals: 0 })} />
+                <StatTile label="Stipendio netto" value={money(breakdown?.stipendio ?? 0)} />
                 <StatTile
                   label="Buoni pasto"
-                  value={formatEuro(breakdown?.buoniPasto ?? 0, { decimals: 0 })}
-                  hint={`${profile.mealVouchers.valuePerDay.toFixed(2)} € × ${profile.mealVouchers.daysPerMonth} giorni`}
+                  value={money(breakdown?.buoniPasto ?? 0)}
+                  hint={
+                    hideIncome
+                      ? undefined
+                      : `${profile.mealVouchers.valuePerDay.toFixed(2)} € × ${profile.mealVouchers.daysPerMonth} giorni`
+                  }
                 />
                 <StatTile
                   label="Mensilità e bonus"
-                  value={formatEuro(breakdown?.differite ?? 0, { decimals: 0 })}
+                  value={money(breakdown?.differite ?? 0)}
                   hint="spalmati su dodici mesi"
                 />
                 <StatTile
                   label="Entrate mensili"
-                  value={formatEuro(breakdown?.totale ?? 0, { decimals: 0 })}
+                  value={money(breakdown?.totale ?? 0)}
                   hint={
-                    profile.monthlySavingsTarget > 0
-                      ? `obiettivo risparmio ${formatEuro(profile.monthlySavingsTarget, { decimals: 0 })}`
-                      : 'nessun obiettivo di risparmio impostato'
+                    hideIncome
+                      ? undefined
+                      : profile.monthlySavingsTarget > 0
+                        ? `obiettivo risparmio ${formatEuro(profile.monthlySavingsTarget, { decimals: 0 })}`
+                        : 'nessun obiettivo di risparmio impostato'
                   }
                 />
               </div>
@@ -80,6 +107,30 @@ export function Impostazioni(): ReactNode {
               </div>
             </>
           )}
+        </Card>
+
+        <Card title="Privacy" note="Come parte l'app su questo dispositivo">
+          <Segmented<'clear' | 'hidden'>
+            ariaLabel="All'apertura mostra i guadagni"
+            value={hideIncomeByDefault ? 'hidden' : 'clear'}
+            onChange={(choice) => setHideIncomeByDefault(choice === 'hidden')}
+            options={[
+              { value: 'clear', label: 'In chiaro', title: 'I guadagni si vedono subito' },
+              { value: 'hidden', label: 'Oscurati', title: 'I guadagni partono coperti' },
+            ]}
+          />
+          <div className="card-foot">
+            Copre entrate, margine, spendibile e obiettivo di risparmio — qui e nel Riepilogo. Le
+            spese restano visibili: sono uscite, non guadagni. Per scoprire il numero un momento
+            basta toccarlo, e quel tocco vale solo per questa sessione: quello che resta è la scelta
+            qui sopra. Vive in questo browser come la persona scelta e il token, quindi non finisce
+            nei dati e non segue gli altri dispositivi.
+          </div>
+          <div className="card-foot">
+            Un limite dichiarato: la pastiglia «sotto controllo / da tenere d'occhio» resta
+            visibile, e dice che le entrate stanno sopra la spesa prevista. Regala una soglia, non
+            una cifra — è il prezzo di conservare lo stato del mese.
+          </div>
         </Card>
 
         <div className="grid-2">

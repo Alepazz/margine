@@ -278,6 +278,25 @@
   ],
   "catCategory": "gatto",
   "tripCategory": "viaggi",
+  "houseSource": "fisse",
+  "houseCategory": "casa",
+  "balance": {
+    "since": "2026-08-09",
+    "opening": 0,
+    "note": "Residuo non attribuibile a un tricount: nei dati di esempio è zero. La data è di ripiego per i tricount che non dichiarano la propria, ed è INCLUSIVA.",
+    "groups": {
+      "fisse": {
+        "since": "2026-08-09",
+        "opening": 12.5,
+        "note": "Punto di partenza di esempio."
+      },
+      "vacanze/2025-sicilia": {
+        "since": "2026-08-19",
+        "opening": 0,
+        "note": "Saldata, di esempio."
+      }
+    }
+  },
   "fiscal": {
     "deductibleHints": [
       "salute/psicologo",

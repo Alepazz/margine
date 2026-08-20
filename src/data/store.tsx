@@ -17,17 +17,19 @@ import {
 
 import { currentMonthKey, monthKeyOf, type MonthKey } from '../domain/dates'
 import { DEFAULT_VIEW, monthsOf, type ViewOptions } from '../domain/selectors'
-import type { Annotation, AppConfig, Dataset, PersonId } from '../domain/types'
+import type { Annotation, AppConfig, Dataset, Expense, PersonId, Settlement, Trip } from '../domain/types'
 import { WrongPassphraseError, decryptEnvelope, deriveKeyCached, encryptEnvelope } from './crypto'
 import { isEnvelope, type Envelope } from './envelope'
 import { GithubError, getFile, loadToken, putFile } from './github'
 import {
   EMPTY_OUTBOX,
-  applyAnnotations,
+  applyOps,
+  describeOps,
   loadOutbox,
   newEntry,
   pruneSettled,
   saveOutbox,
+  type Op,
   type OutboxEntry,
   type OutboxState,
 } from './outbox'
@@ -36,6 +38,12 @@ const DATA_URL = `${import.meta.env.BASE_URL}data/expenses.json.enc`
 const CONFIG_URL = `${import.meta.env.BASE_URL}data/config.json.enc`
 const PASSPHRASE_KEY = 'margine.passphrase.v1'
 const PERSON_KEY = 'margine.person.v1'
+/*
+ * Come parte l'app su **questo** dispositivo, non nei dati: «questo telefono
+ * parte coperto» è una proprietà del telefono. Nei dati non potrebbe stare
+ * comunque — l'app scrive solo `expenses.json.enc`, non la configurazione.
+ */
+const HIDE_INCOME_KEY = 'margine.hideIncome.v1'
 const SYNC_DEBOUNCE_MS = 1200
 
 export type Status = 'boot' | 'locked' | 'unlocking' | 'ready' | 'error'
@@ -64,12 +72,24 @@ export interface StoreApi {
   view: ViewOptions
   sync: SyncState
   hasStoredPassphrase: boolean
+  /** Guadagni oscurati adesso. Il tocco vale per questa sessione. */
+  hideIncome: boolean
+  /** Come parte l'app su questo dispositivo: questo è ciò che resta. */
+  hideIncomeByDefault: boolean
   unlock: (passphrase: string, remember: boolean) => Promise<void>
   lock: () => void
   setMonth: (month: MonthKey) => void
   setPerson: (person: PersonId) => void
   setIncludeVacations: (include: boolean) => void
+  toggleHideIncome: () => void
+  setHideIncomeByDefault: (hidden: boolean) => void
   annotate: (expenseId: string, patch: Omit<Annotation, 'expenseId'>) => void
+  addExpense: (expense: Expense) => void
+  updateExpense: (expenseId: string, fields: Partial<Expense>) => void
+  deleteExpense: (expenseId: string) => void
+  addTrip: (trip: Trip) => void
+  addSettlement: (settlement: Settlement) => void
+  removeSettlement: (settlementId: string) => void
   syncNow: () => Promise<void>
   reload: () => void
 }
@@ -84,15 +104,30 @@ async function fetchEnvelope(url: string): Promise<Envelope> {
   return parsed
 }
 
+/**
+ * I file cifrati scritti prima di ADR-0019 non hanno `settlements`. Si normalizza
+ * appena il dato entra, così il tipo dice la verità in tutto il resto dell'app
+ * invece di costringere ogni lettore a un `?? []`.
+ */
+function normaliseDataset(raw: Dataset): Dataset {
+  return raw.settlements ? raw : { ...raw, settlements: [] }
+}
+
 function describeError(error: unknown): string {
   if (error instanceof Error) return error.message
   return 'Errore sconosciuto.'
 }
 
 function commitMessage(entries: readonly OutboxEntry[]): string {
-  const ids = new Set(entries.map((e) => e.expenseId))
-  const n = ids.size
-  return `730: annotazioni su ${n} ${n === 1 ? 'spesa' : 'spese'} (da Margine)`
+  return `${describeOps(entries)} (da Margine)`
+}
+
+function readHideIncomeDefault(): boolean {
+  try {
+    return localStorage.getItem(HIDE_INCOME_KEY) === 'on'
+  } catch {
+    return false
+  }
 }
 
 function readStoredPerson(): PersonId {
@@ -116,6 +151,8 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
   const [sync, setSync] = useState<SyncState>({ phase: 'idle', pending: 0 })
   const [hasStoredPassphrase, setHasStoredPassphrase] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
+  const [hideIncomeByDefault, setDefaultHidden] = useState(readHideIncomeDefault)
+  const [hideIncome, setHideIncome] = useState(readHideIncomeDefault)
 
   const passphraseRef = useRef<string | undefined>(undefined)
   const configRef = useRef<AppConfig | undefined>(undefined)
@@ -159,9 +196,9 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
         if (!isEnvelope(parsed)) throw new Error('Il file nel repo non è un file cifrato di Margine.')
 
         const key = await deriveKeyCached(passphrase, parsed.kdf)
-        const remoteDataset = await decryptEnvelope<Dataset>(parsed, key)
+        const remoteDataset = normaliseDataset(await decryptEnvelope<Dataset>(parsed, key))
         const entries = outboxRef.current.pending
-        const merged = applyAnnotations(
+        const merged = applyOps(
           { ...remoteDataset, updatedAt: new Date().toISOString() },
           entries,
         )
@@ -206,7 +243,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
   const applyUnlocked = useCallback(
     (nextConfig: AppConfig, rawDataset: Dataset) => {
       const box = loadOutbox()
-      const withLocal = applyAnnotations(rawDataset, [...box.settled, ...box.pending])
+      const withLocal = applyOps(rawDataset, [...box.settled, ...box.pending])
       const pruned = pruneSettled(box, rawDataset, Date.now())
       persistOutbox(pruned)
 
@@ -231,7 +268,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       setError(undefined)
       try {
         const dataKey = await deriveKeyCached(passphrase, envs.data.kdf)
-        const rawDataset = await decryptEnvelope<Dataset>(envs.data, dataKey)
+        const rawDataset = normaliseDataset(await decryptEnvelope<Dataset>(envs.data, dataKey))
         const configKey =
           envs.config.kdf.salt === envs.data.kdf.salt && envs.config.kdf.iterations === envs.data.kdf.iterations
             ? dataKey
@@ -324,19 +361,55 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
     setStatus('locked')
   }, [])
 
-  const annotate = useCallback(
-    (expenseId: string, patch: Omit<Annotation, 'expenseId'>) => {
-      const entry = newEntry({ expenseId, ...patch }, Date.now())
+  /*
+   * Un solo punto di ingresso per tutte le scritture: la modifica compare subito
+   * a schermo e parte verso il repo in sottofondo. Se il commit non riesce resta
+   * in coda, quindi non c'è niente da annullare a mano.
+   */
+  const enqueue = useCallback(
+    (op: Op) => {
+      const entry = newEntry(op, Date.now())
       const next: OutboxState = {
         pending: [...outboxRef.current.pending, entry],
         settled: outboxRef.current.settled,
       }
       persistOutbox(next)
-      setDataset((current) => (current ? applyAnnotations(current, [entry]) : current))
+      setDataset((current) => (current ? applyOps(current, [entry]) : current))
       setSync((s) => ({ ...s, pending: next.pending.length }))
       scheduleFlush()
     },
     [persistOutbox, scheduleFlush],
+  )
+
+  const annotate = useCallback(
+    (expenseId: string, patch: Omit<Annotation, 'expenseId'>) => {
+      enqueue({ kind: 'patch', expenseId, ...patch })
+    },
+    [enqueue],
+  )
+
+  const addExpense = useCallback((expense: Expense) => enqueue({ kind: 'create', expense }), [enqueue])
+
+  const updateExpense = useCallback(
+    (expenseId: string, fields: Partial<Expense>) => enqueue({ kind: 'update', expenseId, fields }),
+    [enqueue],
+  )
+
+  const deleteExpense = useCallback(
+    (expenseId: string) => enqueue({ kind: 'delete', expenseId }),
+    [enqueue],
+  )
+
+  const addTrip = useCallback((trip: Trip) => enqueue({ kind: 'trip', trip }), [enqueue])
+
+  const addSettlement = useCallback(
+    (settlement: Settlement) => enqueue({ kind: 'settle', settlement }),
+    [enqueue],
+  )
+
+  const removeSettlement = useCallback(
+    (settlementId: string) => enqueue({ kind: 'unsettle', settlementId }),
+    [enqueue],
   )
 
   const setPerson = useCallback((person: PersonId) => {
@@ -350,6 +423,25 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
 
   const setIncludeVacations = useCallback((includeVacations: boolean) => {
     setView((v) => ({ ...v, includeVacations }))
+  }, [])
+
+  /*
+   * Il tocco non si ricorda: se si ricordasse, la prima volta che scopri il
+   * numero resteresti scoperto per sempre, che è l'opposto di quello che serve.
+   * Quello che resta è il default, deciso nelle impostazioni.
+   */
+  const toggleHideIncome = useCallback(() => {
+    setHideIncome((hidden) => !hidden)
+  }, [])
+
+  const setHideIncomeByDefault = useCallback((hidden: boolean) => {
+    setDefaultHidden(hidden)
+    setHideIncome(hidden)
+    try {
+      localStorage.setItem(HIDE_INCOME_KEY, hidden ? 'on' : 'off')
+    } catch {
+      /* niente storage: la scelta vale per questa sessione */
+    }
   }, [])
 
   const reload = useCallback(() => {
@@ -376,31 +468,51 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       view,
       sync: { ...sync, pending: outbox.pending.length },
       hasStoredPassphrase,
+      hideIncome,
+      hideIncomeByDefault,
       unlock,
       lock,
       setMonth,
       setPerson,
       setIncludeVacations,
+      toggleHideIncome,
+      setHideIncomeByDefault,
       annotate,
+      addExpense,
+      updateExpense,
+      deleteExpense,
+      addTrip,
+      addSettlement,
+      removeSettlement,
       syncNow: flush,
       reload,
     }),
     [
+      addExpense,
+      addSettlement,
+      addTrip,
       annotate,
+      removeSettlement,
+      deleteExpense,
+      updateExpense,
       config,
       dataset,
       error,
       flush,
       hasStoredPassphrase,
+      hideIncome,
+      hideIncomeByDefault,
       lock,
       month,
       months,
       outbox.pending.length,
       reload,
+      setHideIncomeByDefault,
       setIncludeVacations,
       setPerson,
       status,
       sync,
+      toggleHideIncome,
       unlock,
       view,
     ],

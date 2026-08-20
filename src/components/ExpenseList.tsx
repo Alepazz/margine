@@ -1,13 +1,19 @@
-/** Elenco spese: una riga per voce, toccabile per aprire il dettaglio. */
+/**
+ * Elenco spese: una riga per voce, toccabile per aprire il dettaglio.
+ *
+ * Con `pageSize` l'elenco si impagina da sé. Serve perché una pagina che
+ * mostra tutto diventa un nastro: il tricount di casa da solo faceva undici­mila
+ * pixel di altezza, e sotto le prime venti righe non c'è più niente da capire.
+ */
 
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
 import type { CategoryLookup } from '../domain/categories'
 import { formatDate } from '../domain/dates'
-import { formatEuro } from '../domain/money'
+import { formatEuro, toCents } from '../domain/money'
 import { shareOf } from '../domain/selectors'
-import { toCents } from '../domain/money'
 import type { Expense, PersonId } from '../domain/types'
+import { ShowMore } from './ui'
 
 export function ExpenseList({
   expenses,
@@ -21,6 +27,7 @@ export function ExpenseList({
    */
   detail = 'category',
   emptyText = 'Nessuna spesa qui.',
+  pageSize,
 }: {
   expenses: readonly Expense[]
   person: PersonId
@@ -29,12 +36,24 @@ export function ExpenseList({
   showSource?: boolean
   detail?: 'category' | 'subcategory'
   emptyText?: string
+  /** Quante righe alla volta. Senza, si mostra tutto. */
+  pageSize?: number
 }): ReactNode {
+  const [limit, setLimit] = useState(() => pageSize ?? Number.POSITIVE_INFINITY)
+
+  /* Cambia l'insieme — un filtro, un'altra persona — e si riparte dalla prima
+     pagina: restare a «mostrate 80 di 3» non vorrebbe dire niente. */
+  useEffect(() => setLimit(pageSize ?? Number.POSITIVE_INFINITY), [expenses, pageSize])
+
   if (expenses.length === 0) return <p className="empty">{emptyText}</p>
 
+  const shown = limit >= expenses.length ? expenses : expenses.slice(0, limit)
+  const rest = expenses.length - shown.length
+
   return (
-    <div className="list">
-      {expenses.map((expense) => {
+    <>
+      <div className="list">
+        {shown.map((expense) => {
         const share = shareOf(expense, person)
         const shared = toCents(share) !== toCents(expense.amount)
         return (
@@ -86,6 +105,11 @@ export function ExpenseList({
           </button>
         )
       })}
-    </div>
+      </div>
+
+      {pageSize ? (
+        <ShowMore rest={rest} step={pageSize} onMore={() => setLimit((n) => n + pageSize)} />
+      ) : null}
+    </>
   )
 }
