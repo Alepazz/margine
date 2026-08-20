@@ -42,6 +42,10 @@
           "label": "Bollette"
         },
         {
+          "id": "internet",
+          "label": "Internet e telefono"
+        },
+        {
           "id": "manutenzione",
           "label": "Manutenzione"
         },
@@ -68,7 +72,7 @@
     {
       "id": "ristoranti",
       "label": "Bar e ristoranti",
-      "emoji": "🍝",
+      "emoji": "🍔",
       "slot": 2,
       "subcategories": [
         {
@@ -123,7 +127,7 @@
     },
     {
       "id": "trasporti",
-      "label": "Trasporti",
+      "label": "Auto",
       "emoji": "🚗",
       "slot": 4,
       "subcategories": [
@@ -142,22 +146,22 @@
         {
           "id": "auto",
           "label": "Bollo, assicurazione, officina"
-        },
-        {
-          "id": "mezzi",
-          "label": "Treni e mezzi"
         }
       ]
     },
     {
       "id": "salute",
       "label": "Salute",
-      "emoji": "💊",
+      "emoji": "🦷",
       "slot": 5,
       "subcategories": [
         {
           "id": "psicologo",
           "label": "Psicologo"
+        },
+        {
+          "id": "dentista",
+          "label": "Dentista"
         },
         {
           "id": "farmacia",
@@ -257,18 +261,13 @@
     },
     {
       "id": "telefonia",
-      "label": "Telefonia e internet",
+      "label": "Telefono",
       "emoji": "📱"
     },
     {
-      "id": "tecnologia",
-      "label": "Tecnologia",
-      "emoji": "💻"
-    },
-    {
-      "id": "burocrazia",
-      "label": "Tasse e burocrazia",
-      "emoji": "📄"
+      "id": "mezzi",
+      "label": "Treni e mezzi",
+      "emoji": "🚆"
     },
     {
       "id": "altro",
@@ -303,8 +302,7 @@
       "salute/farmacia",
       "salute/visite",
       "salute/occhiali",
-      "gatto/veterinario",
-      "burocrazia"
+      "gatto/veterinario"
     ],
     "driveFolderHint": "Drive → Scontrini 730 → <anno>"
   },
@@ -312,6 +310,7 @@
     "owner": "Alepazz",
     "repo": "margine",
     "branch": "main",
-    "dataPath": "public/data/expenses.json.enc"
+    "dataPath": "public/data/expenses.json.enc",
+    "configPath": "public/data/config.json.enc"
   }
 }

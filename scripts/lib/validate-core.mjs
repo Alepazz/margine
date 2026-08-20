@@ -182,6 +182,7 @@ export function validateDataset(dataset, config) {
   }
 
   checkBalanceGroups(dataset, config, errors, warnings)
+  checkCategoryRefs(config, errors, warnings)
 
   return { errors, warnings, report: buildReport(dataset) }
 }
@@ -195,6 +196,47 @@ export function validateDataset(dataset, config) {
  * direbbe. Qui la chiave si confronta con i tricount che esistono davvero.
  * → ADR-0022
  */
+/**
+ * I riferimenti a categorie sparsi nella configurazione.
+ *
+ * `catCategory`, `tripCategory`, `houseCategory` e i suggerimenti del 730 sono
+ * **id di categorie scritti a mano** in mezzo alla configurazione: se la
+ * categoria non esiste più, la pagina del gatto resta vuota e i suggerimenti del
+ * 730 non trovano niente — senza un errore, perché cercare qualcosa che non c'è
+ * non è un guasto. Prima era un caso di svista; da quando le categorie si
+ * cancellano dall'app è un caso normale, e va detto. → ADR-0024
+ */
+function checkCategoryRefs(config, errors, warnings) {
+  if (!config) return
+  const ids = new Set((config.categories ?? []).map((c) => c.id))
+  const subs = new Map(
+    (config.categories ?? []).map((c) => [c.id, new Set((c.subcategories ?? []).map((s) => s.id))]),
+  )
+
+  for (const key of ['catCategory', 'tripCategory', 'houseCategory']) {
+    const value = config[key]
+    if (value && !ids.has(value)) {
+      errors.push(`${key} punta a «${value}», che non è una categoria che esiste.`)
+    }
+  }
+
+  for (const hint of config.fiscal?.deductibleHints ?? []) {
+    const [category, sub] = String(hint).split('/')
+    if (!ids.has(category)) {
+      warnings.push(
+        `fiscal.deductibleHints contiene «${hint}», e la categoria «${category}» non esiste più: ` +
+          'quel suggerimento non troverà mai niente nel 730.',
+      )
+      continue
+    }
+    if (sub && !subs.get(category)?.has(sub)) {
+      warnings.push(
+        `fiscal.deductibleHints contiene «${hint}», e «${sub}» non è più un tipo di «${category}».`,
+      )
+    }
+  }
+}
+
 function checkBalanceGroups(dataset, config, errors, warnings) {
   const groups = config?.balance?.groups
   if (!groups) return

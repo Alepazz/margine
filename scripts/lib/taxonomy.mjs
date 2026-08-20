@@ -21,6 +21,13 @@ export const CATEGORIES = [
     subcategories: [
       { id: 'affitto', label: 'Affitto' },
       { id: 'bollette', label: 'Bollette' },
+      /*
+       * La rete di casa è una utenza dell'abitazione, non del telefono di
+       * qualcuno: il modem e la linea fissa stanno qui, le ricariche personali
+       * restano nella categoria «Telefono». Sta fuori da «Bollette» perché
+       * quella resta gas, luce e Tari.
+       */
+      { id: 'internet', label: 'Internet e telefono' },
       { id: 'manutenzione', label: 'Manutenzione' },
       { id: 'arredo', label: 'Arredo e casalinghi' },
       { id: 'prodotti', label: 'Prodotti per la casa' },
@@ -31,7 +38,7 @@ export const CATEGORIES = [
   {
     id: 'ristoranti',
     label: 'Bar e ristoranti',
-    emoji: '🍝',
+    emoji: '🍔',
     slot: 2,
     subcategories: [
       { id: 'colazione', label: 'Colazioni e caffè' },
@@ -54,9 +61,15 @@ export const CATEGORIES = [
       { id: 'accessori', label: 'Accessori e giochi' },
     ],
   },
+  /*
+   * «Auto» e non «Trasporti»: qualunque spesa dell'auto fuori dalle vacanze. I
+   * treni non ci stanno dentro e hanno una categoria loro — l'id resta
+   * `trasporti` perché non si vede da nessuna parte e rinominarlo vorrebbe dire
+   * riscrivere centoventi voci per un'etichetta.
+   */
   {
     id: 'trasporti',
-    label: 'Trasporti',
+    label: 'Auto',
     emoji: '🚗',
     slot: 4,
     subcategories: [
@@ -64,16 +77,16 @@ export const CATEGORIES = [
       { id: 'autostrada', label: 'Autostrada e pedaggi' },
       { id: 'parcheggi', label: 'Parcheggi e lavaggi' },
       { id: 'auto', label: 'Bollo, assicurazione, officina' },
-      { id: 'mezzi', label: 'Treni e mezzi' },
     ],
   },
   {
     id: 'salute',
     label: 'Salute',
-    emoji: '💊',
+    emoji: '🦷',
     slot: 5,
     subcategories: [
       { id: 'psicologo', label: 'Psicologo' },
+      { id: 'dentista', label: 'Dentista' },
       { id: 'farmacia', label: 'Farmacia' },
       { id: 'visite', label: 'Visite ed esami' },
       { id: 'occhiali', label: 'Occhiali e lenti' },
@@ -121,9 +134,9 @@ export const CATEGORIES = [
     ],
   },
   { id: 'abbigliamento', label: 'Abbigliamento', emoji: '👕' },
-  { id: 'telefonia', label: 'Telefonia e internet', emoji: '📱' },
-  { id: 'tecnologia', label: 'Tecnologia', emoji: '💻' },
-  { id: 'burocrazia', label: 'Tasse e burocrazia', emoji: '📄' },
+  /* Solo il telefono di una persona: la rete di casa sta in `casa/internet`. */
+  { id: 'telefonia', label: 'Telefono', emoji: '📱' },
+  { id: 'mezzi', label: 'Treni e mezzi', emoji: '🚆' },
   { id: 'altro', label: 'Altro', emoji: '▫️' },
 ]
 

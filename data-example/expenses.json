@@ -990,7 +990,7 @@
       "source": "condivise",
       "category": "trasporti",
       "recurring": false,
-      "subcategory": "mezzi"
+      "subcategory": "parcheggi"
     },
     {
       "id": "2025-03-07-0140",
@@ -1904,7 +1904,7 @@
       "source": "condivise",
       "category": "trasporti",
       "recurring": false,
-      "subcategory": "mezzi"
+      "subcategory": "parcheggi"
     },
     {
       "id": "2025-05-14-0165",
@@ -3199,9 +3199,9 @@
       },
       "paidBy": "partner",
       "source": "vacanze",
-      "category": "trasporti",
+      "category": "viaggi",
       "recurring": false,
-      "subcategory": "mezzi",
+      "subcategory": "trasporti",
       "trip": "2025-lofoten"
     },
     {
@@ -4316,7 +4316,7 @@
       "source": "condivise",
       "category": "trasporti",
       "recurring": false,
-      "subcategory": "mezzi"
+      "subcategory": "parcheggi"
     },
     {
       "id": "2025-10-13-0227",
@@ -5605,7 +5605,7 @@
       "source": "condivise",
       "category": "trasporti",
       "recurring": false,
-      "subcategory": "parcheggi"
+      "subcategory": "autostrada"
     },
     {
       "id": "2026-01-14-0481",
@@ -6437,9 +6437,9 @@
       },
       "paidBy": "partner",
       "source": "vacanze",
-      "category": "trasporti",
+      "category": "viaggi",
       "recurring": false,
-      "subcategory": "mezzi",
+      "subcategory": "trasporti",
       "trip": "2026-lisbona"
     },
     {
@@ -8636,9 +8636,8 @@
       },
       "paidBy": "me",
       "source": "personali",
-      "category": "trasporti",
+      "category": "mezzi",
       "recurring": false,
-      "subcategory": "mezzi",
       "notes": "Da chiedere al commercialista: l’abbonamento ai mezzi è detraibile."
     },
     {
