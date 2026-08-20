@@ -9,10 +9,18 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type Ref,
 } from 'react'
 
 import { formatPct } from '../domain/money'
 import type { MarginStatus } from '../domain/income'
+
+/**
+ * Il segno al posto di un numero coperto. Sta qui, e non in due posti, perché i
+ * luoghi che oscurano i guadagni sono due — la scheda del margine e il profilo
+ * entrate — e devono coprire allo stesso modo. → ADR-0016
+ */
+export const VEIL = '••••'
 
 // ─────────────────────────── scheda ───────────────────────────
 
@@ -21,14 +29,21 @@ export function Card({
   note,
   action,
   children,
+  /* Classi di **comportamento**, non di stile: `scroll-target` dice che qualcuno
+     ci arriva scorrendo, non come è dipinta la scheda. I colori restano nei
+     token, come sempre. */
+  className,
+  ref,
 }: {
   title?: string
   note?: string
   action?: ReactNode
   children: ReactNode
+  className?: string
+  ref?: Ref<HTMLElement>
 }): ReactNode {
   return (
-    <section className="card">
+    <section className={className ? `card ${className}` : 'card'} ref={ref}>
       {title || action || note ? (
         <div className="card-head">
           <div>
@@ -103,6 +118,38 @@ export function DeltaLabel({
       {formatPct(Math.abs(rounded))}
       {suffix ? ` ${suffix}` : ''}
     </span>
+  )
+}
+
+/**
+ * Il piede di un elenco con un tetto: «Mostra altre 12 (di 46 rimaste)».
+ *
+ * Sta qui e non in ogni pagina perché è la stessa cosa ovunque — un elenco
+ * troncato che si allunga di una pagina — e perché una pagina che stampa
+ * quattromila pixel di righe non si scorre col pollice.
+ */
+export function ShowMore({
+  rest,
+  step,
+  onMore,
+  /* «altre … rimaste» per le spese, «altri … rimasti» per i movimenti: in
+     italiano il genere cambia due parole, quindi lo dice chi chiama. */
+  gender = 'f',
+}: {
+  rest: number
+  step: number
+  onMore: () => void
+  gender?: 'f' | 'm'
+}): ReactNode {
+  if (rest <= 0) return null
+  const altri = gender === 'f' ? 'altre' : 'altri'
+  const rimasti = gender === 'f' ? 'rimaste' : 'rimasti'
+  return (
+    <div className="card-foot" style={{ textAlign: 'center' }}>
+      <button type="button" className="btn btn-sm" onClick={onMore}>
+        Mostra {altri} {Math.min(step, rest)} (di {rest} {rimasti})
+      </button>
+    </div>
   )
 }
 
@@ -184,8 +231,11 @@ export function Segmented<T extends string>({
   onChange: (value: T) => void
   ariaLabel: string
 }): ReactNode {
+  /* Da quattro voci in su l'imbottitura piena sborda dai 390px del telefono. */
+  const tight = options.length >= 4
+
   return (
-    <div className="segmented" role="group" aria-label={ariaLabel}>
+    <div className={`segmented${tight ? ' is-tight' : ''}`} role="group" aria-label={ariaLabel}>
       {options.map((option) => (
         <button
           key={option.value}

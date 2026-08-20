@@ -6,7 +6,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 
 import { BarList } from '../components/charts/BarList'
-import { PersonSwitch } from '../components/Controls'
 import { ExpenseList } from '../components/ExpenseList'
 import { ExpenseSheet } from '../components/ExpenseSheet'
 import { Card, Notice, StatTile, useToast } from '../components/ui'
@@ -70,9 +69,6 @@ export function Tax730(): ReactNode {
           <p className="page-sub">
             Quota di {personName} · anno fiscale {year}
           </p>
-        </div>
-        <div className="row" style={{ marginLeft: 'auto' }}>
-          <PersonSwitch />
         </div>
       </div>
 

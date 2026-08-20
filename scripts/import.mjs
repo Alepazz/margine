@@ -29,6 +29,34 @@ function idFor(expense) {
   return `${expense.date}-${hash8(`${expense.title}|${expense.amount}|${expense.source}`)}`
 }
 
+const cents = (value) => Math.round(Number(value) * 100)
+
+function dayDistance(a, b) {
+  const ms = Math.abs(Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`))
+  return Math.round(ms / 86_400_000)
+}
+
+/**
+ * Da quando le spese si aggiungono anche dall'app, la stessa cena può arrivare
+ * due volte: una battuta al ristorante, una dal tricount il mese dopo. Gli id
+ * non se ne accorgono, perché quello dell'app è casuale e quello dell'import è
+ * ricavato dal titolo — e due titoli diversi per la stessa cena sono la norma.
+ *
+ * Il sospetto è: **stesso importo al centesimo, e data che dista al massimo un
+ * giorno.** Le voci sospette non entrano, e vengono elencate: meglio una spesa
+ * da reimportare a mano che un numero raddoppiato in silenzio. Con `--doppie`
+ * entrano comunque.
+ */
+function findTwin(expense, master) {
+  const amount = cents(expense.amount)
+  return master.find(
+    (other) =>
+      cents(other.amount) === amount &&
+      other.source === expense.source &&
+      dayDistance(other.date, expense.date) <= 1,
+  )
+}
+
 /** Le quote si possono omettere: `split: "half" | "me" | "partner"` basta. */
 function withShares(expense) {
   if (expense.shares) return expense
@@ -57,9 +85,11 @@ try {
       const byId = new Map(master.expenses.map((expense) => [expense.id, expense]))
       const tripsById = new Map(master.trips.map((trip) => [trip.id, trip]))
 
+      const allowTwins = process.argv.includes('--doppie')
       let added = 0
       let skipped = 0
       let tripsAdded = 0
+      const twins = []
 
       for (const name of files) {
         const raw = readJson(join(PATHS.incoming, name))
@@ -80,6 +110,13 @@ try {
             skipped += 1
             continue
           }
+          if (!allowTwins) {
+            const twin = findTwin(expense, [...byId.values()])
+            if (twin) {
+              twins.push({ incoming: expense, twin })
+              continue
+            }
+          }
           byId.set(id, { ...expense, id })
           added += 1
         }
@@ -98,6 +135,25 @@ try {
 
       log('')
       log(`Aggiunte ${added} spese, ${tripsAdded} viaggi. Già presenti (saltate): ${skipped}.`)
+
+      if (twins.length > 0) {
+        const total = twins.reduce((sum, t) => sum + cents(t.incoming.amount), 0) / 100
+        log('')
+        /* L'accordo al plurale su tre parole diverse è un modo sicuro di
+           sbagliare: la frase gira intorno al problema. */
+        const quante = twins.length === 1 ? '1 voce sembra' : `${twins.length} voci sembrano`
+        log(`⚠ ${quante} già esserci: lasciate fuori dall'import (${total.toFixed(2)} €).`)
+        for (const { incoming, twin } of twins) {
+          log(`   in arrivo  ${incoming.date}  ${Number(incoming.amount).toFixed(2)} €  «${incoming.title}»`)
+          log(`   già dentro ${twin.date}  ${Number(twin.amount).toFixed(2)} €  «${twin.title}»  (${twin.id})`)
+          log('')
+        }
+        log('   Stesso importo e data a meno di un giorno: probabile la stessa spesa,')
+        log('   inserita dall\'app e poi arrivata anche dal tricount.')
+        log('   Se sono davvero diverse: npm run import -- --doppie')
+        log('')
+      }
+
       log(`Master: ${merged.expenses.length} spese, ${merged.trips.length} viaggi.`)
 
       writeJson(PATHS.expenses, merged)

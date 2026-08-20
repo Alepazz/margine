@@ -93,6 +93,17 @@ export interface Trip {
   start: string
   /** ISO `YYYY-MM-DD`, incluso. */
   end: string
+  /**
+   * Dove finisce il puntino sul mappamondo. Facoltativa: un viaggio senza
+   * coordinate esiste come tutti gli altri, semplicemente compare nell'elenco
+   * sotto il globo invece che sopra.
+   *
+   * `approx: true` quando il posto è una regione o un paese e non un luogo —
+   * «Germania» e «Campania e Calabria» non hanno un punto, quindi ne è stato
+   * scelto uno centrale. Il mappamondo lo dice, invece di far credere a una
+   * precisione che non c'è. → ADR-0020
+   */
+  coords?: { lat: number; lon: number; approx?: boolean }
 }
 
 export interface Subcategory {
@@ -162,6 +173,44 @@ export interface AppConfig {
   catCategory: string
   /** Id della categoria delle spese di viaggio: dà i nomi alle fette di un viaggio. */
   tripCategory: string
+  /**
+   * Il tricount di casa (le spese fisse condivise) e la categoria «casa».
+   * Sono **due insiemi diversi** e la pagina Casa li mostra separati: nel
+   * tricount finiscono anche telefonia e assicurazione auto, e spese di casa
+   * vere finiscono nell'altro tricount condiviso.
+   */
+  houseSource: Source
+  houseCategory: string
+  /**
+   * Da dove parte il saldo fra le due persone. Calcolarlo da tutta la storia
+   * darebbe [cifra rimossa] — falso, perché in due anni si sono già saldati molte volte
+   * e nessuno di quei rimborsi è nei dati. Quindi si dichiara un punto di
+   * partenza: `opening` è il saldo alla data `since` (positivo = il partner deve
+   * a `me`), e da lì in avanti conta quello che è registrato. → ADR-0019
+   *
+   * Il punto di partenza è **per tricount**, in `groups`: ci si salda un gruppo
+   * alla volta — una vacanza può essere pari mentre le spese di casa non lo
+   * sono — e un numero solo non è confrontabile con niente di quello che si vede
+   * su Tricount. → ADR-0022
+   */
+  balance: {
+    /** Data di ripiego per i tricount che non ne dichiarano una propria. */
+    since: string
+    /**
+     * Residuo **non attribuibile** a nessun tricount: contanti prestati, spese
+     * rimaste fuori da ogni gruppo. Entra nel totale una volta sola — non è
+     * il valore di partenza dei gruppi, che hanno il proprio.
+     */
+    opening: number
+    note?: string
+    /**
+     * Punto di partenza per tricount. La chiave è `fisse` | `condivise` |
+     * `personali` | `vacanze/<idViaggio>`. Un tricount che non compare qui non
+     * ha un numero confrontabile con Tricount, e la pagina lo dichiara invece di
+     * mostrare uno zero che sembra un fatto.
+     */
+    groups?: Record<string, { since: string; opening: number; note?: string }>
+  }
   fiscal: {
     /**
      * Cosa è tipicamente detraibile: l'app lo suggerisce, non decide. Ogni voce
@@ -176,12 +225,35 @@ export interface AppConfig {
   github: GithubConfig | null
 }
 
+/**
+ * Un rimborso fra le due persone: il movimento che riporta il saldo verso zero.
+ *
+ * Non è una spesa e non entra da nessuna parte nei conti del mese — le spese
+ * contano già solo la propria quota, quindi contare anche il rimborso vorrebbe
+ * dire contarlo due volte. Serve a una cosa sola: sapere chi deve cosa a chi.
+ * → ADR-0019
+ */
+export interface Settlement {
+  id: string
+  date: string
+  from: PersonId
+  to: PersonId
+  amount: number
+  note?: string
+}
+
 export interface Dataset {
   version: number
   /** ISO datetime dell'ultimo aggiornamento. */
   updatedAt: string
   expenses: Expense[]
   trips: Trip[]
+  /**
+   * I rimborsi registrati. Il file cifrato scritto prima di ADR-0019 non ha
+   * questo campo: viene normalizzato a lista vuota appena i dati entrano
+   * nell'app, così da qui in poi il tipo dice la verità.
+   */
+  settlements: Settlement[]
 }
 
 /** Patch che l'app scrive su una spesa (tag 730, note, scontrini, welfare). */

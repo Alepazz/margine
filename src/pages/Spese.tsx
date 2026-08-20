@@ -7,7 +7,6 @@
 
 import { useMemo, useState, type ReactNode } from 'react'
 
-import { PersonSwitch } from '../components/Controls'
 import { ExpenseList } from '../components/ExpenseList'
 import { ExpenseSheet } from '../components/ExpenseSheet'
 import { Card, StatTile } from '../components/ui'
@@ -42,7 +41,6 @@ export function Spese(): ReactNode {
   const person = view.person
   const [filter, setFilter] = useState<ExpenseFilter>(EMPTY_FILTER)
   const [sort, setSort] = useState<SortKey>('date-desc')
-  const [limit, setLimit] = useState(PAGE_SIZE)
   const [selected, setSelected] = useState<Expense | null>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
 
@@ -55,11 +53,10 @@ export function Spese(): ReactNode {
 
   const months = useMemo(() => monthsOf(all).reverse(), [all])
   const filtered = useMemo(() => sortExpenses(applyFilter(all, filter), sort, person), [all, filter, person, sort])
-  const shown = filtered.slice(0, limit)
 
+  /* L'impaginazione la fa `ExpenseList`, che riparte da sola quando l'insieme cambia. */
   const update = (patch: Partial<ExpenseFilter>) => {
     setFilter((current) => ({ ...current, ...patch }))
-    setLimit(PAGE_SIZE)
   }
 
   return (
@@ -70,9 +67,6 @@ export function Spese(): ReactNode {
           <p className="page-sub">
             Ogni voce di tutti i tricount, come quota di {config.people[person].name}
           </p>
-        </div>
-        <div className="row" style={{ marginLeft: 'auto' }}>
-          <PersonSwitch />
         </div>
       </div>
 
@@ -176,7 +170,6 @@ export function Spese(): ReactNode {
             onClick={() => {
               setFilter(EMPTY_FILTER)
               setSort('date-desc')
-              setLimit(PAGE_SIZE)
             }}
           >
             Azzera filtri
@@ -202,21 +195,13 @@ export function Spese(): ReactNode {
         </div>
 
         <ExpenseList
-          expenses={shown}
+          expenses={filtered}
           person={person}
           lookup={lookup}
           onSelect={setSelected}
           emptyText="Nessuna spesa corrisponde ai filtri."
+          pageSize={PAGE_SIZE}
         />
-
-        {filtered.length > shown.length ? (
-          <div className="card-foot" style={{ textAlign: 'center' }}>
-            <button type="button" className="btn btn-sm" onClick={() => setLimit((n) => n + PAGE_SIZE)}>
-              Mostra altre {Math.min(PAGE_SIZE, filtered.length - shown.length)} (di{' '}
-              {filtered.length - shown.length} rimaste)
-            </button>
-          </div>
-        ) : null}
       </Card>
 
       {selected ? (

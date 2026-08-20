@@ -254,12 +254,22 @@ a:hover {
   flex: 1 1 auto;
 }
 
+/*
+ * Bersaglio di uno `scrollIntoView`. La testata è appiccicata in cima, quindi
+ * chi arriva qui scorrendo finirebbe sotto il vetro: la distanza la dichiara il
+ * CSS, che è l'unico posto che sa quanto è alta la testata.
+ */
+.scroll-target {
+  scroll-margin-top: 76px;
+}
+
 .content {
   flex: 1 1 auto;
   min-width: 0;
   width: 100%;
   max-width: 1120px;
-  padding: 20px 16px 96px 18px;
+  /* In fondo si riserva l'ingombro vero dell'isola, non un numero a occhio. */
+  padding: 20px 16px var(--tabbar-reserve) 18px;
   /* Il margine del quaderno, sul bordo della pagina. */
   border-left: 2px solid var(--rule);
 }
@@ -274,6 +284,26 @@ a:hover {
 
 .page-head-text {
   min-width: 0;
+}
+
+/*
+ * Testata compatta: titolo, contesto e l'unico interruttore della pagina su una
+ * riga sola, allineati alla base. Cinque blocchi impilati prima del contenuto
+ * erano trecento pixel spesi per non dire niente di nuovo — il mese lo dice già
+ * la striscia, e chi guarda lo dice la testata dell'applicazione.
+ */
+.page-head.is-tight {
+  align-items: baseline;
+  gap: 4px 10px;
+  margin-bottom: 12px;
+}
+
+.page-head.is-tight h1 {
+  font-size: 1.35rem;
+}
+
+.page-head.is-tight .page-sub {
+  margin-top: 0;
 }
 
 .page-sub {
@@ -330,17 +360,47 @@ a:hover {
  * Barra di navigazione a isola fluttuante, in vetro: staccata dai bordi e dal
  * fondo, così il pollice la raggiunge senza sfiorare la gesture bar di iOS e la
  * pagina continua a intravedersi sotto.
+ *
+ * L'isola esiste solo sotto i 900px — sopra c'è la colonna laterale — quindi le
+ * misure da telefono stanno già qui: un secondo giro di valori nel blocco
+ * mobile sarebbe una copia da tenere allineata a mano.
+ *
+ * Lo spazio che la pagina riserva in fondo (`--tabbar-reserve`) deve valere
+ * quanto l'isola ingombra davvero. Erano due costanti indipendenti battute a
+ * occhio, e sono divergite: la pagina riservava 116px per un'isola che ne
+ * occupava 154, e le ultime righe di ogni pagina finivano sotto il vetro.
+ *
+ * `--tabbar-h` non si calcola qui, si **misura**: l'altezza dell'isola è
+ * emergente — la decidono glifo, etichetta e scala del carattere (108% su
+ * telefono), non il `min-height` del link. Prevederla in CSS la sbagliava di
+ * 6px. La pubblica `AppShell` con un ResizeObserver, e il valore qui sotto
+ * serve solo al primo disegno, prima che il misuratore parta.
  */
+:root {
+  /* Quanto l'isola sta staccata dal fondo, oltre alla safe-area. */
+  --tabbar-lift: 14px;
+  --tabbar-h: 80px;
+  --tabbar-reserve: calc(
+    env(safe-area-inset-bottom) + var(--tabbar-lift) + var(--tabbar-h) + 16px
+  );
+}
+
 .tabbar {
   position: fixed;
-  bottom: calc(env(safe-area-inset-bottom) + 14px);
+  bottom: calc(env(safe-area-inset-bottom) + var(--tabbar-lift));
   left: 50%;
   transform: translateX(-50%);
   width: calc(min(560px, 100vw) - 24px);
   z-index: 30;
   display: flex;
   gap: 2px;
-  padding: 7px 6px;
+  /*
+   * Nessun padding-bottom con la safe-area: quello serve a una barra incollata
+   * al bordo dello schermo, che deve tenere le icone sopra la gesture bar. Qui
+   * l'isola è già sollevata dal `bottom`, e sommarla due volte le appendeva
+   * sotto uno zoccolo vuoto di 34px.
+   */
+  padding: 8px 4px;
   border-radius: 999px;
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
@@ -352,16 +412,23 @@ a:hover {
 .tabbar-link {
   flex: 1 1 0;
   min-width: 0;
+  /*
+   * Pavimento tappabile, non l'altezza vera: glifo + etichetta ne fanno già 62,
+   * quindi questo vincolo non morde mai finché ci sono entrambi. Serve se un
+   * giorno una voce perdesse l'etichetta. Non leggerlo come «l'isola è alta
+   * 56 + padding»: quel conto è già stato sbagliato una volta.
+   */
+  min-height: 56px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 3px;
-  padding: 6px 2px;
+  padding: 8px 2px;
   border-radius: 999px;
   color: var(--ink-3);
   text-decoration: none;
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.005em;
   transition:
@@ -375,7 +442,7 @@ a:hover {
 }
 
 .tabbar-glyph {
-  font-size: 1.2rem;
+  font-size: 1.4rem;
   line-height: 1;
 }
 
@@ -393,6 +460,15 @@ a:hover {
   }
 
   .topbar-brand {
+    display: none;
+  }
+
+  /*
+   * Il menu «altre viste» non serve: sulla colonna laterale quelle voci si
+   * vedono già tutte, e un pulsante che apre un foglio con dentro due link
+   * visibili a sinistra sarebbe solo un giro in più.
+   */
+  .topbar-more {
     display: none;
   }
 

@@ -130,6 +130,15 @@ export const CATEGORIES = [
 export const CAT_CATEGORY = 'gatto'
 export const TRIP_CATEGORY = 'viaggi'
 
+/*
+ * La casa ha bisogno di **due** riferimenti perché il tricount e la categoria
+ * non coincidono: nel tricount «Spese Casa» finiscono anche telefonia e
+ * assicurazione auto, e spese di casa vere finiscono nell'altro tricount
+ * condiviso. La pagina Casa mostra i due insiemi separati.
+ */
+export const HOUSE_SOURCE = 'fisse'
+export const HOUSE_CATEGORY = 'casa'
+
 /** Firma stabile della tassonomia: serve a confrontare due copie. */
 export function taxonomyFingerprint(categories) {
   return (categories ?? [])
