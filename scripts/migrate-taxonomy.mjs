@@ -26,11 +26,11 @@ import { PATHS, log, readJson, writeJson } from './lib/io.mjs'
  * sono e non ne inventa: sono l'unica cosa in questa migrazione che nessun
  * codice può sapere. → ADR-0026
  */
-function keepSourceLabels(config, warn) {
-  if (config.sourceLabels) return config.sourceLabels
+function keepSources(config, warn) {
+  if (config.sources) return config.sources
   warn(
-    'config.sourceLabels non c’è: i tricount compariranno coi nomi generici. ' +
-      'Aggiungili a data/config.json coi nomi che leggi su Tricount.',
+    'config.sources non c’è: i tricount compariranno coi nomi generici. ' +
+      'Aggiungili a data/config.json coi nomi e le emoji che leggi su Tricount.',
   )
   return undefined
 }
@@ -182,11 +182,11 @@ function main() {
     return
   }
 
-  const sourceLabels = keepSourceLabels(config, (message) => log(`⚠ ${message}`))
+  const sources = keepSources(config, (message) => log(`⚠ ${message}`))
   writeJson(PATHS.expenses, { ...dataset, expenses, updatedAt: new Date().toISOString() })
   writeJson(PATHS.config, {
     ...config,
-    ...(sourceLabels ? { sourceLabels } : {}),
+    ...(sources ? { sources } : {}),
     categories: CATEGORIES,
   })
   log('\n✓ data/expenses.json e data/config.json aggiornati.')

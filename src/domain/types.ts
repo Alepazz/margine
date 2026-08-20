@@ -34,17 +34,46 @@ export const SOURCE_LABELS: Record<Source, string> = {
 }
 
 /**
- * Il nome vero di un tricount, col generico come ripiego.
+ * Come si chiama un tricount **da lui**: nome ed emoji, come li vedi in cima
+ * alla schermata di Tricount. L'emoji fa parte dell'identità, non è decorazione:
+ * in un menù di otto voci è quello che riconosci prima del testo.
+ */
+export interface SourceMeta {
+  name: string
+  emoji?: string
+}
+
+/** I tricount così come li conosce chi li usa. Vive nei dati: il repo è pubblico. */
+export type SourceMap = Partial<Record<Source, SourceMeta>>
+
+/**
+ * Il nome vero di un tricount, col generico come ripiego. **Senza emoji**: lo
+ * vogliono così l'export CSV e i posti dove il nome finisce in mezzo a una frase.
  *
  * Sta qui, accanto alle etichette che rimpiazza, e non nel `lookup` delle
  * categorie: i nomi dei tricount non hanno niente a che fare coi colori dei
  * grafici, e chi ne ha bisogno non deve costruirsi un tema per averlo.
  */
-export function sourceLabelOf(
-  sourceLabels: Partial<Record<Source, string>> | undefined,
-  source: Source,
-): string {
-  return sourceLabels?.[source] ?? SOURCE_LABELS[source]
+export function sourceLabelOf(sources: SourceMap | undefined, source: Source): string {
+  return sources?.[source]?.name ?? SOURCE_LABELS[source]
+}
+
+/**
+ * Emoji e nome di qualcosa che ha un'identità: un tricount, un viaggio, una
+ * persona. Senza emoji è il nome, senza spazi appesi.
+ */
+export function titleOf(thing: { name: string; emoji?: string }): string {
+  return thing.emoji ? `${thing.emoji} ${thing.name}` : thing.name
+}
+
+/** Emoji e nome di un tricount, per i menù e i titoli: «🏡 Spese casa». */
+export function sourceTitleOf(sources: SourceMap | undefined, source: Source): string {
+  return titleOf({ name: sourceLabelOf(sources, source), emoji: sources?.[source]?.emoji })
+}
+
+/** Emoji e nome di un viaggio. */
+export function tripTitleOf(trip: { name: string; emoji?: string }): string {
+  return titleOf(trip)
 }
 
 /**
@@ -124,6 +153,8 @@ export interface Trip {
    * precisione che non c'è. → ADR-0020
    */
   coords?: { lat: number; lon: number; approx?: boolean }
+  /** L'emoji del tricount del viaggio: 🇫🇷 per Parigi, 🏝️ per Creta. */
+  emoji?: string
   /**
    * Vero quando il viaggio è finito: smette di comparire fra i tricount in cui
    * si può inserire una spesa.
@@ -206,11 +237,11 @@ export interface AppConfig {
   people: Record<PersonId, Person>
   income: { me: IncomeProfile; partner: IncomeProfile | null }
   /**
-   * I nomi veri dei tricount, come li vedi su Tricount. Stanno nei dati e non
-   * nel codice: il repo è pubblico, i dati no. Quello che manca ricade su
-   * `SOURCE_LABELS`.
+   * I tricount come li vedi su Tricount: nome ed emoji. Stanno nei dati e non
+   * nel codice — il repo è pubblico, i dati no. Quello che manca ricade su
+   * `SOURCE_LABELS`, che è generico di proposito. → ADR-0026
    */
-  sourceLabels?: Partial<Record<Source, string>>
+  sources?: SourceMap
   /**
    * Le categorie sono **dato scrivibile dall'app**: si creano, si rinominano e
    * si cancellano da Impostazioni, e l'app riscrive `config.json.enc`. Prima

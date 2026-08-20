@@ -9,7 +9,7 @@
  */
 
 import type { CategorySlice } from './selectors'
-import { sourceLabelOf, type Category, type Source } from './types'
+import { sourceLabelOf, sourceTitleOf, type Category, type Source, type SourceMap } from './types'
 import type { ChartTheme } from '../theme/palette'
 
 export const REST_KEY = '__altre__'
@@ -27,14 +27,17 @@ export interface CategoryLookup {
   color: (id: string) => string
   hasSlot: (id: string) => boolean
   subLabel: (categoryId: string, subId: string | undefined) => string
+  /** Il nome del tricount, senza emoji: per il CSV e per le frasi. */
   sourceLabel: (source: Source) => string
+  /** Emoji e nome, per i menù e le righe dell'interfaccia. */
+  sourceTitle: (source: Source) => string
 }
 
 export function buildCategoryLookup(
   categories: readonly Category[],
   theme: ChartTheme,
-  /** I nomi veri dei tricount, dai dati. Quello che manca ricade sul generico. */
-  sourceLabels: Partial<Record<Source, string>> = {},
+  /** I tricount veri, dai dati. Quello che manca ricade sul generico. */
+  sources: SourceMap = {},
 ): CategoryLookup {
   const byId = new Map(categories.map((c) => [c.id, c]))
 
@@ -68,7 +71,8 @@ export function buildCategoryLookup(
       const sub = byId.get(categoryId)?.subcategories?.find((s) => s.id === subId)
       return sub?.label ?? subId
     },
-    sourceLabel: (source) => sourceLabelOf(sourceLabels, source),
+    sourceLabel: (source) => sourceLabelOf(sources, source),
+    sourceTitle: (source) => sourceTitleOf(sources, source),
   }
 }
 

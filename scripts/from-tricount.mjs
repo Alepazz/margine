@@ -43,6 +43,7 @@ const TRICOUNTS = [
 const TRIPS = [
   {
     id: 'germania-2024',
+    emoji: '🇩🇪',
     name: 'Germania',
     place: 'Germania',
     country: 'Germania',
@@ -53,6 +54,7 @@ const TRIPS = [
   },
   {
     id: 'parigi-2025',
+    emoji: '🇫🇷',
     name: 'Parigi',
     place: 'Parigi',
     country: 'Francia',
@@ -63,6 +65,7 @@ const TRIPS = [
   },
   {
     id: 'ortona-2025',
+    emoji: '🇮🇹',
     name: 'Ortona',
     place: 'Ortona',
     country: 'Italia',
@@ -73,6 +76,7 @@ const TRIPS = [
   },
   {
     id: 'creta-2025',
+    emoji: '🏝️',
     name: 'Creta',
     place: 'Creta',
     country: 'Grecia',
@@ -83,6 +87,7 @@ const TRIPS = [
   },
   {
     id: 'sud-italia-2026',
+    emoji: '🇮🇹',
     name: 'Sud Italia',
     place: 'Campania e Calabria',
     country: 'Italia',

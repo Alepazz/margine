@@ -16,7 +16,7 @@ import { Card, Notice, StatTile, useToast } from '../components/ui'
 import { formatDate } from '../domain/dates'
 import { formatEuro } from '../domain/money'
 import { tripPlaces, tripStats, tripsByYear } from '../domain/selectors'
-import type { Expense } from '../domain/types'
+import { tripTitleOf, type Expense } from '../domain/types'
 import { usePageData } from './usePageData'
 
 export function Vacanze(): ReactNode {
@@ -258,7 +258,7 @@ export function Vacanze(): ReactNode {
                 <span className="list-main">
                   {/* Nome e luogo coincidono spesso («Creta · Creta»): non ripeterlo. */}
                   <span className="list-title">
-                    {entry.trip.name}
+                    {tripTitleOf(entry.trip)}
                     {entry.trip.place === entry.trip.name ? '' : ` · ${entry.trip.place}`}
                   </span>
                   <span className="list-meta">
@@ -303,8 +303,8 @@ export function Vacanze(): ReactNode {
             ref={detail}
             title={
               trip.trip.place === trip.trip.name
-                ? trip.trip.name
-                : `${trip.trip.name} — ${trip.trip.place}`
+                ? tripTitleOf(trip.trip)
+                : `${tripTitleOf(trip.trip)} — ${trip.trip.place}`
             }
             note={`${formatDate(trip.trip.start)} — ${formatDate(trip.trip.end)} · ${trip.days} giorni`}
             action={

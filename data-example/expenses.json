@@ -8946,6 +8946,7 @@
   "trips": [
     {
       "id": "2025-sicilia",
+      "emoji": "🍋",
       "name": "Sicilia in macchina",
       "place": "Sicilia",
       "country": "Italia",
@@ -8960,6 +8961,7 @@
     },
     {
       "id": "2025-lofoten",
+      "emoji": "🇳🇴",
       "name": "Isole Lofoten",
       "place": "Lofoten",
       "country": "Norvegia",
@@ -8974,6 +8976,7 @@
     },
     {
       "id": "2026-lisbona",
+      "emoji": "🇵🇹",
       "name": "Weekend a Lisbona",
       "place": "Lisbona",
       "country": "Portogallo",
@@ -8987,6 +8990,7 @@
     },
     {
       "id": "2026-dolomiti",
+      "emoji": "⛰️",
       "name": "Dolomiti",
       "place": "Dolomiti",
       "country": "Italia",

@@ -6,7 +6,7 @@ import {
   categoriesWithout,
   withSlot,
 } from './categories'
-import { sourceLabelOf, type Category } from './types'
+import { sourceLabelOf, sourceTitleOf, tripTitleOf, type Category } from './types'
 import { LIGHT_CHART } from '../theme/palette'
 
 const CATEGORIES: Category[] = [
@@ -78,10 +78,24 @@ describe('cancellare una categoria', () => {
 })
 
 describe('nomi dei tricount', () => {
+  const sources = { condivise: { name: 'Il nostro tricount', emoji: '🥺' }, fisse: { name: 'Casa' } }
+
   it('usa quello dei dati, e ricade sul generico per quelli che mancano', () => {
-    const labels = { condivise: 'Il nostro tricount' }
-    expect(sourceLabelOf(labels, 'condivise')).toBe('Il nostro tricount')
-    expect(sourceLabelOf(labels, 'fisse')).toBe('Spese fisse condivise')
+    expect(sourceLabelOf(sources, 'condivise')).toBe('Il nostro tricount')
+    expect(sourceLabelOf(sources, 'vacanze')).toBe('Vacanze')
     expect(sourceLabelOf(undefined, 'fisse')).toBe('Spese fisse condivise')
+  })
+
+  /* Il nome per l'export e il titolo per i menù sono due cose diverse: un'emoji
+     in mezzo a una cella di CSV non serve a nessuno. */
+  it('il titolo porta l’emoji, il nome no', () => {
+    expect(sourceTitleOf(sources, 'condivise')).toBe('🥺 Il nostro tricount')
+    expect(sourceLabelOf(sources, 'condivise')).toBe('Il nostro tricount')
+  })
+
+  it('e senza emoji il titolo è il nome, senza spazi appesi', () => {
+    expect(sourceTitleOf(sources, 'fisse')).toBe('Casa')
+    expect(tripTitleOf({ name: 'Parigi', emoji: '🇫🇷' })).toBe('🇫🇷 Parigi')
+    expect(tripTitleOf({ name: 'Parigi' })).toBe('Parigi')
   })
 })

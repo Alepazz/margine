@@ -17,8 +17,8 @@
  */
 
 import { toCents } from './money'
-import type { Category, Expense, Payer, PersonId, Source, Trip } from './types'
-import { SOURCES, sourceLabelOf } from './types'
+import type { Category, Expense, Payer, PersonId, Source, SourceMap, Trip } from './types'
+import { SOURCES, sourceTitleOf, tripTitleOf } from './types'
 
 const DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/
 const PAYERS = new Set(['me', 'partner', 'others'])
@@ -297,9 +297,12 @@ export function ledgerKeyOf(expense: { source: Source; trip?: string }): LedgerK
 export function ledgerLabel(
   key: LedgerKey,
   trips: readonly Trip[],
-  sourceLabels: Partial<Record<Source, string>> | undefined,
+  sources: SourceMap | undefined,
 ): string {
   const { source, trip } = ledgerParts(key)
-  if (trip) return trips.find((candidate) => candidate.id === trip)?.name ?? trip
-  return SOURCES.includes(source) ? sourceLabelOf(sourceLabels, source) : key
+  if (trip) {
+    const found = trips.find((candidate) => candidate.id === trip)
+    return found ? tripTitleOf(found) : trip
+  }
+  return SOURCES.includes(source) ? sourceTitleOf(sources, source) : key
 }

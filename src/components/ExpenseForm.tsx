@@ -7,10 +7,11 @@
  * di che tipo, come si divide, e per ultima la data, che nove volte su dieci è
  * oggi e non si tocca.
  *
- * La divisione si sceglie con tre pulsanti invece di comporre due numeri che
- * devono sommare all'importo: in due anni di dati esistono **solo** tre modi di
- * dividere una spesa fuori dalle vacanze — tutta tua, tutta sua, metà e metà —
- * e la quarta possibilità resta a mano per il caso che non è ancora capitato.
+ * La divisione si dichiara dicendo **chi partecipa**: due caselle, una per
+ * persona, con accanto quanto tocca a ciascuno. Le tre divisioni che esistono
+ * davvero — metà, tutta tua, tutta sua — sono le tre combinazioni di due
+ * caselle, quindi non serve nominarle; e «a mano» resta per il caso che non è
+ * ancora capitato. → ADR-0032
  *
  * Le regole di validità sono quelle di `domain/expense-rules.ts`, le stesse che
  * l'import applica alla sessione mensile: qui si vedono mentre si sbaglia, là
@@ -30,12 +31,12 @@ import {
   validateExpense,
   type SplitPreset,
 } from '../domain/expense-rules'
-import { newExpenseId } from '../domain/ids'
-import { toCents } from '../domain/money'
-import type { Expense, Payer, Trip } from '../domain/types'
+import { newCategoryId, newExpenseId } from '../domain/ids'
+import { formatEuro, toCents } from '../domain/money'
+import { titleOf, type Category, type Expense, type Payer, type PersonId, type Trip } from '../domain/types'
 import { LedgerSelect } from './LedgerSelect'
 import { TripForm } from './TripForm'
-import { Segmented, TilePicker, useToast, type TileOption } from './ui'
+import { AmountInput, NameFields, Segmented, useToast } from './ui'
 
 /** Accetta la virgola: sulla tastiera del telefono è quello che esce. */
 function parseAmount(text: string): number {
@@ -48,12 +49,8 @@ function amountText(value: number): string {
   return value.toFixed(2).replace('.', ',')
 }
 
-const SPLIT_LABELS: Record<SplitPreset, string> = {
-  half: 'Metà',
-  mine: 'Tutta mia',
-  theirs: 'Tutta sua',
-  custom: 'A mano',
-}
+/** Valore riservato nella tendina delle categorie: non è un id, è un comando. */
+const NEW_CATEGORY = '__nuova__'
 
 export function ExpenseForm({
   expense: editing,
@@ -63,7 +60,7 @@ export function ExpenseForm({
   expense?: Expense
   onClose: () => void
 }): ReactNode {
-  const { config, dataset, view, addExpense, updateExpense, addTrip } = useStore()
+  const { config, dataset, view, addExpense, updateExpense, addTrip, setCategories } = useStore()
   const toast = useToast()
   const person = view.person
   const other = person === 'me' ? 'partner' : 'me'
@@ -89,6 +86,9 @@ export function ExpenseForm({
   const [paidBy, setPaidBy] = useState<Payer>(editing?.paidBy ?? person)
   const [recurring, setRecurring] = useState(editing?.recurring ?? false)
   const [newTrip, setNewTrip] = useState(false)
+  const [newCategory, setNewCategory] = useState(false)
+  const [catEmoji, setCatEmoji] = useState('')
+  const [catLabel, setCatLabel] = useState('')
   const [touched, setTouched] = useState(false)
 
   const { source, trip } = ledgerParts(ledger)
@@ -112,15 +112,6 @@ export function ExpenseForm({
   const tripCategory = categories.find((c) => c.id === tripCategoryId)
   const chosenCategory = categories.find((c) => c.id === category)
   const subcategories = chosenCategory?.subcategories ?? []
-
-  const categoryTiles = useMemo<TileOption[]>(
-    () => categories.map((c) => ({ value: c.id, label: c.label, emoji: c.emoji })),
-    [categories],
-  )
-  const subTiles = useMemo<TileOption[]>(
-    () => subcategories.map((s) => ({ value: s.id, label: s.label })),
-    [subcategories],
-  )
 
   const parsedAmount = parseAmount(amount)
 
@@ -149,6 +140,21 @@ export function ExpenseForm({
   }, [effectivePreset, mineText, parsedAmount, payer, person, theirsText])
 
   const othersShare = isVacation ? parseAmount(othersText) || 0 : 0
+
+  /*
+   * Le caselle non sono uno stato a parte: sono la lettura del preset. Così una
+   * combinazione impossibile — nessuno dei due partecipa — non esiste, invece di
+   * esistere e dover essere respinta.
+   */
+  const manual = preset === 'custom'
+  const mineOn = preset === 'half' || preset === 'mine'
+  const theirsOn = preset === 'half' || preset === 'theirs'
+
+  /** Togliere la spunta all'unico che partecipa non fa niente: qualcuno deve pagarla. */
+  const toggleShare = (which: 'mine' | 'theirs'): void => {
+    if (which === 'mine') setPreset(mineOn ? (theirsOn ? 'theirs' : 'mine') : theirsOn ? 'half' : 'mine')
+    else setPreset(theirsOn ? (mineOn ? 'mine' : 'theirs') : mineOn ? 'half' : 'theirs')
+  }
 
   const draft = useMemo<Expense>(() => {
     const built: Expense = {
@@ -227,6 +233,25 @@ export function ExpenseForm({
     }
   }
 
+  /** Creare una categoria senza uscire dal modulo, e trovarsela già scelta. */
+  const createCategory = (): void => {
+    const trimmed = catLabel.trim()
+    if (trimmed === '') {
+      toast.show('Serve un nome per la categoria.')
+      return
+    }
+    const taken = new Set(categories.map((c) => c.id))
+    const created: Category = { id: newCategoryId(trimmed, taken), label: trimmed }
+    if (catEmoji.trim()) created.emoji = catEmoji.trim()
+    setCategories([...categories, created])
+    setCategory(created.id)
+    setSubcategory('')
+    setNewCategory(false)
+    setCatEmoji('')
+    setCatLabel('')
+    toast.show(`Categoria «${trimmed}» creata e scelta.`)
+  }
+
   const createTrip = (candidate: Trip): void => {
     addTrip(candidate)
     setLedger(`vacanze/${candidate.id}`)
@@ -293,7 +318,7 @@ export function ExpenseForm({
                     id="ef-ledger"
                     value={ledger}
                     trips={dataset?.trips ?? []}
-                    sourceLabels={config?.sourceLabels}
+                    sources={config?.sources}
                     onChange={changeLedger}
                   />
                   <button
@@ -326,55 +351,115 @@ export function ExpenseForm({
               <label className="label" htmlFor="ef-amount">
                 Quanto
               </label>
-              <input
-                id="ef-amount"
-                className="input"
-                inputMode="decimal"
-                value={amount}
-                placeholder="47,30"
-                onChange={(event) => setAmount(event.target.value)}
-              />
+              <AmountInput id="ef-amount" value={amount} onChange={setAmount} placeholder="47,30" />
             </div>
 
             {isVacation && tripCategory ? (
               <div className="field">
-                <span className="label">Di che tipo</span>
-                <TilePicker
-                  ariaLabel="Tipo di spesa del viaggio"
-                  options={(tripCategory.subcategories ?? []).map((s) => ({
-                    value: s.id,
-                    label: s.label,
-                  }))}
-                  value={subcategory || undefined}
-                  onChange={(next) => {
+                <label className="label" htmlFor="ef-subtrip">
+                  Di che tipo
+                </label>
+                <select
+                  id="ef-subtrip"
+                  className="select"
+                  value={subcategory}
+                  onChange={(event) => {
                     setCategory(tripCategoryId)
-                    setSubcategory(next ?? '')
+                    setSubcategory(event.target.value)
                   }}
-                />
+                >
+                  <option value="">Scegli…</option>
+                  {(tripCategory.subcategories ?? []).map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             ) : (
               <>
                 <div className="field">
-                  <span className="label">Categoria</span>
-                  <TilePicker
-                    ariaLabel="Categoria della spesa"
-                    options={categoryTiles}
-                    value={category || undefined}
-                    onChange={(next) => {
-                      setCategory(next ?? '')
+                  <label className="label" htmlFor="ef-category">
+                    Categoria
+                  </label>
+                  {/*
+                   * Tendina e non riquadri, con l'ultima voce che ne crea una: è
+                   * quello che serve quando ti accorgi a metà inserimento che la
+                   * categoria giusta non c'è, e non vuoi uscire dal modulo per
+                   * andarla a creare in Impostazioni. → ADR-0031
+                   */}
+                  <select
+                    id="ef-category"
+                    className="select"
+                    value={category}
+                    onChange={(event) => {
+                      const next = event.target.value
+                      if (next === NEW_CATEGORY) {
+                        setNewCategory(true)
+                        return
+                      }
+                      setNewCategory(false)
+                      setCategory(next)
                       setSubcategory('')
                     }}
-                  />
+                  >
+                    <option value="">Scegli…</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.emoji ? `${c.emoji} ` : ''}
+                        {c.label}
+                      </option>
+                    ))}
+                    <option value={NEW_CATEGORY}>➕ Nuova categoria…</option>
+                  </select>
+                  {newCategory ? (
+                    <div className="stack" style={{ gap: 6, marginTop: 6 }}>
+                      <NameFields
+                        emoji={catEmoji}
+                        label={catLabel}
+                        onEmoji={setCatEmoji}
+                        onLabel={setCatLabel}
+                        what="della nuova categoria"
+                        emojiHint="🎈"
+                        labelHint="Come si chiama"
+                      />
+                      <div className="row row-inline" style={{ gap: 6 }}>
+                        <button type="button" className="btn btn-primary btn-sm" onClick={createCategory}>
+                          Crea e scegli
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          onClick={() => setNewCategory(false)}
+                        >
+                          Annulla
+                        </button>
+                      </div>
+                      <p className="hint">
+                        Nasce senza colore: nei grafici finisce in «Altre voci» finché non gliene
+                        dai uno da Impostazioni.
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
-                {subTiles.length > 0 ? (
+                {subcategories.length > 0 ? (
                   <div className="field">
-                    <span className="label">Di che tipo</span>
-                    <TilePicker
-                      ariaLabel="Tipo dentro la categoria"
-                      options={subTiles}
-                      value={subcategory || undefined}
-                      onChange={(next) => setSubcategory(next ?? '')}
-                    />
+                    <label className="label" htmlFor="ef-sub">
+                      Di che tipo
+                    </label>
+                    <select
+                      id="ef-sub"
+                      className="select"
+                      value={subcategory}
+                      onChange={(event) => setSubcategory(event.target.value)}
+                    >
+                      <option value="">Nessuno</option>
+                      {subcategories.map((sub) => (
+                        <option key={sub.id} value={sub.id}>
+                          {sub.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 ) : null}
               </>
@@ -392,70 +477,93 @@ export function ExpenseForm({
             ) : (
               <>
                 <div className="field">
-                  <span className="label">Come si divide</span>
-                  <Segmented<SplitPreset>
-                    ariaLabel="Divisione della spesa"
-                    value={preset}
-                    onChange={(next) => {
-                      setPreset(next)
-                      if (next === 'custom') {
-                        /* Si parte dalla divisione corrente invece che da zero:
-                           quasi sempre si vuole spostare qualche euro, non rifarla. */
-                        setMineText(amountText(person === 'me' ? shares.me : shares.partner))
-                        setTheirsText(amountText(person === 'me' ? shares.partner : shares.me))
-                      }
-                    }}
-                    options={[
-                      { value: 'half', label: SPLIT_LABELS.half },
-                      { value: 'mine', label: SPLIT_LABELS.mine },
-                      { value: 'theirs', label: SPLIT_LABELS.theirs },
-                      { value: 'custom', label: SPLIT_LABELS.custom },
-                    ]}
-                  />
-                </div>
-
-                {preset === 'custom' ? (
-                  <div className="form-row">
-                    <div className="field">
-                      <label className="label" htmlFor="ef-mine">
-                        Quota {config.people[person].name}
-                      </label>
-                      <input
-                        id="ef-mine"
-                        className="input"
-                        inputMode="decimal"
-                        value={mineText}
-                        onChange={(event) => setMineText(event.target.value)}
-                      />
-                    </div>
-                    <div className="field">
-                      <label className="label" htmlFor="ef-theirs">
-                        Quota {config.people[other].name}
-                      </label>
-                      <input
-                        id="ef-theirs"
-                        className="input"
-                        inputMode="decimal"
-                        value={theirsText}
-                        onChange={(event) => setTheirsText(event.target.value)}
-                      />
-                    </div>
-                    {isVacation ? (
-                      <div className="field">
-                        <label className="label" htmlFor="ef-others">
-                          Quota di chi era con voi
-                        </label>
-                        <input
-                          id="ef-others"
-                          className="input"
-                          inputMode="decimal"
-                          value={othersText}
-                          onChange={(event) => setOthersText(event.target.value)}
-                        />
-                      </div>
-                    ) : null}
+                  <div className="row" style={{ justifyContent: 'space-between', gap: 8 }}>
+                    <span className="label" id="ef-split-label">
+                      Come si divide
+                    </span>
+                    <select
+                      className="select"
+                      style={{ width: 'auto' }}
+                      aria-label="Modo di dividere"
+                      value={manual ? 'manual' : 'even'}
+                      onChange={(event) => {
+                        if (event.target.value === 'manual') {
+                          /* Si parte dalla divisione corrente invece che da zero:
+                             quasi sempre si vuole spostare qualche euro, non rifarla. */
+                          setMineText(amountText(person === 'me' ? shares.me : shares.partner))
+                          setTheirsText(amountText(person === 'me' ? shares.partner : shares.me))
+                          setPreset('custom')
+                        } else {
+                          setPreset('half')
+                        }
+                      }}
+                    >
+                      <option value="even">In parti uguali</option>
+                      <option value="manual">A mano</option>
+                    </select>
                   </div>
-                ) : null}
+
+                  {/*
+                   * Chi partecipa, non «che divisione è»: le tre divisioni reali
+                   * sono le tre combinazioni di due caselle, e accanto a ognuna
+                   * c'è quanto le tocca — che è il numero che si vuole vedere
+                   * prima di salvare. → ADR-0032
+                   */}
+                  <div className="split-list" role="group" aria-labelledby="ef-split-label">
+                    {([person, other] as PersonId[]).map((who) => {
+                      const on = who === person ? mineOn : theirsOn
+                      const quota = who === 'me' ? shares.me : shares.partner
+                      /* «(tu)» sta solo accanto a chi ha l'app in mano: è la
+                         stessa distinzione che fa Tricount con «(Me)». */
+                      const name = (
+                        <span className="split-name">
+                          {titleOf({ name: config.people[who].name, emoji: config.people[who].emoji })}
+                          {who === person ? ' (tu)' : ''}
+                        </span>
+                      )
+                      return (
+                        <div className="split-row" key={who}>
+                          {manual ? (
+                            <>
+                              {name}
+                              <AmountInput
+                                value={who === person ? mineText : theirsText}
+                                onChange={who === person ? setMineText : setTheirsText}
+                                ariaLabel={`Quota di ${config.people[who].name}`}
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                className="split-check"
+                                aria-pressed={on}
+                                onClick={() => toggleShare(who === person ? 'mine' : 'theirs')}
+                              >
+                                <span className="split-box" aria-hidden="true">
+                                  {on ? '✓' : ''}
+                                </span>
+                                {name}
+                              </button>
+                              <span className="num split-amount">
+                                {on ? formatEuro(quota) : '—'}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {manual && isVacation ? (
+                    <div className="field" style={{ marginTop: 6 }}>
+                      <label className="label" htmlFor="ef-others">
+                        Quota di chi era con voi
+                      </label>
+                      <AmountInput id="ef-others" value={othersText} onChange={setOthersText} />
+                    </div>
+                  ) : null}
+                </div>
 
                 <div className="field">
                   <span className="label">Chi ha pagato</span>

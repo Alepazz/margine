@@ -12,7 +12,7 @@ import {
   type Ref,
 } from 'react'
 
-import { formatPct } from '../domain/money'
+import { formatPct, sanitizeAmount } from '../domain/money'
 import type { MarginStatus } from '../domain/income'
 
 /**
@@ -252,53 +252,85 @@ export function Segmented<T extends string>({
   )
 }
 
-export interface TileOption {
+/**
+ * Campo importo: tastierino numerico sul telefono, e dentro entrano solo numeri.
+ *
+ * `inputMode="decimal"` è ciò che apre il tastierino su iOS; `type` resta testo
+ * perché il tipo numerico porta le frecette e litiga con la virgola. Il filtro
+ * sta in `sanitizeAmount`, testato: qui non si scrive una lettera nemmeno
+ * incollandola.
+ */
+export function AmountInput({
+  id,
+  value,
+  onChange,
+  placeholder,
+  ariaLabel,
+}: {
+  id?: string
   value: string
-  label: string
-  emoji?: string
+  onChange: (value: string) => void
+  placeholder?: string
+  ariaLabel?: string
+}): ReactNode {
+  return (
+    <input
+      id={id}
+      className="input"
+      type="text"
+      inputMode="decimal"
+      autoComplete="off"
+      /* Su Android indirizza la tastiera anche dove `inputMode` non basta. */
+      pattern="[0-9]*[,.]?[0-9]*"
+      value={value}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      onChange={(event) => onChange(sanitizeAmount(event.target.value))}
+    />
+  )
 }
 
 /**
- * Scelta a riquadri con icona e testo: la categoria di una spesa, e il tipo
- * dentro la categoria.
- *
- * È il fratello a griglia di `Segmented`, che sopra le quattro voci non regge:
- * quattordici categorie in una barra sola diventerebbero quattordici colonne da
- * ventisette pixel. Qui vanno a capo, e ogni riquadro resta un bersaglio da 44px.
+ * Icona e nome, i due campi con cui si battezza qualcosa: una categoria che
+ * nasce, una che si rinomina, un viaggio. Scritti tre volte, il giorno che uno
+ * cresce gli altri restano indietro.
  */
-export function TilePicker({
-  options,
-  value,
-  onChange,
-  ariaLabel,
+export function NameFields({
+  emoji,
+  label,
+  onEmoji,
+  onLabel,
+  what,
+  emojiHint,
+  labelHint,
 }: {
-  options: readonly TileOption[]
-  /** `undefined` = niente scelto. Un riquadro già scelto, ritoccato, deseleziona. */
-  value: string | undefined
-  onChange: (value: string | undefined) => void
-  ariaLabel: string
+  emoji: string
+  label: string
+  onEmoji: (value: string) => void
+  onLabel: (value: string) => void
+  /** Finisce nelle etichette per chi legge con la voce: «Icona della categoria». */
+  what: string
+  emojiHint: string
+  labelHint: string
 }): ReactNode {
   return (
-    <div className="tiles" role="group" aria-label={ariaLabel}>
-      {options.map((option) => {
-        const chosen = option.value === value
-        return (
-          <button
-            key={option.value}
-            type="button"
-            className="tile"
-            aria-pressed={chosen}
-            onClick={() => onChange(chosen ? undefined : option.value)}
-          >
-            {option.emoji ? (
-              <span className="tile-emoji" aria-hidden="true">
-                {option.emoji}
-              </span>
-            ) : null}
-            <span className="tile-label">{option.label}</span>
-          </button>
-        )
-      })}
+    <div className="row row-inline" style={{ gap: 6 }}>
+      <input
+        className="input"
+        style={{ width: 70, flex: '0 0 auto' }}
+        value={emoji}
+        maxLength={4}
+        aria-label={`Icona ${what}`}
+        placeholder={emojiHint}
+        onChange={(event) => onEmoji(event.target.value)}
+      />
+      <input
+        className="input"
+        value={label}
+        aria-label={`Nome ${what}`}
+        placeholder={labelHint}
+        onChange={(event) => onLabel(event.target.value)}
+      />
     </div>
   )
 }
