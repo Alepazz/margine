@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatEuro, relativeChange, splitHalf, sumEuro, toCents } from './money'
+import { formatEuro, relativeChange, sanitizeAmount, splitHalf, sumEuro, toCents } from './money'
 
 describe('somme in euro', () => {
   it('non accumula errori in virgola mobile', () => {
@@ -50,5 +50,32 @@ describe('variazione relativa', () => {
   it('calcola la variazione', () => {
     expect(relativeChange(120, 100)).toBeCloseTo(0.2)
     expect(relativeChange(80, 100)).toBeCloseTo(-0.2)
+  })
+})
+
+describe('quello che si scrive in un campo importo', () => {
+  it('lascia passare solo cifre e un separatore', () => {
+    expect(sanitizeAmount('47,30')).toBe('47,30')
+    expect(sanitizeAmount('47')).toBe('47')
+    expect(sanitizeAmount('')).toBe('')
+  })
+
+  it('butta via le lettere, anche incollate in mezzo', () => {
+    expect(sanitizeAmount('12abc,5')).toBe('12,5')
+    expect(sanitizeAmount('€ 47,30')).toBe('47,30')
+    expect(sanitizeAmount('ciao')).toBe('')
+  })
+
+  /* Sulla tastiera del Mac esce il punto, sul tastierino del telefono la virgola:
+     nel campo si vede una virgola in entrambi i casi. */
+  it('normalizza il punto in virgola, e tiene solo il primo separatore', () => {
+    expect(sanitizeAmount('12.5')).toBe('12,5')
+    expect(sanitizeAmount('12,5,7')).toBe('12,57')
+    expect(sanitizeAmount('1.234,56')).toBe('1,23')
+  })
+
+  it('si ferma a due decimali, perché l’unità è il centesimo', () => {
+    expect(sanitizeAmount('10,999')).toBe('10,99')
+    expect(sanitizeAmount('10,')).toBe('10,')
   })
 })

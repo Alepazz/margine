@@ -13,20 +13,20 @@
 import type { ReactNode } from 'react'
 
 import { ledgerOptions } from '../domain/expense-rules'
-import { sourceLabelOf, type Source, type Trip } from '../domain/types'
+import { sourceTitleOf, tripTitleOf, type Source, type SourceMap, type Trip } from '../domain/types'
 
 export function LedgerSelect({
   id,
   value,
   trips,
-  sourceLabels,
+  sources,
   onChange,
   ariaLabel = 'Tricount',
 }: {
   id?: string
   value: string
   trips: readonly Trip[]
-  sourceLabels: Partial<Record<Source, string>> | undefined
+  sources: SourceMap | undefined
   onChange: (key: string) => void
   ariaLabel?: string
 }): ReactNode {
@@ -44,14 +44,14 @@ export function LedgerSelect({
     >
       {fixed.map((option) => (
         <option key={option.key} value={option.key}>
-          {sourceLabelOf(sourceLabels, option.key as Source)}
+          {sourceTitleOf(sources, option.key as Source)}
         </option>
       ))}
       {vacations.length > 0 ? (
-        <optgroup label={sourceLabelOf(sourceLabels, 'vacanze')}>
+        <optgroup label={sourceTitleOf(sources, 'vacanze')}>
           {vacations.map((option) => (
             <option key={option.key} value={option.key}>
-              {option.trip?.name} {option.trip?.year}
+              {option.trip ? tripTitleOf(option.trip) : option.key} {option.trip?.year}
               {option.closed ? ' (conclusa)' : ''}
             </option>
           ))}

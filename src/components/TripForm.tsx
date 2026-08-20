@@ -17,6 +17,7 @@ import { todayIso } from '../domain/dates'
 import { validateTrip } from '../domain/expense-rules'
 import { newTripId } from '../domain/ids'
 import type { Trip } from '../domain/types'
+import { NameFields } from './ui'
 
 export function TripForm({
   takenIds,
@@ -30,6 +31,7 @@ export function TripForm({
   /** I problemi li mostra chi chiama, dove ha senso nella sua pagina. */
   onProblem: (message: string) => void
 }): ReactNode {
+  const [emoji, setEmoji] = useState('')
   const [name, setName] = useState('')
   const [place, setPlace] = useState('')
   const [country, setCountry] = useState('')
@@ -52,27 +54,29 @@ export function TripForm({
       onProblem(problems[0] ?? 'Il viaggio non è valido.')
       return
     }
-    onCreate(candidate as Trip)
+    /* L'emoji è il tricount visto da lui: 🇫🇷 per Parigi. Facoltativa. */
+    const trip: Trip = emoji.trim() ? { ...candidate, emoji: emoji.trim() } : (candidate as Trip)
+    onCreate(trip)
   }
 
   return (
     <div className="stack" style={{ gap: 8 }}>
-      <div className="form-row">
-        <input
-          className="input"
-          value={name}
-          placeholder="Nome (Sicilia)"
-          aria-label="Nome del viaggio"
-          onChange={(event) => setName(event.target.value)}
-        />
-        <input
-          className="input"
-          value={place}
-          placeholder="Posto (Palermo)"
-          aria-label="Posto"
-          onChange={(event) => setPlace(event.target.value)}
-        />
-      </div>
+      <NameFields
+        emoji={emoji}
+        label={name}
+        onEmoji={setEmoji}
+        onLabel={setName}
+        what="del viaggio"
+        emojiHint="🏝️"
+        labelHint="Nome (Sicilia)"
+      />
+      <input
+        className="input"
+        value={place}
+        placeholder="Posto (Palermo)"
+        aria-label="Posto"
+        onChange={(event) => setPlace(event.target.value)}
+      />
       <input
         className="input"
         value={country}

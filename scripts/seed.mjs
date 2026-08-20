@@ -83,6 +83,7 @@ const CATEGORIES = TAXONOMY
 const TRIPS = [
   {
     id: '2025-sicilia',
+    emoji: '🍋',
     name: 'Sicilia in macchina',
     place: 'Sicilia',
     country: 'Italia',
@@ -93,6 +94,7 @@ const TRIPS = [
   },
   {
     id: '2025-lofoten',
+    emoji: '🇳🇴',
     name: 'Isole Lofoten',
     place: 'Lofoten',
     country: 'Norvegia',
@@ -103,6 +105,7 @@ const TRIPS = [
   },
   {
     id: '2026-lisbona',
+    emoji: '🇵🇹',
     name: 'Weekend a Lisbona',
     place: 'Lisbona',
     country: 'Portogallo',
@@ -113,6 +116,7 @@ const TRIPS = [
   },
   {
     id: '2026-dolomiti',
+    emoji: '⛰️',
     name: 'Dolomiti',
     place: 'Dolomiti',
     country: 'Italia',
@@ -612,6 +616,14 @@ const config = {
     partner: null,
   },
   categories: CATEGORIES,
+  /* Nomi generici di proposito: i dati di esempio stanno nel repo pubblico, e i
+     nomi veri dei tricount stanno solo in `data/config.json`. → ADR-0026 */
+  sources: {
+    condivise: { name: 'Spese condivise', emoji: '🧾' },
+    personali: { name: 'Le mie spese', emoji: '🙋' },
+    fisse: { name: 'Casa', emoji: '🏡' },
+    vacanze: { name: 'Vacanze', emoji: '🧳' },
+  },
   catCategory: CAT_CATEGORY,
   tripCategory: TRIP_CATEGORY,
   houseSource: HOUSE_SOURCE,

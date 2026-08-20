@@ -275,6 +275,24 @@
       "emoji": "▫️"
     }
   ],
+  "sources": {
+    "condivise": {
+      "name": "Spese condivise",
+      "emoji": "🧾"
+    },
+    "personali": {
+      "name": "Le mie spese",
+      "emoji": "🙋"
+    },
+    "fisse": {
+      "name": "Casa",
+      "emoji": "🏡"
+    },
+    "vacanze": {
+      "name": "Vacanze",
+      "emoji": "🧳"
+    }
+  },
   "catCategory": "gatto",
   "tripCategory": "viaggi",
   "houseSource": "fisse",

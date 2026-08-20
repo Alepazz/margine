@@ -183,6 +183,7 @@ export function validateDataset(dataset, config) {
 
   checkBalanceGroups(dataset, config, errors, warnings)
   checkCategoryRefs(config, errors, warnings)
+  checkSources(config, errors)
 
   return { errors, warnings, report: buildReport(dataset) }
 }
@@ -196,6 +197,28 @@ export function validateDataset(dataset, config) {
  * direbbe. Qui la chiave si confronta con i tricount che esistono davvero.
  * → ADR-0022
  */
+/**
+ * I nomi dei tricount in `config.sources`.
+ *
+ * Una chiave che non è una delle quattro origini non rompe niente: semplicemente
+ * quel nome non comparirà mai, e nel menù resterà quello generico. È lo stesso
+ * genere di silenzio dei punti di partenza del saldo, e si chiude allo stesso
+ * modo. → ADR-0026
+ */
+function checkSources(config, errors) {
+  const sources = config?.sources
+  if (!sources) return
+  for (const [key, value] of Object.entries(sources)) {
+    if (!SOURCES.has(key)) {
+      errors.push(`sources.${key}: non è un tricount. Attesi: ${[...SOURCES].join(', ')}.`)
+      continue
+    }
+    if (typeof value?.name !== 'string' || value.name.trim() === '') {
+      errors.push(`sources.${key}: «name» deve essere il nome del tricount.`)
+    }
+  }
+}
+
 /**
  * I riferimenti a categorie sparsi nella configurazione.
  *

@@ -130,7 +130,7 @@ export function Spese(): ReactNode {
             <option value="all">Tutti i tricount</option>
             {SOURCES.map((source) => (
               <option key={source} value={source}>
-                {lookup.sourceLabel(source)}
+                {lookup.sourceTitle(source)}
               </option>
             ))}
           </select>

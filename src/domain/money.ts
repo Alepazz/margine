@@ -81,3 +81,26 @@ export function relativeChange(current: number, base: number): number | null {
   if (toCents(base) === 0) return null
   return (current - base) / base
 }
+
+/**
+ * Ripulisce quello che si sta scrivendo in un campo importo, mentre lo si scrive.
+ *
+ * Il campo delle spese resta `type="text"` con `inputMode="decimal"` e non
+ * `type="number"`: su iOS il tipo numerico porta con sé le frecette e litiga con
+ * la virgola, mentre `inputMode` apre il tastierino e lascia a noi il controllo
+ * della stringa. Il controllo è questo, e vale tre cose:
+ *
+ * - via tutto ciò che non è una cifra o un separatore, così nel campo non entra
+ *   una lettera nemmeno incollandola;
+ * - **un solo** separatore, il primo, e diventa una virgola: chi scrive `12.5`
+ *   sulla tastiera del Mac vede `12,5`, che è come si scrive un importo qui;
+ * - due decimali, non tre: i centesimi sono l'unità di questo progetto.
+ */
+export function sanitizeAmount(text: string): string {
+  const cleaned = text.replace(/[^\d.,]/g, '')
+  const separator = cleaned.search(/[.,]/)
+  if (separator < 0) return cleaned
+  const whole = cleaned.slice(0, separator)
+  const decimals = cleaned.slice(separator + 1).replace(/[.,]/g, '')
+  return `${whole},${decimals.slice(0, 2)}`
+}

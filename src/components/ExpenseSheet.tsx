@@ -91,7 +91,7 @@ function MovePanel({ expense, onDone }: { expense: Expense; onDone: () => void }
 
   const delta = balanceDeltaOf(expense)
   const label = (key: string): string =>
-    ledgerLabel(key, dataset?.trips ?? [], config?.sourceLabels)
+    ledgerLabel(key, dataset?.trips ?? [], config?.sources)
 
   /**
    * Come diventa la spesa dopo lo spostamento.
@@ -132,7 +132,7 @@ function MovePanel({ expense, onDone }: { expense: Expense; onDone: () => void }
           id="move-ledger"
           value={target}
           trips={dataset?.trips ?? []}
-          sourceLabels={config?.sourceLabels}
+          sources={config?.sources}
           onChange={setTarget}
         />
       </div>
@@ -339,7 +339,7 @@ export function ExpenseSheet({
           </div>
           <div className="kv-row">
             <dt>Origine</dt>
-            <dd>{lookup.sourceLabel(expense.source)}</dd>
+            <dd>{lookup.sourceTitle(expense.source)}</dd>
           </div>
           {expense.recurring ? (
             <div className="kv-row">

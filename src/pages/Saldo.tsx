@@ -47,7 +47,7 @@ export function Saldo(): ReactNode {
      che sposta una spesa: le vacanze ne hanno uno per viaggio, e quel nome sta
      nei dati del viaggio e non nella chiave. */
   const groupLabel = (key: string): string =>
-    ledgerLabel(key, dataset.trips, config.sourceLabels)
+    ledgerLabel(key, dataset.trips, config.sources)
 
   /*
    * Il calcolo ha un segno fisso — positivo = `partner` deve a `me` — e qui si
