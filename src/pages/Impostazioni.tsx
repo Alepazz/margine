@@ -206,9 +206,16 @@ export function Impostazioni(): ReactNode {
           </Card>
         </div>
 
+        {/*
+          La nota diceva «tag 730, note e link agli scontrini»: era vera prima
+          di ADR-0018, quando l'app scriveva solo le annotazioni. Da allora
+          questo token è ciò che fa uscire dal telefono **tutto** — spese,
+          rimborsi, tricount, prezzi — e chi cercava «dove metto il token per i
+          prezzi» saltava la scheda credendola di un'altra cosa. → ADR-0018
+        */}
         <Card
           title="Scrittura nel repo"
-          note="Serve per salvare tag 730, note e link agli scontrini"
+          note="Il token che fa arrivare all'altra persona quello che scrivi: spese, prezzi, rimborsi, annotazioni"
         >
           {!config.github ? (
             <Notice tone="warn">
