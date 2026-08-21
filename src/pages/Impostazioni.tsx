@@ -270,33 +270,39 @@ export function Impostazioni(): ReactNode {
               </div>
 
               <div className="row" style={{ gap: 6 }}>
+                {/*
+                  Salvare **verifica**, e non è uno zelo: prima il pulsante
+                  diceva «Token salvato su questo dispositivo» in ogni caso, e
+                  `syncNow()` non fa nessuna richiesta se la coda è vuota. Il
+                  risultato è che si poteva incollare un token senza permessi,
+                  leggere un messaggio di successo, e vedere il token su GitHub
+                  segnato «never used»: nessuno l'aveva mai adoperato. È lo
+                  stesso difetto del controllo in lettura, in un altro punto.
+                  → ADR-0043
+                */}
                 <button
                   type="button"
                   className="btn btn-primary btn-sm"
-                  disabled={token.trim() === ''}
-                  onClick={() => {
-                    saveToken(token)
-                    toast.show('Token salvato su questo dispositivo.')
-                    void syncNow()
-                  }}
-                >
-                  Salva token
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm"
                   disabled={token.trim() === '' || checking}
                   onClick={() => {
-                    if (!config.github) return
+                    const github = config.github
+                    if (!github) return
+                    saveToken(token)
                     setChecking(true)
                     setCheckResult(null)
-                    void testAccess(config.github, token.trim()).then((result) => {
+                    void testAccess(github, token.trim()).then((result) => {
                       setChecking(false)
                       setCheckResult(`${result.ok ? '✓' : '×'} ${result.message}`)
+                      toast.show(
+                        result.ok
+                          ? 'Token salvato: la scrittura funziona.'
+                          : 'Token salvato, ma non può scrivere: leggi qui sotto.',
+                      )
+                      if (result.ok) void syncNow()
                     })
                   }}
                 >
-                  {checking ? 'Verifico…' : 'Verifica la scrittura'}
+                  {checking ? 'Verifico…' : 'Salva e verifica'}
                 </button>
                 <button
                   type="button"

@@ -274,7 +274,18 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       return
     }
     const passphrase = passphraseRef.current
-    if (!passphrase) return
+    if (!passphrase) {
+      /* Era un `return` muto: nessuno stato, nessun messaggio, e il contatore
+         delle modifiche in attesa restava fermo senza dire perché. Un percorso
+         in cui non succede niente e niente lo spiega è il modo più veloce di
+         perdere mezza giornata. */
+      setSync({
+        phase: 'error',
+        pending: pending.length,
+        lastError: 'I dati sono bloccati: sbloccali con la passphrase perché le modifiche possano partire.',
+      })
+      return
+    }
 
     setSync({ phase: 'syncing', pending: pending.length })
     try {
