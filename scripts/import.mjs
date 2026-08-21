@@ -26,7 +26,7 @@ function hash8(text) {
 }
 
 function idFor(expense) {
-  return `${expense.date}-${hash8(`${expense.title}|${expense.amount}|${expense.source}`)}`
+  return `${expense.date}-${hash8(`${expense.title}|${expense.amount}|${expense.tricount}`)}`
 }
 
 const cents = (value) => Math.round(Number(value) * 100)
@@ -52,16 +52,22 @@ function findTwin(expense, master) {
   return master.find(
     (other) =>
       cents(other.amount) === amount &&
-      other.source === expense.source &&
+      other.tricount === expense.tricount &&
       dayDistance(other.date, expense.date) <= 1,
   )
 }
 
-/** Le quote si possono omettere: `split: "half" | "me" | "partner"` basta. */
-function withShares(expense) {
+/**
+ * Le quote si possono omettere: `split: "half" | "me" | "partner"` basta.
+ * In un tricount con un membro solo il default è «tutta del membro»: è il
+ * tricount a dirlo, non un id speciale. → ADR-0037
+ */
+function withShares(expense, tricountsById) {
   if (expense.shares) return expense
-  const split = expense.split ?? (expense.source === 'personali' ? 'me' : 'half')
-  const paidBy = expense.paidBy ?? 'me'
+  const home = tricountsById.get(expense.tricount)
+  const sole = home && home.members?.length === 1 ? home.members[0] : undefined
+  const split = expense.split ?? sole ?? 'half'
+  const paidBy = expense.paidBy ?? sole ?? 'me'
   const { split: _ignored, ...rest } = expense
   return { ...rest, paidBy, shares: sharesFor(expense.amount, split, paidBy) }
 }
@@ -80,10 +86,10 @@ try {
     } else {
       const master = exists(PATHS.expenses)
         ? readJson(PATHS.expenses)
-        : { version: 1, updatedAt: new Date().toISOString(), expenses: [], trips: [] }
+        : { version: 2, updatedAt: new Date().toISOString(), expenses: [], tricounts: [] }
 
       const byId = new Map(master.expenses.map((expense) => [expense.id, expense]))
-      const tripsById = new Map(master.trips.map((trip) => [trip.id, trip]))
+      const tricountsById = new Map(master.tricounts.map((tricount) => [tricount.id, tricount]))
 
       const allowTwins = process.argv.includes('--doppie')
       let added = 0
@@ -94,17 +100,17 @@ try {
       for (const name of files) {
         const raw = readJson(join(PATHS.incoming, name))
         const incomingExpenses = Array.isArray(raw) ? raw : (raw.expenses ?? [])
-        const incomingTrips = Array.isArray(raw) ? [] : (raw.trips ?? [])
+        const incomingTricounts = Array.isArray(raw) ? [] : (raw.tricounts ?? [])
 
-        for (const trip of incomingTrips) {
-          if (!tripsById.has(trip.id)) {
-            tripsById.set(trip.id, trip)
+        for (const tricount of incomingTricounts) {
+          if (!tricountsById.has(tricount.id)) {
+            tricountsById.set(tricount.id, tricount)
             tripsAdded += 1
           }
         }
 
         for (const entry of incomingExpenses) {
-          const expense = withShares(entry)
+          const expense = withShares(entry, tricountsById)
           const id = expense.id ?? idFor(expense)
           if (byId.has(id)) {
             skipped += 1
@@ -121,20 +127,29 @@ try {
           added += 1
         }
 
-        log(`· ${name}: ${incomingExpenses.length} voci, ${incomingTrips.length} viaggi`)
+        log(`· ${name}: ${incomingExpenses.length} voci, ${incomingTricounts.length} tricount`)
       }
 
       const merged = {
-        version: 1,
+        version: 2,
         updatedAt: new Date().toISOString(),
         expenses: [...byId.values()].sort((a, b) =>
           a.date === b.date ? String(a.id).localeCompare(String(b.id)) : a.date < b.date ? -1 : 1,
         ),
-        trips: [...tripsById.values()].sort((a, b) => (a.start < b.start ? -1 : 1)),
+        /* I registri stabili prima, i viaggi in ordine di partenza. */
+        tricounts: [...tricountsById.values()].sort((a, b) => {
+          if (!a.trip && !b.trip) return 0
+          if (!a.trip) return -1
+          if (!b.trip) return 1
+          return a.trip.start < b.trip.start ? -1 : 1
+        }),
       }
 
       log('')
-      log(`Aggiunte ${added} spese, ${tripsAdded} viaggi. Già presenti (saltate): ${skipped}.`)
+      log(`Aggiunte ${added} spese, ${tripsAdded} tricount. Già presenti (saltate): ${skipped}.`)
+
+      // conservato: preserva i rimborsi già registrati
+      if (master.settlements) merged.settlements = master.settlements
 
       if (twins.length > 0) {
         const total = twins.reduce((sum, t) => sum + cents(t.incoming.amount), 0) / 100
@@ -154,7 +169,7 @@ try {
         log('')
       }
 
-      log(`Master: ${merged.expenses.length} spese, ${merged.trips.length} viaggi.`)
+      log(`Master: ${merged.expenses.length} spese, ${merged.tricounts.length} tricount.`)
 
       writeJson(PATHS.expenses, merged)
 

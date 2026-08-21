@@ -29,72 +29,102 @@ const PARTNER = new Set(['Rica', 'Fede'])
  * di vacanza è un viaggio solo: le date vengono dal grappolo di spese sul posto,
  * non dal primo pagamento (voli e hotel si prenotano mesi prima).
  */
+/*
+ * `idToken` è il **vecchio** valore di `source`, congelato: entra nell'hash che
+ * genera gli id, e cambiare il token cambierebbe l'id di ogni voce a ogni
+ * riconversione — le annotazioni 730 perderebbero le loro spese e ogni
+ * reimport creerebbe gemelle. I tricount nuovi usano il proprio id come token.
+ */
 const TRICOUNTS = [
-  { file: 'spese_casa_expenses.json', source: 'fisse' },
-  { file: 'personale_expenses.json', source: 'personali' },
-  { file: 'perché_non_sono_ric(c)a_expenses.json', source: 'condivise' },
-  { file: 'germania🇩🇪_expenses.json', source: 'vacanze', trip: 'germania-2024' },
-  { file: 'parigi_expenses.json', source: 'vacanze', trip: 'parigi-2025' },
-  { file: 'ortona_expenses.json', source: 'vacanze', trip: 'ortona-2025' },
-  { file: 'vacanze_cretine_expenses.json', source: 'vacanze', trip: 'creta-2025' },
-  { file: '🍕sud_italia_expenses.json', source: 'vacanze', trip: 'sud-italia-2026' },
+  { file: 'spese_casa_expenses.json', tricount: 'fisse', idToken: 'fisse' },
+  { file: 'personale_expenses.json', tricount: 'personali-alessio', idToken: 'personali' },
+  { file: 'perché_non_sono_ric(c)a_expenses.json', tricount: 'condivise', idToken: 'condivise' },
+  /*
+   * Il tricount personale di Federica: il nome del file è **generico di
+   * proposito** — questo script sta nel repo pubblico, e il nome che una
+   * persona dà al suo tricount è roba sua. L'export si rinomina così a mano.
+   */
+  { file: 'personale_2_expenses.json', tricount: 'personali-federica', idToken: 'personali-federica', optional: true },
+  { file: 'germania🇩🇪_expenses.json', tricount: 'germania-2024', idToken: 'vacanze' },
+  { file: 'parigi_expenses.json', tricount: 'parigi-2025', idToken: 'vacanze' },
+  { file: 'ortona_expenses.json', tricount: 'ortona-2025', idToken: 'vacanze' },
+  { file: 'vacanze_cretine_expenses.json', tricount: 'creta-2025', idToken: 'vacanze' },
+  { file: '🍕sud_italia_expenses.json', tricount: 'sud-italia-2026', idToken: 'vacanze' },
 ]
+
+/* Gli id dei tricount di vacanza: servono a `classify` e all'output. */
+const TRIP_IDS = new Set(['germania-2024', 'parigi-2025', 'ortona-2025', 'creta-2025', 'sud-italia-2026', 'new-york-2024'])
 
 const TRIPS = [
   {
     id: 'germania-2024',
     emoji: '🇩🇪',
     name: 'Germania',
-    place: 'Germania',
-    country: 'Germania',
-    year: 2024,
-    start: '2024-10-26',
-    end: '2024-10-28',
-    coords: { lat: 51.2, lon: 10.4, approx: true },   // centro del paese: non c'è una città
+    members: ['me', 'partner'],
+    trip: {
+      place: 'Germania',
+      country: 'Germania',
+      year: 2024,
+      start: '2024-10-26',
+      end: '2024-10-28',
+      coords: { lat: 51.2, lon: 10.4, approx: true }, // centro del paese: non c'è una città
+    },
   },
   {
     id: 'parigi-2025',
     emoji: '🇫🇷',
     name: 'Parigi',
-    place: 'Parigi',
-    country: 'Francia',
-    year: 2025,
-    start: '2025-04-26',
-    end: '2025-05-01',
-    coords: { lat: 48.86, lon: 2.35 },
+    members: ['me', 'partner'],
+    trip: {
+      place: 'Parigi',
+      country: 'Francia',
+      year: 2025,
+      start: '2025-04-26',
+      end: '2025-05-01',
+      coords: { lat: 48.86, lon: 2.35 },
+    },
   },
   {
     id: 'ortona-2025',
     emoji: '🇮🇹',
     name: 'Ortona',
-    place: 'Ortona',
-    country: 'Italia',
-    year: 2025,
-    start: '2025-07-21',
-    end: '2025-07-23',
-    coords: { lat: 42.35, lon: 14.4 },
+    members: ['me', 'partner'],
+    trip: {
+      place: 'Ortona',
+      country: 'Italia',
+      year: 2025,
+      start: '2025-07-21',
+      end: '2025-07-23',
+      coords: { lat: 42.35, lon: 14.4 },
+    },
   },
   {
     id: 'creta-2025',
     emoji: '🏝️',
     name: 'Creta',
-    place: 'Creta',
-    country: 'Grecia',
-    year: 2025,
-    start: '2025-08-17',
-    end: '2025-08-25',
-    coords: { lat: 35.24, lon: 24.81, approx: true }, // centro dell'isola
+    members: ['me', 'partner'],
+    trip: {
+      place: 'Creta',
+      country: 'Grecia',
+      year: 2025,
+      start: '2025-08-17',
+      end: '2025-08-25',
+      coords: { lat: 35.24, lon: 24.81, approx: true }, // centro dell'isola
+    },
   },
   {
     id: 'sud-italia-2026',
     emoji: '🇮🇹',
     name: 'Sud Italia',
-    place: 'Campania e Calabria',
-    country: 'Italia',
-    year: 2026,
-    start: '2026-07-15',
-    end: '2026-07-24',
-    coords: { lat: 39.5, lon: 16.2, approx: true },   // fra Campania e Calabria
+    members: ['me', 'partner'],
+    trip: {
+      place: 'Campania e Calabria',
+      country: 'Italia',
+      year: 2026,
+      start: '2026-07-15',
+      end: '2026-07-24',
+      coords: { lat: 39.5, lon: 16.2, approx: true },   // fra Campania e Calabria
+    },
   },
 ]
 
@@ -357,11 +387,12 @@ function main() {
   }
 
   const present = new Set(readdirSync(RAW_DIR))
-  const missing = TRICOUNTS.filter((t) => !present.has(t.file)).map((t) => t.file)
+  const missing = TRICOUNTS.filter((t) => !t.optional && !present.has(t.file)).map((t) => t.file)
   if (missing.length > 0) {
     fail(`Export non trovati in data/raw/: ${missing.join(', ')}`)
     return
   }
+  const found = TRICOUNTS.filter((t) => present.has(t.file))
 
   /** Contatore per le voci gemelle: stessa data, stesso titolo, stesso importo. */
   const seen = new Map()
@@ -370,9 +401,9 @@ function main() {
   let welfareMarked = 0
   const unmatched = []
 
-  for (const tricount of TRICOUNTS) {
+  for (const tricount of found) {
     const raw = JSON.parse(readFileSync(join(RAW_DIR, tricount.file), 'utf8'))
-    const isTrip = tricount.source === 'vacanze'
+    const isTrip = TRIP_IDS.has(tricount.tricount)
     const expenses = []
 
     for (const entry of raw) {
@@ -380,7 +411,7 @@ function main() {
       const { category, subcategory, recurring } = classify(title, isTrip)
       if (category === 'altro') unmatched.push({ file: tricount.file, title, total: entry.total })
 
-      const base = `${entry.date}|${title}|${entry.total}|${tricount.source}`
+      const base = `${entry.date}|${title}|${entry.total}|${tricount.idToken}`
       const twin = seen.get(base) ?? 0
       seen.set(base, twin + 1)
 
@@ -388,7 +419,7 @@ function main() {
       /* Il welfare è di chi anticipa: su un conto pagato da altri non vuol dire niente. */
       const welfare =
         paidBy !== 'others' &&
-        WELFARE.some((w) => w.trip === tricount.trip && w.title === title)
+        WELFARE.some((w) => w.trip === tricount.tricount && w.title === title)
 
       expenses.push({
         id: `${entry.date}-${hash8(base)}${twin > 0 ? `-${twin}` : ''}`,
@@ -397,11 +428,10 @@ function main() {
         amount: entry.total,
         shares: sharesOf(entry, paidBy),
         paidBy,
-        source: tricount.source,
+        tricount: tricount.tricount,
         category,
         ...(subcategory ? { subcategory } : {}),
         recurring,
-        ...(tricount.trip ? { trip: tricount.trip } : {}),
         ...(welfare ? { welfare: true } : {}),
       })
       if (welfare) welfareMarked += 1
@@ -412,7 +442,7 @@ function main() {
     byTricount.push({ tricount, expenses })
   }
 
-  log(`Convertite ${converted} voci da ${TRICOUNTS.length} tricount.`)
+  log(`Convertite ${converted} voci da ${found.length} tricount.`)
   if (welfareMarked !== WELFARE.length) {
     log(
       `⚠ segnate welfare ${welfareMarked} voci su ${WELFARE.length} dichiarate: ` +
@@ -434,8 +464,14 @@ function main() {
 
   mkdirSync(PATHS.incoming, { recursive: true })
   for (const { tricount, expenses } of byTricount) {
-    const name = tricount.trip ?? tricount.source
-    const payload = { expenses, ...(tricount.trip ? { trips: TRIPS.filter((t) => t.id === tricount.trip) } : {}) }
+    const name = tricount.tricount
+    /* I tricount di vacanza portano con sé la propria definizione, così un
+       reimport da zero li ricrea. I registri stabili e i personali vivono nel
+       master coi loro nomi veri, che non stanno in questo script. */
+    const payload = {
+      expenses,
+      ...(TRIP_IDS.has(name) ? { tricounts: TRIPS.filter((t) => t.id === name) } : {}),
+    }
     const target = join(PATHS.incoming, `${name}.json`)
     writeFileSync(target, `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
     log(`→ ${target} (${expenses.length} voci)`)

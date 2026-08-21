@@ -1,38 +1,41 @@
 /**
- * Il selettore del tricount: una scelta sola.
+ * Il selettore del tricount: una scelta sola, **fra i propri**.
  *
  * Su Tricount i gruppi sono una lista piatta e ogni vacanza è un gruppo come gli
- * altri. Prima qui c'erano due tendine — «in quale registro», e poi «quale
- * viaggio» — che sono due domande dove nella testa di chi inserisce ce n'è una.
- * → ADR-0026
+ * altri: qui è uguale. → ADR-0026
  *
- * Le vacanze concluse non compaiono, tranne quella della spesa che si sta
+ * Il menù mostra solo i tricount di cui chi guarda è membro: il compartimento
+ * personale dell'altra persona non compare, quindi metterci una spesa per
+ * errore non è vietato — è impossibile. → ADR-0037
+ *
+ * I tricount conclusi non compaiono, tranne quello della spesa che si sta
  * correggendo: un menù che non contiene il valore corrente lo cambierebbe da sé.
  */
 
 import type { ReactNode } from 'react'
 
-import { ledgerOptions } from '../domain/expense-rules'
-import { sourceTitleOf, tripTitleOf, type Source, type SourceMap, type Trip } from '../domain/types'
+import { tricountOptions } from '../domain/expense-rules'
+import { tricountTitleOf, type PersonId, type Tricount } from '../domain/types'
 
 export function LedgerSelect({
   id,
   value,
-  trips,
-  sources,
+  tricounts,
+  person,
   onChange,
   ariaLabel = 'Tricount',
 }: {
   id?: string
   value: string
-  trips: readonly Trip[]
-  sources: SourceMap | undefined
+  tricounts: readonly Tricount[]
+  /** Chi sta inserendo: il menù offre solo i suoi tricount. */
+  person: PersonId
   onChange: (key: string) => void
   ariaLabel?: string
 }): ReactNode {
-  const options = ledgerOptions(trips, { current: value })
-  const fixed = options.filter((option) => option.trip === undefined)
-  const vacations = options.filter((option) => option.trip !== undefined)
+  const options = tricountOptions(tricounts, person, { current: value })
+  const plain = options.filter((option) => option.tricount.trip === undefined)
+  const vacations = options.filter((option) => option.tricount.trip !== undefined)
 
   return (
     <select
@@ -42,17 +45,17 @@ export function LedgerSelect({
       aria-label={ariaLabel}
       onChange={(event) => onChange(event.target.value)}
     >
-      {fixed.map((option) => (
-        <option key={option.key} value={option.key}>
-          {sourceTitleOf(sources, option.key as Source)}
+      {plain.map((option) => (
+        <option key={option.tricount.id} value={option.tricount.id}>
+          {tricountTitleOf(option.tricount)}
         </option>
       ))}
       {vacations.length > 0 ? (
-        <optgroup label={sourceTitleOf(sources, 'vacanze')}>
+        <optgroup label="Vacanze">
           {vacations.map((option) => (
-            <option key={option.key} value={option.key}>
-              {option.trip ? tripTitleOf(option.trip) : option.key} {option.trip?.year}
-              {option.closed ? ' (conclusa)' : ''}
+            <option key={option.tricount.id} value={option.tricount.id}>
+              {tricountTitleOf(option.tricount)} {option.tricount.trip?.year}
+              {option.closed ? ' (concluso)' : ''}
             </option>
           ))}
         </optgroup>

@@ -22,20 +22,23 @@ import { validateExpense } from '../../src/domain/expense-rules.ts'
 import { CATEGORIES } from './taxonomy.mjs'
 import { validateDataset } from './validate-core.mjs'
 
-const CONFIG = { categories: CATEGORIES }
+const CONFIG = { categories: CATEGORIES, houseTricount: 'fisse' }
 
-const TRIPS = [
+/* I tricount della fixture: gli stessi che vede l'app. Il personale ha un
+   membro solo, ed è quello che fa scattare la regola sulle quote. */
+const TRICOUNTS = [
+  { id: 'condivise', name: 'Condivise', members: ['me', 'partner'] },
+  { id: 'personali', name: 'Personale', members: ['me'] },
+  { id: 'fisse', name: 'Casa', members: ['me', 'partner'] },
   {
     id: 'sicilia-2026',
     name: 'Sicilia',
-    place: 'Palermo',
-    year: 2026,
-    start: '2026-09-12',
-    end: '2026-09-20',
+    members: ['me', 'partner'],
+    trip: { place: 'Palermo', year: 2026, start: '2026-09-12', end: '2026-09-20' },
   },
 ]
 
-const CTX = { categories: CATEGORIES, tripIds: TRIPS.map((t) => t.id), takenIds: new Set() }
+const CTX = { categories: CATEGORIES, tricounts: TRICOUNTS, takenIds: new Set() }
 
 function base(overrides = {}) {
   return {
@@ -45,7 +48,7 @@ function base(overrides = {}) {
     amount: 47.3,
     shares: { me: 23.65, partner: 23.65 },
     paidBy: 'me',
-    source: 'condivise',
+    tricount: 'condivise',
     category: 'spesa',
     recurring: false,
     ...overrides,
@@ -58,13 +61,16 @@ const ACCETTABILI = [
   ['tutta mia', base({ shares: { me: 47.3, partner: 0 } })],
   ['tutta sua', base({ shares: { me: 0, partner: 47.3 }, paidBy: 'partner' })],
   ['importo dispari, metà arrotondata', base({ amount: 5.05, shares: { me: 2.53, partner: 2.52 } })],
-  ['personale', base({ source: 'personali', shares: { me: 47.3, partner: 0 } })],
-  ['fissa ricorrente', base({ source: 'fisse', recurring: true, category: 'casa', subcategory: 'affitto' })],
+  ['personale', base({ tricount: 'personali', shares: { me: 47.3, partner: 0 } })],
+  [
+    'personale anticipata dall\'altra persona: il pagante è un fatto',
+    base({ tricount: 'personali', shares: { me: 47.3, partner: 0 }, paidBy: 'partner' }),
+  ],
+  ['fissa ricorrente', base({ tricount: 'fisse', recurring: true, category: 'casa', subcategory: 'affitto' })],
   [
     'di vacanza, con quota di terzi',
     base({
-      source: 'vacanze',
-      trip: 'sicilia-2026',
+      tricount: 'sicilia-2026',
       category: 'viaggi',
       subcategory: 'cibo',
       amount: 90,
@@ -74,8 +80,7 @@ const ACCETTABILI = [
   [
     'anticipata da un terzo in vacanza',
     base({
-      source: 'vacanze',
-      trip: 'sicilia-2026',
+      tricount: 'sicilia-2026',
       category: 'viaggi',
       paidBy: 'others',
       amount: 60,
@@ -96,12 +101,11 @@ const RIFIUTABILI = [
   ['senza descrizione', base({ title: '   ' })],
   ['categoria inesistente', base({ category: 'nuvole' })],
   ['sottocategoria di un\'altra categoria', base({ category: 'casa', subcategory: 'psicologo' })],
-  ['vacanza senza viaggio', base({ source: 'vacanze', category: 'viaggi' })],
-  ['vacanza con viaggio inesistente', base({ source: 'vacanze', category: 'viaggi', trip: 'marte-2030' })],
-  ['viaggio fuori dalle vacanze', base({ trip: 'sicilia-2026' })],
+  ['tricount inesistente', base({ tricount: 'marte-2030' })],
   ['quota di terzi fuori dalle vacanze', base({ amount: 90, shares: { me: 30, partner: 30, others: 30 } })],
-  ['welfare su un conto anticipato da altri', base({ paidBy: 'others', welfare: true })],
-  ['registro inventato', base({ source: 'regali' })],
+  ['pagante di gruppo fuori dalle vacanze', base({ paidBy: 'others' })],
+  ['quota dell\'altra persona in un tricount personale', base({ tricount: 'personali' })],
+  ['welfare su un conto anticipato da altri', base({ tricount: 'sicilia-2026', category: 'viaggi', paidBy: 'others', welfare: true })],
   ['link allo scontrino non valido', base({ receiptLinks: ['drive.google.com/x'] })],
   ['tre decimali', base({ amount: 47.333, shares: { me: 23.665, partner: 23.668 } })],
 ]
@@ -111,7 +115,7 @@ describe('regole di una spesa: il browser e l’import concordano', () => {
     it(`accetta: ${nome}`, () => {
       expect(validateExpense(expense, CTX)).toEqual([])
       // e l'import non ci trova errori: è la direzione che conta
-      const { errors } = validateDataset({ expenses: [expense], trips: TRIPS }, CONFIG)
+      const { errors } = validateDataset({ expenses: [expense], tricounts: TRICOUNTS }, CONFIG)
       expect(errors).toEqual([])
     })
   }

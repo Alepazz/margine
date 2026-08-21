@@ -14,7 +14,7 @@ import { Card, Notice, ShowMore, StatTile, useToast } from '../components/ui'
 import { formatDate, todayIso } from '../domain/dates'
 import { newSettlementId } from '../domain/ids'
 import { formatEuro, toCents } from '../domain/money'
-import { ledgerLabel } from '../domain/expense-rules'
+import { tricountLabel } from '../domain/expense-rules'
 import { coupleBalance } from '../domain/selectors'
 import type { Settlement } from '../domain/types'
 import { usePageData } from './usePageData'
@@ -46,8 +46,7 @@ export function Saldo(): ReactNode {
   /* Il nome leggibile di un tricount, dalla stessa funzione che usa il pannello
      che sposta una spesa: le vacanze ne hanno uno per viaggio, e quel nome sta
      nei dati del viaggio e non nella chiave. */
-  const groupLabel = (key: string): string =>
-    ledgerLabel(key, dataset.trips, config.sources)
+  const groupLabel = (key: string): string => tricountLabel(key, dataset.tricounts)
 
   /*
    * Il calcolo ha un segno fisso — positivo = `partner` deve a `me` — e qui si

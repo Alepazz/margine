@@ -11,8 +11,8 @@ import type { CategoryLookup } from '../domain/categories'
 import { formatDate } from '../domain/dates'
 import { formatEuro, toCents } from '../domain/money'
 import { balanceDeltaOf } from '../domain/selectors'
-import { ledgerKeyOf, ledgerLabel, ledgerParts } from '../domain/expense-rules'
-import type { Expense } from '../domain/types'
+import { tricountLabel } from '../domain/expense-rules'
+import { soleMemberOf, type Expense } from '../domain/types'
 import { ExpenseForm } from './ExpenseForm'
 import { LedgerSelect } from './LedgerSelect'
 import { useToast } from './ui'
@@ -65,33 +65,32 @@ function TagToggle({
  *
  * Non è un cambio di etichetta: sposta un debito da un saldo a un altro, e sono
  * saldi che si confrontano uno per uno con Tricount. Per questo il pannello dice
- * **quanto** sposta prima di spostarlo, e per questo tre casi non passano
+ * **quanto** sposta prima di spostarlo, e per questo due casi non passano
  * silenziosamente:
  *
  * - fuori da una vacanza la quota di chi era con voi non esiste: se c'è, lo
  *   spostamento si rifiuta invece di buttarla via;
- * - in «Personale» una spesa è al 100% di una persona, quindi le quote si
- *   rifanno — tenerle divise creerebbe un debito dentro un tricount che per
- *   costruzione non ne ha;
- * - `trip` si mette e si toglie insieme alla vacanza, altrimenti la validazione
- *   rifiuta il salvataggio con un messaggio che non c'entra niente.
+ * - in un tricount con un membro solo la spesa è al 100% di **quel membro**,
+ *   quindi le quote si rifanno — tenerle divise creerebbe un debito dentro un
+ *   tricount che per costruzione non ne ha.
  */
 function MovePanel({ expense, onDone }: { expense: Expense; onDone: () => void }): ReactNode {
   const { config, dataset, updateExpense, view } = useStore()
   const toast = useToast()
-  const current = ledgerKeyOf(expense)
+  const current = expense.tricount
   const [target, setTarget] = useState(current)
 
-  const parts = ledgerParts(target)
+  const tricounts = dataset?.tricounts ?? []
+  const targetTricount = tricounts.find((t) => t.id === target)
+  const targetMember = soleMemberOf(targetTricount)
   const othersShare = expense.shares.others ?? 0
   const blocked =
-    parts.source !== 'vacanze' && toCents(othersShare) > 0
+    targetTricount && !targetTricount.trip && toCents(othersShare) > 0
       ? 'Questa spesa ha una quota di chi era con voi, che esiste solo in vacanza: correggi le quote prima di spostarla.'
       : null
 
   const delta = balanceDeltaOf(expense)
-  const label = (key: string): string =>
-    ledgerLabel(key, dataset?.trips ?? [], config?.sources)
+  const label = (key: string): string => tricountLabel(key, tricounts)
 
   /**
    * Come diventa la spesa dopo lo spostamento.
@@ -103,11 +102,10 @@ function MovePanel({ expense, onDone }: { expense: Expense; onDone: () => void }
    * accaduto, non una conseguenza del tricount in cui la spesa finisce.
    */
   const fieldsFor = (): Partial<Expense> => {
-    const fields: Partial<Expense> = { source: parts.source }
-    fields.trip = parts.source === 'vacanze' ? (parts.trip ?? '') : ''
-    if (parts.source === 'personali') {
+    const fields: Partial<Expense> = { tricount: target }
+    if (targetMember) {
       const whole = expense.amount
-      fields.shares = view.person === 'me' ? { me: whole, partner: 0 } : { me: 0, partner: whole }
+      fields.shares = targetMember === 'me' ? { me: whole, partner: 0 } : { me: 0, partner: whole }
     }
     return fields
   }
@@ -131,8 +129,8 @@ function MovePanel({ expense, onDone }: { expense: Expense; onDone: () => void }
         <LedgerSelect
           id="move-ledger"
           value={target}
-          trips={dataset?.trips ?? []}
-          sources={config?.sources}
+          tricounts={tricounts}
+          person={view.person}
           onChange={setTarget}
         />
       </div>
@@ -150,7 +148,9 @@ function MovePanel({ expense, onDone }: { expense: Expense; onDone: () => void }
                 `Il debito passa da «${label(current)}» a «${label(target)}» e cambia: qui vale ${formatEuro(
                   Math.abs(delta),
                 )}, là diventa ${formatEuro(Math.abs(deltaAfter))}.`}
-          {parts.source === 'personali' ? ' In «Personale» la spesa diventa tutta tua.' : ''}
+          {targetMember && config
+            ? ` Lì la spesa diventa tutta di ${config.people[targetMember].name}.`
+            : ''}
         </p>
       ) : null}
 
@@ -338,8 +338,8 @@ export function ExpenseSheet({
             </dd>
           </div>
           <div className="kv-row">
-            <dt>Origine</dt>
-            <dd>{lookup.sourceTitle(expense.source)}</dd>
+            <dt>Tricount</dt>
+            <dd>{lookup.tricountTitle(expense.tricount)}</dd>
           </div>
           {expense.recurring ? (
             <div className="kv-row">

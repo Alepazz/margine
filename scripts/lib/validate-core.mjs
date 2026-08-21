@@ -6,7 +6,6 @@
  * esiste, lo si vede prima di cifrare — non sei mesi dopo dentro un grafico.
  */
 
-const SOURCES = new Set(['fisse', 'personali', 'condivise', 'vacanze'])
 const PEOPLE = ['me', 'partner']
 /** Chi può aver anticipato: in vacanza anche uno del gruppo. */
 const PAYERS = ['me', 'partner', 'others']
@@ -36,27 +35,50 @@ export function validateDataset(dataset, config) {
     return { errors: ['Il dataset non è un oggetto.'], warnings, report: null }
   }
   if (!Array.isArray(dataset.expenses)) errors.push('Manca l\'elenco `expenses`.')
-  if (!Array.isArray(dataset.trips)) errors.push('Manca l\'elenco `trips`.')
+  if (!Array.isArray(dataset.tricounts)) errors.push('Manca l\'elenco `tricounts`.')
   if (errors.length > 0) return { errors, warnings, report: null }
 
   const categoryIds = new Set((config?.categories ?? []).map((c) => c.id))
   const subIds = new Map(
     (config?.categories ?? []).map((c) => [c.id, new Set((c.subcategories ?? []).map((s) => s.id))]),
   )
-  const tripIds = new Set(dataset.trips.map((t) => t.id))
+  const tricountById = new Map(dataset.tricounts.map((t) => [t.id, t]))
   const seenIds = new Set()
 
-  for (const trip of dataset.trips) {
-    const where = `viaggio ${trip.id ?? '(senza id)'}`
-    if (!trip.id) errors.push(`${where}: manca l'id.`)
-    for (const field of ['name', 'place', 'start', 'end']) {
-      if (!trip[field]) errors.push(`${where}: manca «${field}».`)
+  const seenTricounts = new Set()
+  for (const tricount of dataset.tricounts) {
+    const where = `tricount ${tricount.id ?? '(senza id)'}`
+    if (!tricount.id) errors.push(`${where}: manca l'id.`)
+    else if (seenTricounts.has(tricount.id)) errors.push(`id di tricount duplicato: ${tricount.id}.`)
+    else seenTricounts.add(tricount.id)
+
+    if (typeof tricount.name !== 'string' || tricount.name.trim() === '') {
+      errors.push(`${where}: manca il nome.`)
     }
-    if (trip.start && !isDate(trip.start)) errors.push(`${where}: data di inizio non valida (${trip.start}).`)
-    if (trip.end && !isDate(trip.end)) errors.push(`${where}: data di fine non valida (${trip.end}).`)
-    if (trip.start && trip.end && trip.end < trip.start) errors.push(`${where}: finisce prima di cominciare.`)
-    if (trip.start && trip.year !== Number(trip.start.slice(0, 4))) {
-      warnings.push(`${where}: l'anno (${trip.year}) non coincide con la data di inizio (${trip.start}).`)
+    /* I membri: almeno uno, tutti conosciuti, senza doppioni. Un tricount di
+       nessuno non comparirebbe in nessun menù, e le sue spese sarebbero orfane. */
+    if (!Array.isArray(tricount.members) || tricount.members.length === 0) {
+      errors.push(`${where}: manca l'elenco dei membri.`)
+    } else {
+      for (const member of tricount.members) {
+        if (!PEOPLE.includes(member)) errors.push(`${where}: membro sconosciuto (${member}).`)
+      }
+      if (new Set(tricount.members).size !== tricount.members.length) {
+        errors.push(`${where}: membro ripetuto.`)
+      }
+    }
+
+    const trip = tricount.trip
+    if (trip) {
+      for (const field of ['place', 'start', 'end']) {
+        if (!trip[field]) errors.push(`${where}: manca «${field}» nel viaggio.`)
+      }
+      if (trip.start && !isDate(trip.start)) errors.push(`${where}: data di inizio non valida (${trip.start}).`)
+      if (trip.end && !isDate(trip.end)) errors.push(`${where}: data di fine non valida (${trip.end}).`)
+      if (trip.start && trip.end && trip.end < trip.start) errors.push(`${where}: finisce prima di cominciare.`)
+      if (trip.start && trip.year !== Number(trip.start.slice(0, 4))) {
+        warnings.push(`${where}: l'anno (${trip.year}) non coincide con la data di inizio (${trip.start}).`)
+      }
     }
   }
 
@@ -130,13 +152,23 @@ export function validateDataset(dataset, config) {
           `${where}: le quote sommano ${(sum / 100).toFixed(2)} ma l'importo è ${expense.amount.toFixed(2)}.`,
         )
       }
-      if (others !== undefined && expense.source !== 'vacanze') {
+      /* Le quote appartengono ai membri: in un tricount con un membro solo la
+         quota dell'altra persona deve essere zero. → ADR-0037 */
+      const home = tricountById.get(expense.tricount)
+      if (home && Array.isArray(home.members)) {
+        for (const person of PEOPLE) {
+          if (home.members.includes(person)) continue
+          if (cents(expense.shares[person] ?? 0) > 0) {
+            errors.push(`${where}: quota di «${person}», che non è membro di ${expense.tricount}.`)
+          }
+        }
+      }
+      if (others !== undefined && home && !home.trip) {
         warnings.push(`${where}: ha una quota di terzi ma non è una spesa di vacanza.`)
       }
     }
 
     if (!PAYERS.includes(expense.paidBy)) errors.push(`${where}: «paidBy» non valido (${expense.paidBy}).`)
-    if (!SOURCES.has(expense.source)) errors.push(`${where}: origine non valida (${expense.source}).`)
     if (typeof expense.recurring !== 'boolean') errors.push(`${where}: «recurring» deve essere booleano.`)
 
     if (!categoryIds.has(expense.category)) {
@@ -148,11 +180,9 @@ export function validateDataset(dataset, config) {
       }
     }
 
-    if (expense.source === 'vacanze') {
-      if (!expense.trip) errors.push(`${where}: spesa di vacanza senza viaggio.`)
-      else if (!tripIds.has(expense.trip)) errors.push(`${where}: viaggio inesistente (${expense.trip}).`)
-    } else if (expense.trip) {
-      warnings.push(`${where}: ha un viaggio ma non è nel tricount vacanze.`)
+    if (!expense.tricount) errors.push(`${where}: manca il tricount.`)
+    else if (!tricountById.has(expense.tricount)) {
+      errors.push(`${where}: tricount inesistente (${expense.tricount}).`)
     }
 
     if (expense.receiptLinks !== undefined) {
@@ -183,7 +213,7 @@ export function validateDataset(dataset, config) {
 
   checkBalanceGroups(dataset, config, errors, warnings)
   checkCategoryRefs(config, errors, warnings)
-  checkSources(config, errors)
+  checkTricountRefs(dataset, config, errors)
 
   return { errors, warnings, report: buildReport(dataset) }
 }
@@ -198,24 +228,15 @@ export function validateDataset(dataset, config) {
  * → ADR-0022
  */
 /**
- * I nomi dei tricount in `config.sources`.
- *
- * Una chiave che non è una delle quattro origini non rompe niente: semplicemente
- * quel nome non comparirà mai, e nel menù resterà quello generico. È lo stesso
- * genere di silenzio dei punti di partenza del saldo, e si chiude allo stesso
- * modo. → ADR-0026
+ * I riferimenti a tricount nella configurazione: come per le categorie, sono id
+ * scritti a mano, e uno sbagliato non rompe niente — la pagina Casa resterebbe
+ * vuota, in silenzio. → ADR-0037
  */
-function checkSources(config, errors) {
-  const sources = config?.sources
-  if (!sources) return
-  for (const [key, value] of Object.entries(sources)) {
-    if (!SOURCES.has(key)) {
-      errors.push(`sources.${key}: non è un tricount. Attesi: ${[...SOURCES].join(', ')}.`)
-      continue
-    }
-    if (typeof value?.name !== 'string' || value.name.trim() === '') {
-      errors.push(`sources.${key}: «name» deve essere il nome del tricount.`)
-    }
+function checkTricountRefs(dataset, config, errors) {
+  if (!config) return
+  const ids = new Set(dataset.tricounts.map((t) => t.id))
+  if (config.houseTricount && !ids.has(config.houseTricount)) {
+    errors.push(`houseTricount punta a «${config.houseTricount}», che non è un tricount che esiste.`)
   }
 }
 
@@ -264,8 +285,7 @@ function checkBalanceGroups(dataset, config, errors, warnings) {
   const groups = config?.balance?.groups
   if (!groups) return
 
-  const known = new Set(SOURCES)
-  for (const trip of dataset.trips) known.add(`vacanze/${trip.id}`)
+  const known = new Set(dataset.tricounts.map((t) => t.id))
 
   for (const [key, start] of Object.entries(groups)) {
     const where = `balance.groups.${key}`
@@ -291,7 +311,7 @@ function checkBalanceGroups(dataset, config, errors, warnings) {
     if (expense.paidBy === 'others') continue
     const owed = expense.paidBy === 'me' ? expense.shares.partner : expense.shares.me
     if (Math.round(owed * 100) === 0) continue
-    owing.add(expense.source === 'vacanze' && expense.trip ? `vacanze/${expense.trip}` : expense.source)
+    owing.add(expense.tricount)
   }
   const missing = [...owing].filter((key) => !groups[key]).sort()
   if (missing.length > 0) {
@@ -313,7 +333,7 @@ export function buildReport(dataset) {
     row.partner += cents(expense.shares?.partner ?? 0)
     row.others += cents(expense.shares?.others ?? 0)
     row.count += 1
-    row.sources[expense.source] = (row.sources[expense.source] ?? 0) + cents(expense.amount ?? 0)
+    row.sources[expense.tricount] = (row.sources[expense.tricount] ?? 0) + cents(expense.amount ?? 0)
     months.set(month, row)
   }
   const rows = [...months.values()]
@@ -329,7 +349,7 @@ export function buildReport(dataset) {
   return {
     months: rows,
     expenses: dataset.expenses.length,
-    trips: dataset.trips.length,
+    trips: dataset.tricounts.filter((t) => t.trip).length,
     total: rows.reduce((acc, r) => acc + cents(r.total), 0) / 100,
     tagged730: dataset.expenses.filter((e) => e.tax730).length,
   }

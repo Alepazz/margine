@@ -26,12 +26,19 @@ import type {
   IncomeProfile,
   PersonId,
   Settlement,
-  Trip,
+  Tricount,
 } from '../domain/types'
 
-const STORAGE_KEY = 'margine.outbox.v2'
-/** La coda di quando sapeva fare solo annotazioni: si converte, non si butta. */
-const LEGACY_KEY = 'margine.outbox.v1'
+/*
+ * v3 con il modello a tricount (ADR-0037): le operazioni della v2 portavano
+ * `source` + `trip` e qui non si possono convertire, perché «personali» era un
+ * tricount solo e il suo compartimento di destinazione dipende da chi l'aveva
+ * scritto — che la coda non sa. La v2 si ignora: è il costo, dichiarato nella
+ * migrazione, di una coda rimasta non sincronizzata durante il cambio.
+ */
+const STORAGE_KEY = 'margine.outbox.v3'
+/** Le code dei modelli passati: si cancellano, non si convertono. */
+const DEAD_KEYS = ['margine.outbox.v1', 'margine.outbox.v2']
 const SETTLED_TTL_MS = 14 * 24 * 60 * 60 * 1000
 
 export type Op =
@@ -39,8 +46,8 @@ export type Op =
   | { kind: 'create'; expense: Expense }
   | { kind: 'update'; expenseId: string; fields: Partial<Expense> }
   | { kind: 'delete'; expenseId: string }
-  | { kind: 'trip'; trip: Trip }
-  | { kind: 'trip-edit'; tripId: string; fields: Partial<Trip> }
+  | { kind: 'tricount'; tricount: Tricount }
+  | { kind: 'tricount-edit'; tricountId: string; fields: Partial<Tricount> }
   | { kind: 'settle'; settlement: Settlement }
   | { kind: 'unsettle'; settlementId: string }
   /**
@@ -79,10 +86,10 @@ function isEntry(value: unknown): value is OutboxEntry {
       return typeof (v as { expenseId?: unknown }).expenseId === 'string'
     case 'create':
       return typeof (v as { expense?: { id?: unknown } }).expense?.id === 'string'
-    case 'trip':
-      return typeof (v as { trip?: { id?: unknown } }).trip?.id === 'string'
-    case 'trip-edit':
-      return typeof (v as { tripId?: unknown }).tripId === 'string'
+    case 'tricount':
+      return typeof (v as { tricount?: { id?: unknown } }).tricount?.id === 'string'
+    case 'tricount-edit':
+      return typeof (v as { tricountId?: unknown }).tricountId === 'string'
     case 'settle':
       return typeof (v as { settlement?: { id?: unknown } }).settlement?.id === 'string'
     case 'unsettle':
@@ -105,46 +112,21 @@ function isEntry(value: unknown): value is OutboxEntry {
   }
 }
 
-/**
- * Converte la coda vecchia: ogni voce era un'annotazione, quindi diventa un
- * `patch`. Senza questo passaggio le modifiche ancora in attesa su un
- * dispositivo spariscono in silenzio al primo caricamento della versione nuova.
- */
-function migrateLegacy(raw: string): OutboxState {
-  const parsed: unknown = JSON.parse(raw)
-  if (typeof parsed !== 'object' || parsed === null) return EMPTY_OUTBOX
-  const convert = (list: unknown): OutboxEntry[] =>
-    (Array.isArray(list) ? list : [])
-      .map((item) => {
-        if (typeof item !== 'object' || item === null) return null
-        const v = item as Record<string, unknown>
-        if (typeof v.entryId !== 'string' || typeof v.ts !== 'number') return null
-        if (typeof v.expenseId !== 'string') return null
-        return { ...v, kind: 'patch' } as OutboxEntry
-      })
-      .filter((entry): entry is OutboxEntry => entry !== null)
-  const { pending, settled } = parsed as Record<string, unknown>
-  return { pending: convert(pending), settled: convert(settled) }
-}
-
 export function loadOutbox(): OutboxState {
   try {
+    /* Non lasciare in giro la coda di un modello che non esiste più: il
+       prossimo che apre gli strumenti del browser la troverebbe e non saprebbe
+       dire se conta ancora. */
+    for (const dead of DEAD_KEYS) localStorage.removeItem(dead)
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed: unknown = JSON.parse(raw)
-      if (typeof parsed !== 'object' || parsed === null) return EMPTY_OUTBOX
-      const { pending, settled } = parsed as Partial<OutboxState>
-      return {
-        pending: Array.isArray(pending) ? pending.filter(isEntry) : [],
-        settled: Array.isArray(settled) ? settled.filter(isEntry) : [],
-      }
+    if (!raw) return EMPTY_OUTBOX
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed !== 'object' || parsed === null) return EMPTY_OUTBOX
+    const { pending, settled } = parsed as Partial<OutboxState>
+    return {
+      pending: Array.isArray(pending) ? pending.filter(isEntry) : [],
+      settled: Array.isArray(settled) ? settled.filter(isEntry) : [],
     }
-    const legacy = localStorage.getItem(LEGACY_KEY)
-    if (!legacy) return EMPTY_OUTBOX
-    const migrated = migrateLegacy(legacy)
-    saveOutbox(migrated)
-    localStorage.removeItem(LEGACY_KEY)
-    return migrated
   } catch {
     return EMPTY_OUTBOX
   }
@@ -170,11 +152,11 @@ export function applyOps(dataset: Dataset, entries: readonly OutboxEntry[]): Dat
   if (entries.length === 0) return dataset
 
   let expenses = dataset.expenses
-  let trips = dataset.trips
+  let tricounts = dataset.tricounts
   let settlements = dataset.settlements ?? []
   /* Copia solo se serve: il caso normale è una coda vuota o di soli patch. */
   let expensesTouched = false
-  let tripsTouched = false
+  let tricountsTouched = false
   let settlementsTouched = false
 
   const byId = new Map(expenses.map((e, index) => [e.id, index]))
@@ -214,25 +196,25 @@ export function applyOps(dataset: Dataset, entries: readonly OutboxEntry[]): Dat
         expenses.forEach((e, index) => byId.set(e.id, index))
         break
       }
-      case 'trip': {
-        if (trips.some((t) => t.id === entry.trip.id)) break
-        if (!tripsTouched) {
-          trips = [...trips]
-          tripsTouched = true
+      case 'tricount': {
+        if (tricounts.some((t) => t.id === entry.tricount.id)) break
+        if (!tricountsTouched) {
+          tricounts = [...tricounts]
+          tricountsTouched = true
         }
-        trips.push(entry.trip)
+        tricounts.push(entry.tricount)
         break
       }
-      case 'trip-edit': {
-        const index = trips.findIndex((t) => t.id === entry.tripId)
+      case 'tricount-edit': {
+        const index = tricounts.findIndex((t) => t.id === entry.tricountId)
         if (index < 0) break
-        if (!tripsTouched) {
-          trips = [...trips]
-          tripsTouched = true
+        if (!tricountsTouched) {
+          tricounts = [...tricounts]
+          tricountsTouched = true
         }
-        const current = trips[index]
+        const current = tricounts[index]
         if (!current) break
-        trips[index] = normalizeTrip({ ...current, ...entry.fields })
+        tricounts[index] = normalizeTricount({ ...current, ...entry.fields })
         break
       }
       case 'recategorize': {
@@ -268,8 +250,8 @@ export function applyOps(dataset: Dataset, entries: readonly OutboxEntry[]): Dat
     }
   }
 
-  if (!expensesTouched && !tripsTouched && !settlementsTouched) return dataset
-  return { ...dataset, expenses, trips, settlements }
+  if (!expensesTouched && !tricountsTouched && !settlementsTouched) return dataset
+  return { ...dataset, expenses, tricounts, settlements }
 }
 
 /**
@@ -294,10 +276,13 @@ export function applyConfigOps(config: AppConfig, entries: readonly OutboxEntry[
 }
 
 /** Come `normalize` per le spese: un flag falso non si scrive. */
-function normalizeTrip(trip: Trip): Trip {
-  const next: Trip = { ...trip }
+function normalizeTricount(tricount: Tricount): Tricount {
+  const next: Tricount = { ...tricount }
   if (next.closed !== true) delete next.closed
-  if (next.country !== undefined && next.country.trim() === '') delete next.country
+  if (next.trip?.country !== undefined && next.trip.country.trim() === '') {
+    const { country: _drop, ...rest } = next.trip
+    next.trip = rest
+  }
   return next
 }
 
@@ -313,14 +298,15 @@ function applyPatch(expense: Expense, patch: Annotation): Expense {
 /**
  * Togliamo i campi vuoti: il JSON resta pulito e i diff leggibili.
  *
- * `subcategory` e `trip` cadono anche se sono la **stringa vuota**, e non è un
- * dettaglio: un `update` si applica come `{ ...spesa, ...campi }`, quindi un
- * campo assente vuol dire «lascia com'era» e per cancellarlo bisogna dire
- * qualcosa. Dire `undefined` non basta — `JSON.stringify` lo butta via, e la
- * coda vive in localStorage: bastava un ricaricamento perché una spesa portata
- * fuori da una vacanza si tenesse il suo `trip`, cioè un viaggio su una spesa
- * che non è più di vacanza. La stringa vuota sopravvive al salvataggio e vuol
- * dire «togli».
+ * `subcategory` cade anche se è la **stringa vuota**, e non è un dettaglio: un
+ * `update` si applica come `{ ...spesa, ...campi }`, quindi un campo assente
+ * vuol dire «lascia com'era» e per cancellarlo bisogna dire qualcosa. Dire
+ * `undefined` non basta — `JSON.stringify` lo butta via, e la coda vive in
+ * localStorage. La stringa vuota sopravvive al salvataggio e vuol dire «togli».
+ *
+ * Il campo `trip` non c'è più in questa danza, ed è una conseguenza voluta del
+ * modello: `tricount` è sempre presente e non vuoto, quindi spostare una spesa
+ * è riscrivere un campo, non tenerne due d'accordo. → ADR-0037
  */
 function normalize(expense: Expense): Expense {
   const next: Expense = { ...expense }
@@ -329,7 +315,6 @@ function normalize(expense: Expense): Expense {
   if (next.notes !== undefined && next.notes.trim() === '') delete next.notes
   if (next.receiptLinks !== undefined && next.receiptLinks.length === 0) delete next.receiptLinks
   if (!next.subcategory) delete next.subcategory
-  if (!next.trip) delete next.trip
   if (next.shares.others !== undefined && toCents(next.shares.others) === 0) {
     const { others: _drop, ...rest } = next.shares
     next.shares = rest
@@ -372,8 +357,8 @@ export function isAlreadyApplied(
       const expense = dataset.expenses.find((e) => e.id === entry.expenseId)
       if (!expense) return false
       /* Si confronta con l'**intenzione normalizzata**, non col valore grezzo:
-         `trip: ''` significa «togli il viaggio», e una spesa che non ce l'ha più
-         soddisfa quell'operazione anche se le due stringhe non si somigliano. */
+         `subcategory: ''` significa «togli il dettaglio», e una spesa che non ce
+         l'ha più soddisfa quell'operazione anche se le stringhe non coincidono. */
       const wanted = normalize({ ...expense, ...entry.fields })
       return Object.keys(entry.fields).every(
         (key) =>
@@ -383,13 +368,13 @@ export function isAlreadyApplied(
     }
     case 'delete':
       return !dataset.expenses.some((e) => e.id === entry.expenseId)
-    case 'trip':
-      return dataset.trips.some((t) => t.id === entry.trip.id)
-    case 'trip-edit': {
-      const trip = dataset.trips.find((t) => t.id === entry.tripId)
-      if (!trip) return false
+    case 'tricount':
+      return dataset.tricounts.some((t) => t.id === entry.tricount.id)
+    case 'tricount-edit': {
+      const tricount = dataset.tricounts.find((t) => t.id === entry.tricountId)
+      if (!tricount) return false
       return Object.entries(entry.fields).every(
-        ([key, value]) => JSON.stringify(trip[key as keyof Trip]) === JSON.stringify(value),
+        ([key, value]) => JSON.stringify(tricount[key as keyof Tricount]) === JSON.stringify(value),
       )
     }
     case 'settle':
@@ -437,8 +422,8 @@ export function describeOps(entries: readonly OutboxEntry[]): string {
     update: ['spesa corretta', 'spese corrette'],
     delete: ['spesa eliminata', 'spese eliminate'],
     patch: ['annotazione', 'annotazioni'],
-    trip: ['viaggio nuovo', 'viaggi nuovi'],
-    'trip-edit': ['viaggio modificato', 'viaggi modificati'],
+    tricount: ['tricount nuovo', 'tricount nuovi'],
+    'tricount-edit': ['tricount modificato', 'tricount modificati'],
     settle: ['rimborso registrato', 'rimborsi registrati'],
     unsettle: ['rimborso annullato', 'rimborsi annullati'],
     categories: ['categorie aggiornate', 'categorie aggiornate'],

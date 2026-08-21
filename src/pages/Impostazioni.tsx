@@ -10,13 +10,15 @@
 import { useState, type ReactNode } from 'react'
 
 import { CategoryEditor } from '../components/CategoryEditor'
-import { ThemeChooser } from '../components/Controls'
+import { PersonSwitch, ThemeChooser } from '../components/Controls'
 import { IncomeEditor } from '../components/IncomeEditor'
+import { TricountForm } from '../components/TricountForm'
 import { Card, Notice, Segmented, StatTile, VEIL, useToast } from '../components/ui'
 import { clearToken, loadToken, saveToken, testAccess } from '../data/github'
 import { formatDate } from '../domain/dates'
 import { incomeBreakdown } from '../domain/income'
 import { formatEuro } from '../domain/money'
+import { tricountTitleOf } from '../domain/types'
 import { usePageData } from './usePageData'
 
 export function Impostazioni(): ReactNode {
@@ -34,6 +36,7 @@ export function Impostazioni(): ReactNode {
     hideIncomeByDefault,
     toggleHideIncome,
     setHideIncomeByDefault,
+    addTricount,
   } = usePageData()
   const toast = useToast()
   const person = view.person
@@ -42,6 +45,7 @@ export function Impostazioni(): ReactNode {
   const [editingIncome, setEditingIncome] = useState(false)
   const [checking, setChecking] = useState(false)
   const [checkResult, setCheckResult] = useState<string | null>(null)
+  const [creatingTricount, setCreatingTricount] = useState(false)
 
   const breakdown = profile ? incomeBreakdown(profile) : null
   /* Qui i numeri sono i guadagni nella loro forma più nuda: si coprono tutti. */
@@ -58,6 +62,20 @@ export function Impostazioni(): ReactNode {
       </div>
 
       <div className="stack">
+        {/*
+          L'identità sta qui e non nella testata: si dice una volta di chi è
+          questo telefono, e tutta l'app parla di quella persona. L'avatar che
+          scambiava la vista a ogni tocco non esiste più. → ADR-0038
+        */}
+        <Card title="Questo dispositivo" note="Di chi è: decide quali tricount e quali numeri si vedono">
+          <PersonSwitch />
+          <div className="card-foot">
+            La scelta resta su questo telefono o computer, come il tema e il token. Cambiarla è il
+            modo per dare un'occhiata ai numeri dell'altra persona — apposta scomodo: non è un
+            gesto da fare per sbaglio.
+          </div>
+        </Card>
+
         <Card
           title={`Profilo entrate — ${config.people[person].name}`}
           note="Serve a trasformare le spese in margine"
@@ -165,8 +183,8 @@ export function Impostazioni(): ReactNode {
                 <span className="num">{dataset.expenses.length}</span>
               </div>
               <div className="row" style={{ justifyContent: 'space-between' }}>
-                <span>Viaggi</span>
-                <span className="num">{dataset.trips.length}</span>
+                <span>Tricount</span>
+                <span className="num">{dataset.tricounts.length}</span>
               </div>
               <div className="row" style={{ justifyContent: 'space-between' }}>
                 <span>Categorie</span>
@@ -294,6 +312,54 @@ export function Impostazioni(): ReactNode {
               </div>
             </div>
           )}
+        </Card>
+
+        <Card
+          title="I tricount"
+          note="Chi partecipa a cosa. Le vacanze si aprono dalla pagina Vacanze"
+          action={
+            creatingTricount ? null : (
+              <button type="button" className="btn btn-sm" onClick={() => setCreatingTricount(true)}>
+                Nuovo tricount
+              </button>
+            )
+          }
+        >
+          {creatingTricount ? (
+            <div style={{ marginBottom: 12 }}>
+              <TricountForm
+                takenIds={new Set(dataset.tricounts.map((t) => t.id))}
+                vacation={false}
+                onCreate={(candidate) => {
+                  addTricount(candidate)
+                  setCreatingTricount(false)
+                  toast.show(`Tricount «${candidate.name}» creato.`)
+                }}
+                onCancel={() => setCreatingTricount(false)}
+                onProblem={(message) => toast.show(message)}
+              />
+            </div>
+          ) : null}
+          <div className="stack" style={{ gap: 6, fontSize: '0.9rem' }}>
+            {dataset.tricounts.map((tricount) => (
+              <div className="row" style={{ justifyContent: 'space-between', gap: 8 }} key={tricount.id}>
+                <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {tricountTitleOf(tricount)}
+                  {tricount.trip ? ` · ${tricount.trip.year}` : ''}
+                  {tricount.closed ? ' · concluso' : ''}
+                </span>
+                {/* Gli avatar dei membri: due emoji dicono «condiviso» a colpo d'occhio. */}
+                <span style={{ whiteSpace: 'nowrap' }} aria-label={tricount.members.map((m) => config.people[m].name).join(' e ')}>
+                  {tricount.members.map((member) => config.people[member].emoji).join(' ')}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="card-foot">
+            Un tricount con un solo partecipante è personale: l'altra persona non lo trova nei suoi
+            menù. Non è una cassaforte — la passphrase è una sola e apre tutto il file: è la
+            disposizione delle stanze, non una serratura. → ADR-0039
+          </div>
         </Card>
 
         <Card

@@ -149,7 +149,7 @@ export const TRIP_CATEGORY = 'viaggi'
  * assicurazione auto, e spese di casa vere finiscono nell'altro tricount
  * condiviso. La pagina Casa mostra i due insiemi separati.
  */
-export const HOUSE_SOURCE = 'fisse'
+export const HOUSE_TRICOUNT = 'fisse'
 export const HOUSE_CATEGORY = 'casa'
 
 /** Firma stabile della tassonomia: serve a confrontare due copie. */

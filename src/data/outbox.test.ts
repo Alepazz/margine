@@ -22,12 +22,12 @@ const DATASET: Dataset = {
       amount: 90,
       shares: { me: 45, partner: 45 },
       paidBy: 'me',
-      source: 'condivise',
+      tricount: 'condivise',
       category: 'gatto',
       recurring: false,
     },
   ],
-  trips: [],
+  tricounts: [],
   settlements: [],
 }
 
@@ -42,7 +42,7 @@ const NUOVA: Expense = {
   amount: 47.3,
   shares: { me: 23.65, partner: 23.65 },
   paidBy: 'me',
-  source: 'condivise',
+  tricount: 'condivise',
   category: 'spesa',
   recurring: false,
 }
@@ -131,15 +131,20 @@ describe('creare, correggere, eliminare', () => {
     expect(next.expenses[0]?.notes).toBe('sulla seconda')
   })
 
-  it('aggiunge un viaggio, una volta sola', () => {
+  it('aggiunge un tricount, una volta sola', () => {
     const viaggio = {
-      kind: 'trip' as const,
-      trip: { id: 'sicilia-2026', name: 'Sicilia', place: 'Palermo', year: 2026, start: '2026-09-12', end: '2026-09-20' },
+      kind: 'tricount' as const,
+      tricount: {
+        id: 'sicilia-2026',
+        name: 'Sicilia',
+        members: ['me', 'partner'] as ('me' | 'partner')[],
+        trip: { place: 'Palermo', year: 2026, start: '2026-09-12', end: '2026-09-20' },
+      },
       entryId: 't',
       ts: 1,
     }
     const next = applyOps(applyOps(DATASET, [viaggio]), [{ ...viaggio, entryId: 't2', ts: 2 }])
-    expect(next.trips).toHaveLength(1)
+    expect(next.tricounts).toHaveLength(1)
   })
 })
 
@@ -196,43 +201,42 @@ const IN_VACANZA: Expense = {
   amount: 30,
   shares: { me: 15, partner: 15 },
   paidBy: 'me',
-  source: 'vacanze',
+  tricount: 'sud-italia-2026',
   category: 'viaggi',
   subcategory: 'attivita',
   recurring: false,
-  trip: 'sud-italia-2026',
 }
 
 const CON_VACANZA: Dataset = { ...DATASET, expenses: [...DATASET.expenses, IN_VACANZA] }
 
 describe('togliere un campo con un update', () => {
+  /*
+   * Con il modello a tricount lo spostamento è un campo solo che si riscrive:
+   * la danza «source più trip, e trip si svuota con la stringa vuota» non
+   * esiste più per il viaggio. Resta per la sottocategoria, ed è lei che questo
+   * blocco presidia: la coda vive in localStorage e `JSON.stringify` butta via
+   * le chiavi `undefined`, quindi «togli» si dice con la stringa vuota.
+   */
   const uscita: OutboxEntry = {
     kind: 'update',
     expenseId: 'v',
-    fields: { source: 'condivise', trip: '' },
+    fields: { tricount: 'condivise', category: 'spesa', subcategory: '' },
     entryId: 'u',
     ts: 1,
   }
 
-  it('la spesa esce dalla vacanza e non si porta dietro il viaggio', () => {
+  it('la spesa esce dalla vacanza e non si porta dietro il dettaglio', () => {
     const next = applyOps(CON_VACANZA, [uscita])
     const moved = next.expenses.find((e) => e.id === 'v')
-    expect(moved?.source).toBe('condivise')
-    expect(moved).not.toHaveProperty('trip')
+    expect(moved?.tricount).toBe('condivise')
+    expect(moved).not.toHaveProperty('subcategory')
   })
 
-  /*
-   * Il difetto vero, e la ragione per cui il campo si svuota con una stringa e
-   * non con `undefined`: la coda vive in localStorage, e `JSON.stringify` butta
-   * via le chiavi `undefined`. Bastava ricaricare la pagina prima che il
-   * salvataggio partisse perché l'operazione perdesse il pezzo che cancella, e
-   * la spesa restasse attaccata a un viaggio pur non essendo più di vacanza.
-   */
   it('e sopravvive al giro in localStorage, che è dove si perdeva', () => {
     const round = JSON.parse(JSON.stringify(uscita)) as OutboxEntry
     expect(round).toEqual(uscita)
     const moved = applyOps(CON_VACANZA, [round]).expenses.find((e) => e.id === 'v')
-    expect(moved).not.toHaveProperty('trip')
+    expect(moved).not.toHaveProperty('subcategory')
   })
 
   it('e una volta applicata non resta in coda per sempre', () => {
@@ -242,41 +246,46 @@ describe('togliere un campo con un update', () => {
   })
 })
 
-describe('il flag «conclusa» di un viaggio', () => {
+describe('il flag «concluso» di un tricount', () => {
   const VIAGGI: Dataset = {
     ...DATASET,
-    trips: [
-      { id: 'creta-2025', name: 'Creta', place: 'Creta', year: 2025, start: '2025-08-17', end: '2025-08-25' },
+    tricounts: [
+      {
+        id: 'creta-2025',
+        name: 'Creta',
+        members: ['me', 'partner'],
+        trip: { place: 'Creta', year: 2025, start: '2025-08-17', end: '2025-08-25' },
+      },
     ],
   }
   const chiudi: OutboxEntry = {
-    kind: 'trip-edit',
-    tripId: 'creta-2025',
+    kind: 'tricount-edit',
+    tricountId: 'creta-2025',
     fields: { closed: true },
     entryId: 'te',
     ts: 1,
   }
 
-  it('si applica al viaggio che esiste', () => {
-    expect(applyOps(VIAGGI, [chiudi]).trips[0]?.closed).toBe(true)
+  it('si applica al tricount che esiste', () => {
+    expect(applyOps(VIAGGI, [chiudi]).tricounts[0]?.closed).toBe(true)
   })
 
-  it('su un viaggio che non c’è non fa niente, invece di inventarlo', () => {
-    const altro: OutboxEntry = { ...chiudi, tripId: 'mai-esistito', entryId: 'x' }
-    expect(applyOps(VIAGGI, [altro]).trips).toEqual(VIAGGI.trips)
+  it('su un tricount che non c’è non fa niente, invece di inventarlo', () => {
+    const altro: OutboxEntry = { ...chiudi, tricountId: 'mai-esistito', entryId: 'x' }
+    expect(applyOps(VIAGGI, [altro]).tricounts).toEqual(VIAGGI.tricounts)
   })
 
-  /* Senza questo, l'operazione resterebbe in coda a vita: `trip` guardava solo
-     se l'id esisteva, e per una modifica l'id esiste già sempre. */
-  it('e si riconosce come già pubblicata, cosa che «trip» non saprebbe fare', () => {
+  /* Senza questo, l'operazione resterebbe in coda a vita: «tricount» guarda solo
+     se l'id esiste, e per una modifica l'id esiste già sempre. */
+  it('e si riconosce come già pubblicata, cosa che «tricount» non saprebbe fare', () => {
     expect(isAlreadyApplied(VIAGGI, undefined, chiudi)).toBe(false)
     expect(isAlreadyApplied(applyOps(VIAGGI, [chiudi]), undefined, chiudi)).toBe(true)
   })
 
-  it('riaprire un viaggio non lascia «closed: false» nei dati', () => {
+  it('riaprire un tricount non lascia «closed: false» nei dati', () => {
     const chiuso = applyOps(VIAGGI, [chiudi])
     const riapri: OutboxEntry = { ...chiudi, fields: { closed: false }, entryId: 'r', ts: 2 }
-    expect(applyOps(chiuso, [riapri]).trips[0]).not.toHaveProperty('closed')
+    expect(applyOps(chiuso, [riapri]).tricounts[0]).not.toHaveProperty('closed')
   })
 })
 
@@ -323,7 +332,7 @@ const CONFIG: AppConfig = {
   categories: [{ id: 'casa', label: 'Casa', slot: 0 }],
   catCategory: 'gatto',
   tripCategory: 'viaggi',
-  houseSource: 'fisse' as const,
+  houseTricount: 'fisse',
   houseCategory: 'casa',
   balance: { since: '2026-08-16', opening: 0 },
   fiscal: { deductibleHints: [], driveFolderHint: '' },

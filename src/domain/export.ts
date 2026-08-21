@@ -37,7 +37,7 @@ export function tax730Csv(
     expense.subcategory ? lookup.subLabel(expense.category, expense.subcategory) : '',
     expense.amount.toFixed(2).replace('.', ','),
     (expense.shares[person] ?? 0).toFixed(2).replace('.', ','),
-    lookup.sourceLabel(expense.source),
+    lookup.tricountLabel(expense.tricount),
     expense.notes ?? '',
     (expense.receiptLinks ?? []).join(' | '),
   ])

@@ -24,7 +24,7 @@ import {
   type ExpenseFilter,
   type SortKey,
 } from '../domain/selectors'
-import { SOURCES, type Expense, type PersonId, type Source } from '../domain/types'
+import { isMember, tricountTitleOf, type Expense, type PersonId } from '../domain/types'
 import { usePageData } from './usePageData'
 
 const PAGE_SIZE = 80
@@ -37,7 +37,7 @@ const SORT_LABELS: Record<SortKey, string> = {
 }
 
 export function Spese(): ReactNode {
-  const { config, view, lookup, all } = usePageData()
+  const { config, dataset, view, lookup, all } = usePageData()
   const person = view.person
   const [filter, setFilter] = useState<ExpenseFilter>(EMPTY_FILTER)
   const [sort, setSort] = useState<SortKey>('date-desc')
@@ -47,7 +47,7 @@ export function Spese(): ReactNode {
   const activeFilters =
     (filter.month === 'all' ? 0 : 1) +
     (filter.category === 'all' ? 0 : 1) +
-    (filter.source === 'all' ? 0 : 1) +
+    (filter.tricount === 'all' ? 0 : 1) +
     (filter.paidBy === 'all' ? 0 : 1) +
     (filter.tax730Only ? 1 : 0)
 
@@ -123,16 +123,21 @@ export function Spese(): ReactNode {
           </select>
           <select
             className="select"
-            value={filter.source}
-            onChange={(event) => update({ source: event.target.value as Source | 'all' })}
-            aria-label="Origine"
+            value={filter.tricount}
+            onChange={(event) => update({ tricount: event.target.value })}
+            aria-label="Tricount"
           >
             <option value="all">Tutti i tricount</option>
-            {SOURCES.map((source) => (
-              <option key={source} value={source}>
-                {lookup.sourceTitle(source)}
-              </option>
-            ))}
+            {/* Solo i propri: le spese in elenco sono già solo quelle con una
+                quota di chi guarda, e il compartimento dell'altra persona qui
+                sarebbe un filtro che non trova mai niente. → ADR-0037 */}
+            {dataset.tricounts
+              .filter((tricount) => isMember(tricount, person))
+              .map((tricount) => (
+                <option key={tricount.id} value={tricount.id}>
+                  {tricountTitleOf(tricount)}
+                </option>
+              ))}
           </select>
           <select
             className="select"

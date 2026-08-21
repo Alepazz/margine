@@ -10,13 +10,11 @@
 
 import { categoryBreakdown, type CategorySlice } from './selectors'
 import {
-  sourceLabelOf,
-  sourceTitleOf,
+  tricountTitleOf,
   type Category,
   type Expense,
   type PersonId,
-  type Source,
-  type SourceMap,
+  type Tricount,
 } from './types'
 import type { ChartTheme } from '../theme/palette'
 
@@ -36,18 +34,19 @@ export interface CategoryLookup {
   hasSlot: (id: string) => boolean
   subLabel: (categoryId: string, subId: string | undefined) => string
   /** Il nome del tricount, senza emoji: per il CSV e per le frasi. */
-  sourceLabel: (source: Source) => string
+  tricountLabel: (id: string) => string
   /** Emoji e nome, per i menù e le righe dell'interfaccia. */
-  sourceTitle: (source: Source) => string
+  tricountTitle: (id: string) => string
 }
 
 export function buildCategoryLookup(
   categories: readonly Category[],
   theme: ChartTheme,
-  /** I tricount veri, dai dati. Quello che manca ricade sul generico. */
-  sources: SourceMap = {},
+  /** I tricount, dai dati: nome ed emoji veri. Un id sconosciuto resta un id. */
+  tricounts: readonly Tricount[] = [],
 ): CategoryLookup {
   const byId = new Map(categories.map((c) => [c.id, c]))
+  const tricountById = new Map(tricounts.map((t) => [t.id, t]))
 
   /*
    * Solo uno `slot` dichiarato dà un colore. Prima, una categoria senza slot lo
@@ -79,8 +78,11 @@ export function buildCategoryLookup(
       const sub = byId.get(categoryId)?.subcategories?.find((s) => s.id === subId)
       return sub?.label ?? subId
     },
-    sourceLabel: (source) => sourceLabelOf(sources, source),
-    sourceTitle: (source) => sourceTitleOf(sources, source),
+    tricountLabel: (id) => tricountById.get(id)?.name ?? id,
+    tricountTitle: (id) => {
+      const found = tricountById.get(id)
+      return found ? tricountTitleOf(found) : id
+    },
   }
 }
 

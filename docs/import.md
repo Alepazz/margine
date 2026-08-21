@@ -71,7 +71,7 @@ Un file per mese o per tricount, per esempio `data/incoming/2026-07.json`:
       "date": "2026-07-14",
       "title": "Veterinario — vaccino annuale",
       "amount": 85.00,
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "subcategory": "veterinario",
       "paidBy": "me",
@@ -82,7 +82,7 @@ Un file per mese o per tricount, per esempio `data/incoming/2026-07.json`:
       "date": "2026-07-02",
       "title": "Palestra",
       "amount": 45.00,
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "subcategory": "sport",
       "paidBy": "me",
@@ -93,8 +93,7 @@ Un file per mese o per tricount, per esempio `data/incoming/2026-07.json`:
       "date": "2026-07-20",
       "title": "Cena in sei",
       "amount": 216.10,
-      "source": "vacanze",
-      "trip": "creta-2025",
+      "tricount": "creta-2025",
       "category": "viaggi",
       "subcategory": "cibo",
       "paidBy": "others",
@@ -102,15 +101,19 @@ Un file per mese o per tricount, per esempio `data/incoming/2026-07.json`:
       "recurring": false
     }
   ],
-  "trips": [
+  "tricounts": [
     {
-      "id": "2026-dolomiti",
+      "id": "dolomiti-2026",
       "name": "Dolomiti",
-      "place": "Dolomiti",
-      "country": "Italia",
-      "year": 2026,
-      "start": "2026-07-04",
-      "end": "2026-07-11"
+      "emoji": "⛰️",
+      "members": ["me", "partner"],
+      "trip": {
+        "place": "Dolomiti",
+        "country": "Italia",
+        "year": 2026,
+        "start": "2026-07-04",
+        "end": "2026-07-11"
+      }
     }
   ]
 }
@@ -123,18 +126,17 @@ Campi:
 | `date` | sì | `YYYY-MM-DD` |
 | `title` | sì | la descrizione come sta su Tricount |
 | `amount` | sì | importo **totale** in euro, due decimali |
-| `source` | sì | `fisse` · `personali` · `condivise` · `vacanze` |
+| `tricount` | sì | l'**id di un tricount** che esiste in `dataset.tricounts` (→ ADR-0037). Non c'è più un elenco chiuso: `fisse`, `condivise`, `personali-alessio`, `personali-federica`, e un id per ogni viaggio |
 | `category` | sì | un id presente in `config.categories` |
 | `subcategory` | no | se la categoria ne prevede |
 | `paidBy` | no (default `me`) | `me` · `partner` · `others` (uno del gruppo, in vacanza) |
-| `split` | no | `half` (default per tutto tranne le personali) · `me` · `partner` |
+| `split` | no | `half` · `me` · `partner`. Il default è `half`, tranne in un tricount con **un membro solo**, dove è quel membro: lo decide il tricount, non un id speciale |
 | `shares` | no | `{ "me": 42.50, "partner": 42.50 }`, e `"others"` per la quota di chi non siete voi due. **Devono sommare esatte all'importo.** Serve ogni volta che la divisione non è una di quelle di `split` — cioè quasi sempre, sui dati veri |
 | `recurring` | no (default `false`) | `true` per affitto, bollette, abbonamenti |
-| `trip` | solo per `vacanze` | id del viaggio |
-| `id` | no | se manca, viene calcolato da data, titolo, importo e origine: rilanciare l'import sullo stesso file non crea doppioni |
+| `id` | no | se manca, viene calcolato da data, titolo, importo e tricount: rilanciare l'import sullo stesso file non crea doppioni |
 | `welfare` | no | `true` se l'ha pagata il welfare aziendale: resta nel costo della vacanza e negli elenchi, ma non erode il budget di chi l'ha anticipata (→ ADR-0014). Di norma **non si scrive qui**: si mette dall'app, come il tag 730 |
 
-I viaggi si dichiarano una volta sola, nel mese in cui compaiono.
+I tricount si dichiarano una volta sola, nel mese in cui compaiono: `members` dice chi vi partecipa (un membro solo = tricount personale), e `trip` c'è solo se è una vacanza. Un tricount con un membro solo accetta quote **solo di quel membro**: la validazione lo controlla, ed è la stessa regola che nel browser fa sparire la divisione dal modulo. → ADR-0037
 
 ## 5. Fondere e cifrare
 

@@ -5,7 +5,7 @@ import { useMemo } from 'react'
 import { useReadyStore, type ReadyStore } from '../data/store'
 import { buildCategoryLookup, type CategoryLookup } from '../domain/categories'
 import { todayIso } from '../domain/dates'
-import { allFor, monthlySeries, visibleFor, type MonthTotal } from '../domain/selectors'
+import { allFor, monthlySeries, vacationIdsOf, visibleFor, type MonthTotal } from '../domain/selectors'
 import type { Expense } from '../domain/types'
 import type { ChartTheme } from '../theme/palette'
 import { useChartTheme } from '../theme/theme'
@@ -28,10 +28,14 @@ export function usePageData(): PageData {
   const { person } = store.view
 
   const lookup = useMemo(
-    () => buildCategoryLookup(store.config.categories, chart, store.config.sources),
-    [store.config.categories, store.config.sources, chart],
+    () => buildCategoryLookup(store.config.categories, chart, store.dataset.tricounts),
+    [store.config.categories, store.dataset.tricounts, chart],
   )
-  const visible = useMemo(() => visibleFor(expenses, store.view), [expenses, store.view])
+  const vacationIds = useMemo(() => vacationIdsOf(store.dataset.tricounts), [store.dataset.tricounts])
+  const visible = useMemo(
+    () => visibleFor(expenses, store.view, vacationIds),
+    [expenses, store.view, vacationIds],
+  )
   const all = useMemo(() => allFor(expenses, person), [expenses, person])
   const series = useMemo(() => monthlySeries(visible, person), [visible, person])
 

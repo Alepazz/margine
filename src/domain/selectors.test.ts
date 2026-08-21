@@ -35,12 +35,15 @@ function expense(partial: Partial<Expense> & { id: string; date: string; amount:
     title: 'Voce',
     shares: { me: half, partner: partial.amount - half },
     paidBy: 'me',
-    source: 'condivise',
+    tricount: 'condivise',
     category: 'spesa',
     recurring: false,
     ...partial,
   }
 }
+
+/* I tricount della fixture: due condivisi, un personale, un viaggio. */
+const VACANZE = new Set(['viaggio'])
 
 const DATA: Expense[] = [
   expense({ id: 'a', date: '2026-06-03', amount: 100, recurring: true, category: 'casa' }),
@@ -51,15 +54,14 @@ const DATA: Expense[] = [
     id: 'd',
     date: '2026-08-10',
     amount: 40,
-    source: 'vacanze',
-    trip: 'viaggio',
+    tricount: 'viaggio',
     category: 'viaggi',
   }),
   expense({
     id: 'e',
     date: '2026-08-12',
     amount: 200,
-    source: 'personali',
+    tricount: 'personali',
     category: 'salute',
     shares: { me: 200, partner: 0 },
     tax730: true,
@@ -69,17 +71,17 @@ const DATA: Expense[] = [
 
 describe('filtro di vista', () => {
   it('tiene fuori le vacanze per impostazione predefinita', () => {
-    const visible = visibleFor(DATA, { person: 'me', includeVacations: false })
+    const visible = visibleFor(DATA, { person: 'me', includeVacations: false }, VACANZE)
     expect(visible.map((e) => e.id)).toEqual(['a', 'b', 'c', 'e'])
   })
 
   it('le include quando richiesto', () => {
-    const visible = visibleFor(DATA, { person: 'me', includeVacations: true })
+    const visible = visibleFor(DATA, { person: 'me', includeVacations: true }, VACANZE)
     expect(visible.map((e) => e.id)).toEqual(['a', 'b', 'c', 'd', 'e'])
   })
 
   it('esclude le spese in cui la persona non ha quota', () => {
-    const visible = visibleFor(DATA, { person: 'partner', includeVacations: true })
+    const visible = visibleFor(DATA, { person: 'partner', includeVacations: true }, VACANZE)
     expect(visible.map((e) => e.id)).toEqual(['a', 'b', 'c', 'd'])
   })
 
@@ -94,12 +96,12 @@ describe('filtro di vista', () => {
     })
 
     it('non erode il budget di chi l’ha pagata col welfare', () => {
-      const visible = visibleFor([...DATA, cena], { person: 'me', includeVacations: false })
+      const visible = visibleFor([...DATA, cena], { person: 'me', includeVacations: false }, VACANZE)
       expect(visible.map((e) => e.id)).not.toContain('welfare')
     })
 
     it('resta una spesa normale per l’altra persona, che la rimborsa in contanti', () => {
-      const visible = visibleFor([...DATA, cena], { person: 'partner', includeVacations: false })
+      const visible = visibleFor([...DATA, cena], { person: 'partner', includeVacations: false }, VACANZE)
       expect(visible.map((e) => e.id)).toContain('welfare')
     })
 
@@ -110,7 +112,7 @@ describe('filtro di vista', () => {
 })
 
 describe('serie mensile', () => {
-  const visible = visibleFor(DATA, { person: 'me', includeVacations: false })
+  const visible = visibleFor(DATA, { person: 'me', includeVacations: false }, VACANZE)
   const series = monthlySeries(visible, 'me')
 
   it('separa fisse e variabili', () => {
@@ -164,7 +166,7 @@ describe('proiezione di fine mese', () => {
 
 describe('confronto fra periodi', () => {
   it('parte dal mese precedente a quello selezionato', () => {
-    const series = monthlySeries(visibleFor(DATA, { person: 'me', includeVacations: false }), 'me')
+    const series = monthlySeries(visibleFor(DATA, { person: 'me', includeVacations: false }, VACANZE), 'me')
     const comparison = comparePeriods(series, '2026-09', 3)
     expect(comparison.currentMonths).toEqual(['2026-06', '2026-07', '2026-08'])
     expect(comparison.previousMonths).toEqual(['2026-03', '2026-04', '2026-05'])
@@ -176,7 +178,7 @@ describe('confronto fra periodi', () => {
 
 describe('categorie', () => {
   it('ordina le fette e calcola le percentuali', () => {
-    const visible = visibleFor(DATA, { person: 'me', includeVacations: false })
+    const visible = visibleFor(DATA, { person: 'me', includeVacations: false }, VACANZE)
     const slices = categoryBreakdown(visible, 'me')
     expect(slices[0]?.key).toBe('salute')
     expect(slices[0]?.total).toBe(200)
@@ -225,8 +227,7 @@ describe('viaggi', () => {
       id: 'gruppo',
       date: '2026-08-10',
       amount: 216.1,
-      source: 'vacanze',
-      trip: 'viaggio',
+      tricount: 'viaggio',
       category: 'viaggi',
       subcategory: 'cibo',
       paidBy: 'others',
@@ -250,8 +251,7 @@ describe('viaggi', () => {
       id: 'stellato',
       date: '2026-08-10',
       amount: 200,
-      source: 'vacanze',
-      trip: 'viaggio',
+      tricount: 'viaggio',
       category: 'viaggi',
       subcategory: 'cibo',
       paidBy: 'me',
@@ -267,8 +267,7 @@ describe('viaggi', () => {
       id: 'hotel',
       date: '2026-08-09',
       amount: 100,
-      source: 'vacanze',
-      trip: 'viaggio',
+      tricount: 'viaggio',
       category: 'viaggi',
       subcategory: 'alloggio',
     })
@@ -318,14 +317,14 @@ describe('filtri', () => {
 describe('la casa: due insiemi che non coincidono', () => {
   const CASA: Expense[] = [
     // dentro il tricount di casa
-    expense({ id: 'h1', date: '2026-06-01', amount: 800, source: 'fisse', category: 'casa', subcategory: 'affitto', recurring: true }),
-    expense({ id: 'h2', date: '2026-06-05', amount: 120, source: 'fisse', category: 'casa', subcategory: 'bollette', recurring: true }),
+    expense({ id: 'h1', date: '2026-06-01', amount: 800, tricount: 'fisse', category: 'casa', subcategory: 'affitto', recurring: true }),
+    expense({ id: 'h2', date: '2026-06-05', amount: 120, tricount: 'fisse', category: 'casa', subcategory: 'bollette', recurring: true }),
     // nel tricount di casa ma casa non è: è il caso vero della telefonia
-    expense({ id: 'h3', date: '2026-06-07', amount: 30, source: 'fisse', category: 'telefonia', recurring: true }),
+    expense({ id: 'h3', date: '2026-06-07', amount: 30, tricount: 'fisse', category: 'telefonia', recurring: true }),
     // casa, ma registrata nell'altro tricount condiviso
-    expense({ id: 'h4', date: '2026-06-11', amount: 40, source: 'condivise', category: 'casa', subcategory: 'prodotti' }),
+    expense({ id: 'h4', date: '2026-06-11', amount: 40, tricount: 'condivise', category: 'casa', subcategory: 'prodotti' }),
     // né l'uno né l'altro
-    expense({ id: 'h5', date: '2026-06-12', amount: 25, source: 'condivise', category: 'spesa' }),
+    expense({ id: 'h5', date: '2026-06-12', amount: 25, tricount: 'condivise', category: 'spesa' }),
   ]
 
   it('il tricount comprende anche ciò che casa non è', () => {
@@ -401,8 +400,7 @@ describe('il saldo fra le due persone', () => {
         date: '2026-08-09',
         amount: 90,
         paidBy: 'others',
-        source: 'vacanze',
-        trip: 'x',
+        tricount: 'x',
         shares: { me: 30, partner: 30, others: 30 },
       }),
     ]
@@ -425,29 +423,25 @@ describe('il saldo tricount per tricount', () => {
    * di quello che si vede su Tricount, che tiene un saldo per gruppo. → ADR-0022
    */
   const SPESE: Expense[] = [
-    expense({ id: 'f1', date: '2026-08-05', amount: 30, paidBy: 'me', source: 'fisse' }),
-    expense({ id: 'c1', date: '2026-08-06', amount: 50, paidBy: 'partner', source: 'condivise' }),
+    expense({ id: 'f1', date: '2026-08-05', amount: 30, paidBy: 'me', tricount: 'fisse' }),
+    expense({ id: 'c1', date: '2026-08-06', amount: 50, paidBy: 'partner', tricount: 'condivise' }),
     expense({
       id: 'v1',
       date: '2026-08-07',
       amount: 100,
       paidBy: 'me',
-      source: 'vacanze',
-      trip: 'creta-2025',
+      tricount: 'creta-2025',
     }),
   ]
 
   it('separa i tricount, e le vacanze una per viaggio', () => {
     const saldo = coupleBalance(SPESE, [], { since: '2026-08-01', opening: 0 })
-    expect(saldo.groups.map((g) => g.key).sort()).toEqual([
-      'condivise',
-      'fisse',
-      'vacanze/creta-2025',
-    ])
+    /* In ordine alfabetico: senza il prefisso «vacanze/» i viaggi si mescolano. */
+    expect(saldo.groups.map((g) => g.key).sort()).toEqual(['condivise', 'creta-2025', 'fisse'])
     const per = (key: string) => saldo.groups.find((g) => g.key === key)
     expect(per('fisse')?.balance).toBe(15)
     expect(per('condivise')?.balance).toBe(-25)
-    expect(per('vacanze/creta-2025')?.balance).toBe(50)
+    expect(per('creta-2025')?.balance).toBe(50)
     /* Il totale resta la somma: separare non deve cambiare quanto vi dovete. */
     expect(saldo.balance).toBe(40)
   })
@@ -467,8 +461,8 @@ describe('il saldo tricount per tricount', () => {
     expect(per('fisse')?.movements).toBe(0)
     expect(per('condivise')?.balance).toBe(-25)
     /* Non dichiarato: il suo numero non è confrontabile con Tricount. */
-    expect(per('vacanze/creta-2025')?.declared).toBe(false)
-    expect(saldo.undeclared).toEqual(['vacanze/creta-2025'])
+    expect(per('creta-2025')?.declared).toBe(false)
+    expect(saldo.undeclared).toEqual(['creta-2025'])
     expect(saldo.balance).toBe(16.93 - 25 + 50)
   })
 
@@ -489,9 +483,9 @@ describe('il saldo tricount per tricount', () => {
     const saldo = coupleBalance([], [], {
       since: '2026-08-01',
       opening: 0,
-      groups: { 'vacanze/sud-italia-2026': { since: '2026-08-20', opening: 0 } },
+      groups: { 'sud-italia-2026': { since: '2026-08-20', opening: 0 } },
     })
-    expect(saldo.groups.map((g) => g.key)).toEqual(['vacanze/sud-italia-2026'])
+    expect(saldo.groups.map((g) => g.key)).toEqual(['sud-italia-2026'])
     expect(saldo.groups[0]?.declared).toBe(true)
     expect(saldo.undeclared).toEqual([])
   })
@@ -508,15 +502,14 @@ describe('il saldo tricount per tricount', () => {
         date: '2024-10-27',
         amount: 200,
         paidBy: 'me',
-        source: 'vacanze',
-        trip: 'germania-2024',
+        tricount: 'germania-2024',
       }),
     ]
     const saldo = coupleBalance(vecchia, [], { since: '2026-08-16', opening: 0 })
-    expect(saldo.groups.map((g) => g.key)).toEqual(['vacanze/germania-2024'])
+    expect(saldo.groups.map((g) => g.key)).toEqual(['germania-2024'])
     expect(saldo.groups[0]?.declared).toBe(false)
     expect(saldo.groups[0]?.movements).toBe(0)
-    expect(saldo.undeclared).toEqual(['vacanze/germania-2024'])
+    expect(saldo.undeclared).toEqual(['germania-2024'])
   })
 
   it('le spese personali non fanno una riga: non hanno mai una quota dell’altro', () => {
@@ -526,7 +519,7 @@ describe('il saldo tricount per tricount', () => {
         date: '2026-08-05',
         amount: 20,
         paidBy: 'me',
-        source: 'personali',
+        tricount: 'personali',
         shares: { me: 20, partner: 0 },
       }),
     ]
@@ -536,7 +529,7 @@ describe('il saldo tricount per tricount', () => {
   it('ogni movimento sa da quale tricount viene', () => {
     const saldo = coupleBalance(SPESE, [], { since: '2026-08-01', opening: 0 })
     expect(saldo.movements.map((m) => m.group)).toEqual([
-      'vacanze/creta-2025',
+      'creta-2025',
       'condivise',
       'fisse',
     ])
@@ -560,8 +553,7 @@ describe('quanto sposta il saldo una spesa', () => {
       date: '2026-08-10',
       amount: 60,
       paidBy: 'others',
-      source: 'vacanze',
-      trip: 'creta-2025',
+      tricount: 'creta-2025',
       shares: { me: 20, partner: 20, others: 20 },
     })
     expect(balanceDeltaOf(altrui)).toBe(0)
@@ -576,7 +568,7 @@ describe('quanto sposta il saldo una spesa', () => {
     const spesa = expense({ id: 'x', date: '2026-08-10', amount: 50, paidBy: 'me' })
     const opts = { since: '2026-08-01', opening: 0 }
     const prima = coupleBalance([spesa], [], opts)
-    const dopo = coupleBalance([{ ...spesa, source: 'fisse' }], [], opts)
+    const dopo = coupleBalance([{ ...spesa, tricount: 'fisse' }], [], opts)
 
     expect(prima.groups.map((g) => g.key)).toEqual(['condivise'])
     expect(dopo.groups.map((g) => g.key)).toEqual(['fisse'])
@@ -604,7 +596,7 @@ describe('portare una spesa in «Personale»', () => {
     expect(balanceDeltaOf(pagataDaLei)).toBe(-25)
 
     /* Come la porta il pannello: quote tutte mie, pagante intatto. */
-    const mia = { ...pagataDaLei, source: 'personali' as const, shares: { me: 50, partner: 0 } }
+    const mia = { ...pagataDaLei, tricount: 'personali' as const, shares: { me: 50, partner: 0 } }
     expect(balanceDeltaOf(mia)).toBe(-50)
 
     /* Come la portava prima, riscrivendo il pagante: il debito svaniva. */
@@ -613,7 +605,7 @@ describe('portare una spesa in «Personale»', () => {
   })
 
   it('e il saldo la conta, anche se è un tricount personale', () => {
-    const mia = { ...pagataDaLei, source: 'personali' as const, shares: { me: 50, partner: 0 } }
+    const mia = { ...pagataDaLei, tricount: 'personali' as const, shares: { me: 50, partner: 0 } }
     const saldo = coupleBalance([mia], [], { since: '2026-08-01', opening: 0 })
     expect(saldo.balance).toBe(-50)
     expect(saldo.groups.map((g) => g.key)).toEqual(['personali'])
@@ -665,7 +657,7 @@ describe('confronto col mese scorso a pari giorni', () => {
 })
 
 describe('statistiche di lungo periodo', () => {
-  const serie = monthlySeries(visibleFor(DATA, { person: 'me', includeVacations: false }), 'me')
+  const serie = monthlySeries(visibleFor(DATA, { person: 'me', includeVacations: false }, VACANZE), 'me')
 
   it('l’anno per anno conta i mesi osservati, non dodici', () => {
     const anni = yearlyTotals(serie)

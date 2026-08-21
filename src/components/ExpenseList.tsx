@@ -77,7 +77,7 @@ export function ExpenseList({
                 {showSource ? (
                   <>
                     <span aria-hidden="true">·</span>
-                    <span>{lookup.sourceTitle(expense.source)}</span>
+                    <span>{lookup.tricountTitle(expense.tricount)}</span>
                   </>
                 ) : null}
                 {expense.tax730 ? <span className="chip is-tax">730</span> : null}

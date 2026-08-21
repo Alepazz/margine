@@ -12,13 +12,21 @@ import { PERSON_IDS, type PersonId } from '../domain/types'
 import { useTheme, type ThemeMode } from '../theme/theme'
 import { Segmented } from './ui'
 
-/** Nessun login: si sceglie l'avatar e l'app ricalcola tutto sulla sua quota. */
+/**
+ * Di chi è questo dispositivo: **l'identità**, non una lente.
+ *
+ * Prima era un avatar nella testata che scambiava la vista a ogni tocco. Con i
+ * compartimenti personali quel gesto è diventato ambiguo — «di chi sono questi
+ * numeri?» non deve avere due risposte a un tocco di distanza — quindi la
+ * scelta sta qui, si fa una volta per telefono, e resta (in localStorage, come
+ * il tema e il token). Cambiarla è possibile ma volutamente scomodo. → ADR-0038
+ */
 export function PersonSwitch(): ReactNode {
   const { config, view, setPerson } = useStore()
   if (!config) return null
   return (
     <Segmented<PersonId>
-      ariaLabel="Chi sta guardando"
+      ariaLabel="Di chi è questo dispositivo"
       value={view.person}
       onChange={setPerson}
       options={PERSON_IDS.map((id) => ({
@@ -34,41 +42,6 @@ export function PersonSwitch(): ReactNode {
         ),
       }))}
     />
-  )
-}
-
-/**
- * Chi guarda, nella testata dell'applicazione.
- *
- * Sta qui e non nelle pagine perché è una lente **globale**: vale per ogni
- * schermata e resta scelta fra una sessione e l'altra, come il tema. Era
- * ripetuta in sei testate di pagina, e sei copie dello stesso comando sono sei
- * righe rubate al contenuto.
- *
- * Le persone sono due, quindi è un interruttore e non un menù. Su telefono
- * mostra solo l'avatar: il nome è già scritto nella riga di contesto della
- * pagina, e nella testata sarebbero cinquanta pixel spesi per ripeterlo.
- */
-export function PersonButton(): ReactNode {
-  const { config, view, setPerson } = useStore()
-  if (!config) return null
-  const current = view.person
-  const next: PersonId = current === 'me' ? 'partner' : 'me'
-  const label = `Stai guardando ${config.people[current].name}, tocca per passare a ${config.people[next].name}`
-
-  return (
-    <button
-      type="button"
-      className="btn btn-ghost person-button"
-      onClick={() => setPerson(next)}
-      aria-label={label}
-      title={label}
-    >
-      <span className="avatar" aria-hidden="true">
-        {config.people[current].emoji}
-      </span>
-      <span className="person-button-name">{config.people[current].name}</span>
-    </button>
   )
 }
 
