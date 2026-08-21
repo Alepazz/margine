@@ -32,9 +32,10 @@ const PRICE_UNITS = ['kg', 'l', 'pezzo']
 
 /**
  * Due nomi sono lo stesso nome. È la gemella di `nameKey` in
- * `src/domain/prices.ts`: qui serve solo per un avviso, quindi non c'è un test
- * di parità come per le regole delle spese — se le due divergessero, il peggio
- * che accade è un avviso in più o in meno.
+ * `src/domain/text.ts`, e resta una copia perché questo file gira in Node
+ * accanto agli script: qui serve solo per un avviso, quindi non c'è un test di
+ * parità come per le regole delle spese — se le due divergessero, il peggio che
+ * accade è un avviso in più o in meno.
  */
 const nameKey = (text) => String(text ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
 
@@ -199,8 +200,13 @@ export function validateDataset(dataset, config) {
       errors.push(`${where}: importo non valido.`)
     } else if (expense.amount <= 0) {
       warnings.push(`${where}: importo non positivo (${expense.amount}).`)
-    } else if (cents(expense.amount) !== Math.round(expense.amount * 100)) {
-      warnings.push(`${where}: più di due decimali.`)
+    } else if (!atMostTwoDecimals(expense.amount)) {
+      /* Prima qui c'era `cents(x) !== Math.round(x * 100)`, cioè `X !== X`: il
+         controllo non è mai scattato da quando esiste. Non bastava girare il
+         confronto — `2.15 * 100` in virgola mobile fa 214.99999999999997, quindi
+         la versione aritmetica avrebbe segnalato come sbagliato un importo
+         giusto. Si legge la rappresentazione del numero. */
+      warnings.push(`${where}: più di due decimali (${expense.amount}).`)
     }
 
     if (!expense.shares || typeof expense.shares !== 'object') {

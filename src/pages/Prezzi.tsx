@@ -18,7 +18,8 @@ import { PriceForm } from '../components/PriceForm'
 import { useReadyStore } from '../data/store'
 import { formatDate } from '../domain/dates'
 import { formatEuro } from '../domain/money'
-import { filterBoard, nameKey, priceBoard, UNIT_LABEL, type PriceRow } from '../domain/prices'
+import { filterBoard, priceBoard, UNIT_LABEL, type PriceRow } from '../domain/prices'
+import { nameKey } from '../domain/text'
 
 /** Quale riga è aperta nel foglio: il gruppo e il supermercato. */
 interface Opened {

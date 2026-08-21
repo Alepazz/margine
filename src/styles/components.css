@@ -1620,6 +1620,18 @@ button.hero-value:focus-visible {
   color: var(--ink-2);
 }
 
+/*
+ * «Sono Alessio» / «Sono Federica» alla prima apertura: due bersagli grandi, uno
+ * sopra l'altro. Non un controllo segmentato — quello dice «scegli una vista fra
+ * due», e questa è una scelta che si fa una volta e non si cambia. → ADR-0042
+ */
+.identity-choice {
+  justify-content: flex-start;
+  gap: 10px;
+  min-height: 52px;
+  font-size: 1rem;
+}
+
 .checkbox {
   display: flex;
   align-items: center;

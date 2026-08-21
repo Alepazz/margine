@@ -15,7 +15,7 @@ import {
   type ReactNode,
 } from 'react'
 
-import { currentMonthKey, monthKeyOf, type MonthKey } from '../domain/dates'
+import { currentMonthKey, monthKeyOf, todayIso, type MonthKey } from '../domain/dates'
 import { DEFAULT_VIEW, monthsOf, type ViewOptions } from '../domain/selectors'
 import type {
   Annotation,
@@ -51,6 +51,12 @@ const DATA_URL = `${import.meta.env.BASE_URL}data/expenses.json.enc`
 const CONFIG_URL = `${import.meta.env.BASE_URL}data/config.json.enc`
 const PASSPHRASE_KEY = 'margine.passphrase.v1'
 const PERSON_KEY = 'margine.person.v1'
+/**
+ * Quando è stata fatta la scelta. Non c'è sui dispositivi configurati prima di
+ * ADR-0042: la scheda in Impostazioni mostra la data solo se la conosce, invece
+ * di inventarne una.
+ */
+const IDENTITY_SINCE_KEY = 'margine.person.since.v1'
 /*
  * Come parte l'app su **questo** dispositivo, non nei dati: «questo telefono
  * parte coperto» è una proprietà del telefono, e il Mac di casa può volere
@@ -85,6 +91,13 @@ export interface StoreApi {
   view: ViewOptions
   sync: SyncState
   hasStoredPassphrase: boolean
+  /**
+   * Di chi è questo dispositivo. `undefined` = non ancora scelto, e allora
+   * l'app mostra la schermata che lo chiede invece delle pagine. → ADR-0042
+   */
+  identity?: PersonId
+  /** Quando è stata fatta la scelta, se il dispositivo lo sa. */
+  identitySince?: string
   /** Guadagni oscurati adesso. Il tocco vale per questa sessione. */
   hideIncome: boolean
   /** Come parte l'app su questo dispositivo: questo è ciò che resta. */
@@ -92,7 +105,13 @@ export interface StoreApi {
   unlock: (passphrase: string, remember: boolean) => Promise<void>
   lock: () => void
   setMonth: (month: MonthKey) => void
-  setPerson: (person: PersonId) => void
+  /**
+   * Dice di chi è questo dispositivo, **una volta sola**: se la scelta c'è già
+   * non fa niente. Il rifiuto sta qui e non solo nell'assenza di un pulsante,
+   * perché è la garanzia richiesta — non una comodità dell'interfaccia.
+   * → ADR-0042
+   */
+  chooseIdentity: (person: PersonId) => void
   setIncludeVacations: (include: boolean) => void
   toggleHideIncome: () => void
   setHideIncomeByDefault: (hidden: boolean) => void
@@ -174,12 +193,30 @@ function readHideIncomeDefault(): boolean {
   }
 }
 
-function readStoredPerson(): PersonId {
+/**
+ * Di chi è questo dispositivo, se lo ha già detto.
+ *
+ * `undefined` quando la scelta non è ancora stata fatta, e **non** un ripiego su
+ * `'me'`: era il difetto vero di prima di ADR-0042. Un telefono appena aperto —
+ * o uno a cui sono stati svuotati i dati del sito — partiva dalla vista di
+ * Alessio, compreso il suo compartimento personale, senza che nessuno avesse
+ * scelto niente. Chi apre l'app senza identità vede la schermata che la chiede,
+ * non i numeri di qualcuno.
+ */
+function readIdentity(): PersonId | undefined {
   try {
     const raw = localStorage.getItem(PERSON_KEY)
-    return raw === 'partner' ? 'partner' : 'me'
+    return raw === 'partner' || raw === 'me' ? raw : undefined
   } catch {
-    return 'me'
+    return undefined
+  }
+}
+
+function readIdentitySince(): string | undefined {
+  try {
+    return localStorage.getItem(IDENTITY_SINCE_KEY) ?? undefined
+  } catch {
+    return undefined
   }
 }
 
@@ -190,7 +227,17 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
   const [config, setConfig] = useState<AppConfig | undefined>()
   const [dataset, setDataset] = useState<Dataset | undefined>()
   const [month, setMonth] = useState<MonthKey>(currentMonthKey())
-  const [view, setView] = useState<ViewOptions>({ ...DEFAULT_VIEW, person: readStoredPerson() })
+  const [identity, setIdentity] = useState<PersonId | undefined>(readIdentity)
+  const [identitySince, setIdentitySince] = useState<string | undefined>(readIdentitySince)
+  /*
+   * `person` deve essere una `PersonId` perché lo è in tutti i selettori, quindi
+   * senza identità porta `'me'` — un valore che **nessuno deve vedere**. Non lo
+   * vede: `App` mostra la schermata dell'identità prima delle pagine, e
+   * `useReadyStore` (la porta da cui passano tutte) si rifiuta di aprire senza
+   * identità scelta. Togliere una delle due guardie rimetterebbe in piedi il
+   * difetto per cui esiste ADR-0042.
+   */
+  const [view, setView] = useState<ViewOptions>({ ...DEFAULT_VIEW, person: readIdentity() ?? 'me' })
   const [outbox, setOutbox] = useState<OutboxState>(EMPTY_OUTBOX)
   const [sync, setSync] = useState<SyncState>({ phase: 'idle', pending: 0 })
   const [hasStoredPassphrase, setHasStoredPassphrase] = useState(false)
@@ -538,13 +585,24 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
     [enqueue],
   )
 
-  const setPerson = useCallback((person: PersonId) => {
-    setView((v) => ({ ...v, person }))
+  /*
+   * Si scrive una volta e non si riscrive. Il controllo guarda `localStorage` e
+   * non lo stato di React: due schede aperte insieme condividono il primo e non
+   * il secondo, e la garanzia deve valere anche là.
+   */
+  const chooseIdentity = useCallback((person: PersonId) => {
+    if (readIdentity() !== undefined) return
+    const today = todayIso()
     try {
       localStorage.setItem(PERSON_KEY, person)
+      localStorage.setItem(IDENTITY_SINCE_KEY, today)
     } catch {
-      /* ignora */
+      /* Niente storage (navigazione privata): la scelta vale per questa sessione,
+         e alla prossima apertura l'app la richiede. Meglio che indovinarla. */
     }
+    setIdentity(person)
+    setIdentitySince(today)
+    setView((v) => ({ ...v, person }))
   }, [])
 
   const setIncludeVacations = useCallback((includeVacations: boolean) => {
@@ -594,12 +652,14 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       view,
       sync: { ...sync, pending: outbox.pending.length },
       hasStoredPassphrase,
+      identity,
+      identitySince,
       hideIncome,
       hideIncomeByDefault,
       unlock,
       lock,
       setMonth,
-      setPerson,
+      chooseIdentity,
       setIncludeVacations,
       toggleHideIncome,
       setHideIncomeByDefault,
@@ -647,7 +707,9 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       reload,
       setHideIncomeByDefault,
       setIncludeVacations,
-      setPerson,
+      chooseIdentity,
+      identity,
+      identitySince,
       status,
       sync,
       toggleHideIncome,
@@ -668,12 +730,22 @@ export function useStore(): StoreApi {
 export interface ReadyStore extends StoreApi {
   config: AppConfig
   dataset: Dataset
+  identity: PersonId
 }
 
-/** Per le pagine, montate solo quando i dati sono aperti. */
+/**
+ * Per le pagine, montate solo quando i dati sono aperti **e** il dispositivo ha
+ * detto di chi è.
+ *
+ * La seconda condizione è la guardia di ADR-0042: nessuna pagina può renderizzare
+ * con l'identità di ripiego, quindi non esiste un modo di vedere i numeri di una
+ * persona senza che qualcuno l'abbia scelta. È un'eccezione e non un ripiego
+ * gentile di proposito — un ripiego qui sarebbe di nuovo «mostra Alessio».
+ */
 export function useReadyStore(): ReadyStore {
   const store = useStore()
   if (!store.config || !store.dataset) throw new Error('Dati non ancora disponibili.')
+  if (!store.identity) throw new Error('Questo dispositivo non ha ancora detto di chi è.')
   return store as ReadyStore
 }
 

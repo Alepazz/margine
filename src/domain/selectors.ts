@@ -19,6 +19,7 @@ import {
   type MonthKey,
 } from './dates'
 import { round2, sumBy, toCents } from './money'
+import { nameKey } from './text'
 import type { Expense, PersonId, Settlement, Tricount, Trip } from './types'
 
 export interface ViewOptions {
@@ -30,6 +31,12 @@ export interface ViewOptions {
   includeVacations: boolean
 }
 
+/**
+ * Il valore di partenza della vista. `person` è qui solo perché il tipo lo
+ * vuole: chi crea la vista lo sovrascrive **sempre** con l'identità del
+ * dispositivo, e senza identità l'app non arriva a renderizzare una pagina
+ * (→ ADR-0042). Non è «la persona predefinita»: quella non esiste più.
+ */
 export const DEFAULT_VIEW: ViewOptions = { person: 'me', includeVacations: false }
 
 /**
@@ -635,7 +642,7 @@ export function recurringProfile(
     if (!expense.recurring) continue
     const cents = toCents(shareOf(expense, person))
     if (cents === 0) continue
-    const key = expense.title.trim().toLowerCase().replace(/\s+/g, ' ')
+    const key = nameKey(expense.title)
     const row = map.get(key) ?? {
       title: expense.title.trim(),
       category: expense.category,

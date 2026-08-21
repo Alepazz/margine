@@ -10,7 +10,7 @@
 import { useState, type ReactNode } from 'react'
 
 import { CategoryEditor } from '../components/CategoryEditor'
-import { PersonSwitch, ThemeChooser } from '../components/Controls'
+import { DeviceIdentity, ThemeChooser } from '../components/Controls'
 import { IncomeEditor } from '../components/IncomeEditor'
 import { TricountForm } from '../components/TricountForm'
 import { Card, Notice, Segmented, StatTile, VEIL, useToast } from '../components/ui'
@@ -63,16 +63,16 @@ export function Impostazioni(): ReactNode {
 
       <div className="stack">
         {/*
-          L'identità sta qui e non nella testata: si dice una volta di chi è
-          questo telefono, e tutta l'app parla di quella persona. L'avatar che
-          scambiava la vista a ogni tocco non esiste più. → ADR-0038
+          L'identità si dice una volta, alla prima apertura, e qui si legge: non
+          c'è un controllo per cambiarla, perché cambiarla vorrebbe dire aprire
+          il compartimento personale dell'altra persona. → ADR-0042, ADR-0038
         */}
         <Card title="Questo dispositivo" note="Di chi è: decide quali tricount e quali numeri si vedono">
-          <PersonSwitch />
+          <DeviceIdentity />
           <div className="card-foot">
-            La scelta resta su questo telefono o computer, come il tema e il token. Cambiarla è il
-            modo per dare un'occhiata ai numeri dell'altra persona — apposta scomodo: non è un
-            gesto da fare per sbaglio.
+            Non è una serratura: la passphrase è una sola e apre tutto il file, quindi con gli
+            strumenti del browser si legge comunque tutto. Toglie il gesto, non la possibilità.
+            → ADR-0042, ADR-0039
           </div>
         </Card>
 
