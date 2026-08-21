@@ -82,11 +82,13 @@ Nel repo finiscono **solo** i file cifrati. Il master in chiaro e la passphrase 
 
 Dall'app si aggiunge una spesa col **+** al centro della barra, si corregge o si elimina dal foglio di dettaglio, si crea un viaggio, si registra un rimborso nella pagina Saldo, e si segna una spesa per il 730. Ogni modifica compare subito e viene committata nel repo in sottofondo, riscrivendo il file cifrato.
 
-Serve un token GitHub, una volta per dispositivo:
+Serve un token GitHub, una volta per dispositivo, e il tipo dipende da chi lo crea.
 
-1. GitHub → Settings → Developer settings → **Personal access tokens → Fine-grained tokens** → Generate new token.
-2. Repository access: **solo** questo repo. Permissions → Repository permissions → **Contents: Read and write**.
-3. Copia il token in Margine → Impostazioni → «Scrittura nel repo», poi «Verifica accesso».
+**Se il repo è tuo** — GitHub → Settings → Developer settings → **Personal access tokens → Fine-grained tokens** → Generate new token. Repository access: **solo** questo repo. Permissions → Repository permissions → **Contents: Read and write**.
+
+**Se vi accedi come collaboratore** — nell'elenco dei fine-grained il repo **non c'è**, e non è un errore tuo: quel tipo di token vede solo i repo del proprio account o di un'organizzazione. Serve un token **classic** con la sola spunta **`public_repo`**: il modulo sta su **`github.com/settings/tokens/new`**, che sono le impostazioni *del tuo account* — non la linguetta *Settings* del repo, dove un collaboratore trova solo «You don't have access to repository options». → [ADR-0040](docs/adr/0040-il-token-di-chi-non-possiede-il-repo.md)
+
+In entrambi i casi il token si incolla in Margine → Impostazioni → «Scrittura nel repo», poi «Verifica accesso».
 
 Il token resta in questo browser, non entra mai nel repo. Quando scade, il salvataggio fallisce con un messaggio esplicito e le modifiche restano in coda: nulla va perso. [ADR-0005](docs/adr/0005-annotazioni-730-via-api-github.md), [ADR-0018](docs/adr/0018-l-app-scrive-le-spese-non-solo-le-annotazioni.md)
 

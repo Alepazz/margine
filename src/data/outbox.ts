@@ -25,6 +25,7 @@ import type {
   Expense,
   IncomeProfile,
   PersonId,
+  PriceEntry,
   Settlement,
   Tricount,
 } from '../domain/types'
@@ -50,6 +51,14 @@ export type Op =
   | { kind: 'tricount-edit'; tricountId: string; fields: Partial<Tricount> }
   | { kind: 'settle'; settlement: Settlement }
   | { kind: 'unsettle'; settlementId: string }
+  /**
+   * Una rilevazione di prezzo, e la sua cancellazione. Sono le due sole
+   * operazioni possibili: non c'è un `price-edit` perché correggere una
+   * rilevazione è cancellarla e rifarla — è un fatto osservato in un giorno, non
+   * uno stato che evolve. → ADR-0041
+   */
+  | { kind: 'price'; entry: PriceEntry }
+  | { kind: 'price-delete'; priceId: string }
   /**
    * L'elenco **intero** delle categorie, nuovo. Non un delta: la tassonomia è
    * una lista ordinata in cui gli slot di colore devono restare coerenti fra
@@ -94,6 +103,10 @@ function isEntry(value: unknown): value is OutboxEntry {
       return typeof (v as { settlement?: { id?: unknown } }).settlement?.id === 'string'
     case 'unsettle':
       return typeof (v as { settlementId?: unknown }).settlementId === 'string'
+    case 'price':
+      return typeof (v as { entry?: { id?: unknown } }).entry?.id === 'string'
+    case 'price-delete':
+      return typeof (v as { priceId?: unknown }).priceId === 'string'
     case 'categories': {
       /* Non vuoto: una tassonomia senza categorie non è uno stato che l'app sa
          produrre, quindi una voce così è spazzatura — e applicarla lascerebbe
@@ -154,10 +167,12 @@ export function applyOps(dataset: Dataset, entries: readonly OutboxEntry[]): Dat
   let expenses = dataset.expenses
   let tricounts = dataset.tricounts
   let settlements = dataset.settlements ?? []
+  let prices = dataset.prices ?? []
   /* Copia solo se serve: il caso normale è una coda vuota o di soli patch. */
   let expensesTouched = false
   let tricountsTouched = false
   let settlementsTouched = false
+  let pricesTouched = false
 
   const byId = new Map(expenses.map((e, index) => [e.id, index]))
 
@@ -247,11 +262,26 @@ export function applyOps(dataset: Dataset, entries: readonly OutboxEntry[]): Dat
         settlementsTouched = true
         break
       }
+      case 'price': {
+        if (prices.some((p) => p.id === entry.entry.id)) break
+        if (!pricesTouched) {
+          prices = [...prices]
+          pricesTouched = true
+        }
+        prices.push(normalizePrice(entry.entry))
+        break
+      }
+      case 'price-delete': {
+        if (!prices.some((p) => p.id === entry.priceId)) break
+        prices = prices.filter((p) => p.id !== entry.priceId)
+        pricesTouched = true
+        break
+      }
     }
   }
 
-  if (!expensesTouched && !tricountsTouched && !settlementsTouched) return dataset
-  return { ...dataset, expenses, tricounts, settlements }
+  if (!expensesTouched && !tricountsTouched && !settlementsTouched && !pricesTouched) return dataset
+  return { ...dataset, expenses, tricounts, settlements, prices }
 }
 
 /**
@@ -272,6 +302,22 @@ export function applyConfigOps(config: AppConfig, entries: readonly OutboxEntry[
       next = { ...next, income: { ...next.income, [entry.person]: entry.profile } }
     }
   }
+  return next
+}
+
+/**
+ * Come `normalize` per le spese: il testo arriva ripulito e una nota vuota non
+ * si scrive. Il trim non è cosmetico — `nameKey` normalizza in lettura, ma la
+ * grafia salvata è quella che poi si vede nei suggerimenti e nei titoli.
+ */
+function normalizePrice(entry: PriceEntry): PriceEntry {
+  const next: PriceEntry = {
+    ...entry,
+    product: entry.product.trim(),
+    store: entry.store.trim(),
+  }
+  if (next.note !== undefined && next.note.trim() === '') delete next.note
+  else if (next.note !== undefined) next.note = next.note.trim()
   return next
 }
 
@@ -381,6 +427,10 @@ export function isAlreadyApplied(
       return (dataset.settlements ?? []).some((s) => s.id === entry.settlement.id)
     case 'unsettle':
       return !(dataset.settlements ?? []).some((s) => s.id === entry.settlementId)
+    case 'price':
+      return (dataset.prices ?? []).some((p) => p.id === entry.entry.id)
+    case 'price-delete':
+      return !(dataset.prices ?? []).some((p) => p.id === entry.priceId)
     case 'recategorize':
       return !dataset.expenses.some((e) => e.category === entry.from)
     case 'categories':
@@ -426,6 +476,8 @@ export function describeOps(entries: readonly OutboxEntry[]): string {
     'tricount-edit': ['tricount modificato', 'tricount modificati'],
     settle: ['rimborso registrato', 'rimborsi registrati'],
     unsettle: ['rimborso annullato', 'rimborsi annullati'],
+    price: ['prezzo rilevato', 'prezzi rilevati'],
+    'price-delete': ['rilevazione eliminata', 'rilevazioni eliminate'],
     categories: ['categorie aggiornate', 'categorie aggiornate'],
     recategorize: ['categoria svuotata', 'categorie svuotate'],
     income: ['entrate aggiornate', 'entrate aggiornate'],

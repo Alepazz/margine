@@ -120,3 +120,104 @@ describe('quote', () => {
     expect(report.months[0].total).toBe(180)
   })
 })
+
+// ─────────────────────── rilevazioni di prezzo (ADR-0041) ───────────────────────
+
+function price(partial) {
+  return {
+    id: 'prezzo-2026-08-21-aaa',
+    product: 'Passata di pomodoro',
+    store: 'Esselunga',
+    unit: 'kg',
+    price: 2.15,
+    date: '2026-08-21',
+    ...partial,
+  }
+}
+
+/** Un dataset con delle rilevazioni e nessuna spesa: sono liste indipendenti. */
+function withPrices(prices) {
+  return { ...dataset([]), prices }
+}
+
+describe('prezzi', () => {
+  it('accetta una rilevazione completa', () => {
+    const { errors, warnings } = validateDataset(withPrices([price({})]), CONFIG)
+    expect(errors).toEqual([])
+    expect(warnings).toEqual([])
+  })
+
+  it('regge un dataset senza il campo, come quelli scritti prima', () => {
+    const { errors } = validateDataset(dataset([]), CONFIG)
+    expect(errors).toEqual([])
+  })
+
+  it('rifiuta due rilevazioni con lo stesso id', () => {
+    const { errors } = validateDataset(withPrices([price({}), price({})]), CONFIG)
+    expect(errors.some((e) => e.includes('id di rilevazione duplicato'))).toBe(true)
+  })
+
+  it('rifiuta un’unità che non esiste', () => {
+    const { errors } = validateDataset(withPrices([price({ unit: 'etto' })]), CONFIG)
+    expect(errors.some((e) => e.includes('unità sconosciuta'))).toBe(true)
+  })
+
+  it('rifiuta un prezzo a tre decimali, e accetta quello a due', () => {
+    const tre = validateDataset(withPrices([price({ price: 2.155 })]), CONFIG)
+    expect(tre.errors.some((e) => e.includes('più di due decimali'))).toBe(true)
+    /* 2.15 * 100 in virgola mobile fa 214.99999999999997: il controllo
+       aritmetico lo segnalerebbe, quello sulla rappresentazione no. */
+    const due = validateDataset(withPrices([price({ price: 2.15 })]), CONFIG)
+    expect(due.errors).toEqual([])
+  })
+
+  it('rifiuta prezzo non positivo, prodotto vuoto, supermercato vuoto e data finta', () => {
+    const { errors } = validateDataset(
+      withPrices([
+        price({ id: 'p1', price: 0 }),
+        price({ id: 'p2', product: '   ' }),
+        price({ id: 'p3', store: '' }),
+        price({ id: 'p4', date: '2026-02-31' }),
+      ]),
+      CONFIG,
+    )
+    expect(errors.some((e) => e.includes('prezzo non positivo'))).toBe(true)
+    expect(errors.some((e) => e.includes('manca il prodotto'))).toBe(true)
+    expect(errors.some((e) => e.includes('manca il supermercato'))).toBe(true)
+    expect(errors.some((e) => e.includes('data non valida'))).toBe(true)
+  })
+
+  it('avvisa — senza rifiutare — lo stesso prodotto rilevato in due unità', () => {
+    const { errors, warnings } = validateDataset(
+      withPrices([
+        price({ id: 'p1', product: 'Latte', unit: 'l' }),
+        price({ id: 'p2', product: ' latte ', unit: 'pezzo' }),
+      ]),
+      CONFIG,
+    )
+    expect(errors).toEqual([])
+    expect(warnings.some((w) => w.includes('due gruppi che non si confrontano'))).toBe(true)
+  })
+
+  it('non avvisa quando lo stesso prodotto sta sempre nella stessa unità', () => {
+    const { warnings } = validateDataset(
+      withPrices([
+        price({ id: 'p1', store: 'Esselunga' }),
+        price({ id: 'p2', store: 'Lidl', price: 1.79 }),
+      ]),
+      CONFIG,
+    )
+    expect(warnings).toEqual([])
+  })
+
+  it('le conta nel riepilogo, senza mescolarle ai totali delle spese', () => {
+    const { report } = validateDataset(
+      withPrices([price({ id: 'p1' }), price({ id: 'p2', store: 'Lidl', price: 1.79 })]),
+      CONFIG,
+    )
+    expect(report.prices).toBe(2)
+    /* Nessuna spesa: le rilevazioni non entrano in nessun totale. */
+    expect(report.total).toBe(0)
+    expect(report.expenses).toBe(0)
+  })
+})

@@ -236,17 +236,26 @@ export function Impostazioni(): ReactNode {
 
               <div className="field">
                 <label className="label" htmlFor="gh-token">
-                  Token GitHub (fine-grained, permesso «Contents: read and write» su questo repo)
+                  Token GitHub
                 </label>
                 <input
                   id="gh-token"
                   className="input"
                   type="password"
                   autoComplete="off"
-                  placeholder="github_pat_…"
+                  placeholder="github_pat_… o ghp_…"
                   value={token}
                   onChange={(event) => setToken(event.target.value)}
                 />
+                <p className="hint">
+                  Se il repo è tuo: token <strong>fine-grained</strong> con «Contents: read and
+                  write» su questo repo. Se vi accedi come <strong>collaboratore</strong>, il repo
+                  non compare in quell'elenco — serve un token <strong>classic</strong> con la sola
+                  spunta <code>public_repo</code>. Si creano su{' '}
+                  <code>github.com/settings/tokens</code>, che sono le impostazioni del{' '}
+                  <strong>tuo account</strong>: nelle impostazioni del repo non c'è niente da fare.
+                  → ADR-0040
+                </p>
                 <p className="hint">
                   Resta in questo browser, non entra mai nel repo. Va rigenerato quando scade
                   (l'errore di salvataggio te lo dirà).

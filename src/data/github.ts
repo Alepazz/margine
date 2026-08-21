@@ -2,9 +2,11 @@
  * Scritture nel repo direttamente dal browser, via API GitHub.
  *
  * È l'unica scrittura che l'app fa in autonomia (le annotazioni 730): l'import
- * delle spese resta nella sessione mensile. Serve un token fine-grained con
- * permesso `Contents: read and write` sul solo repo di Margine, salvato in
- * localStorage — quindi per dispositivo, mai nel repo.
+ * delle spese resta nella sessione mensile. Il token vive in localStorage —
+ * quindi per dispositivo, mai nel repo — e il suo tipo dipende da chi lo crea:
+ * fine-grained con `Contents: read and write` per chi possiede il repo, classic
+ * con `public_repo` per chi vi accede come collaboratore, perché un token
+ * fine-grained non può scrivere su un repo di un altro account. → ADR-0040
  */
 
 import type { GithubConfig } from '../domain/types'
@@ -73,7 +75,7 @@ function humanize(status: number, detail: string): string {
     case 401:
       return 'Token GitHub non valido o scaduto: rigeneralo dalle impostazioni.'
     case 403:
-      return `Permesso negato dal token (serve «Contents: read and write»). ${detail}`
+      return `Permesso negato dal token: serve «Contents: read and write» se è fine-grained, «public_repo» se è classic. ${detail}`
     case 404:
       return 'Repo, branch o percorso del file non trovato: controlla la configurazione.'
     case 409:

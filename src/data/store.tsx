@@ -25,6 +25,7 @@ import type {
   Expense,
   IncomeProfile,
   PersonId,
+  PriceEntry,
   Settlement,
   Tricount,
 } from '../domain/types'
@@ -108,6 +109,9 @@ export interface StoreApi {
   setIncome: (person: PersonId, profile: IncomeProfile) => void
   addSettlement: (settlement: Settlement) => void
   removeSettlement: (settlementId: string) => void
+  /** Una rilevazione di prezzo. Si aggiunge e si elimina: non si modifica. → ADR-0041 */
+  addPrice: (entry: PriceEntry) => void
+  deletePrice: (priceId: string) => void
   syncNow: () => Promise<void>
   reload: () => void
 }
@@ -123,15 +127,20 @@ async function fetchEnvelope(url: string): Promise<Envelope> {
 }
 
 /**
- * I file cifrati scritti prima di ADR-0019 non hanno `settlements`. Si normalizza
- * appena il dato entra, così il tipo dice la verità in tutto il resto dell'app
- * invece di costringere ogni lettore a un `?? []`.
+ * I file cifrati scritti prima di ADR-0019 non hanno `settlements`, quelli
+ * prima di ADR-0041 non hanno `prices`. Si normalizzano appena il dato entra,
+ * così il tipo dice la verità in tutto il resto dell'app invece di costringere
+ * ogni lettore a un `?? []`.
  *
  * Il modello **prima** dei tricount (ADR-0037) invece non si normalizza: si
  * rifiuta con una frase che dice cosa fare. È un caso che capita davvero per un
  * minuto — GitHub Pages può servire il file vecchio subito dopo un deploy, e un
  * telefono può averlo in cache — e senza questo controllo l'app si aprirebbe
  * mostrando zeri al posto di venti mesi di spese: un guasto che sembra un dato.
+ *
+ * La differenza fra i due casi è che un campo **aggiunto** si normalizza e un
+ * campo **cambiato di forma** si rifiuta: nel primo caso il dato vecchio è
+ * ancora vero, nel secondo direbbe il falso.
  */
 function normaliseDataset(raw: Dataset & { trips?: unknown }): Dataset {
   if (!Array.isArray(raw.tricounts)) {
@@ -140,7 +149,12 @@ function normaliseDataset(raw: Dataset & { trips?: unknown }): Dataset {
         'Ricarica la pagina: se insiste, è la cache di GitHub Pages e passa da sé in un minuto.',
     )
   }
-  return raw.settlements ? raw : { ...raw, settlements: [] }
+  if (Array.isArray(raw.settlements) && Array.isArray(raw.prices)) return raw
+  return {
+    ...raw,
+    settlements: Array.isArray(raw.settlements) ? raw.settlements : [],
+    prices: Array.isArray(raw.prices) ? raw.prices : [],
+  }
 }
 
 function describeError(error: unknown): string {
@@ -517,6 +531,13 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
     [enqueue],
   )
 
+  const addPrice = useCallback((entry: PriceEntry) => enqueue({ kind: 'price', entry }), [enqueue])
+
+  const deletePrice = useCallback(
+    (priceId: string) => enqueue({ kind: 'price-delete', priceId }),
+    [enqueue],
+  )
+
   const setPerson = useCallback((person: PersonId) => {
     setView((v) => ({ ...v, person }))
     try {
@@ -593,13 +614,17 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       setIncome,
       addSettlement,
       removeSettlement,
+      addPrice,
+      deletePrice,
       syncNow: flush,
       reload,
     }),
     [
       addExpense,
+      addPrice,
       addSettlement,
       addTricount,
+      deletePrice,
       updateTricount,
       setCategories,
       recategorize,

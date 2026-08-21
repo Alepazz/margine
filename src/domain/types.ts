@@ -346,6 +346,34 @@ export interface Settlement {
   note?: string
 }
 
+/** In che cosa è misurato un prezzo. L'etichetta a scaffale usa queste tre. */
+export type PriceUnit = 'kg' | 'l' | 'pezzo'
+
+/**
+ * Una rilevazione di prezzo a scaffale: «passata di pomodoro, 2,15 €/kg,
+ * Esselunga, 21/08/2026».
+ *
+ * **Non è una spesa** e non ne diventa mai una: non ha quote, non ha un tricount,
+ * non tocca margine, saldo né statistiche. È un fatto osservato — quanto costava
+ * quella cosa, là, quel giorno — e serve a una domanda sola: davanti allo
+ * scaffale, quanto costa altrove. Per questo è **condivisa** fra le due persone
+ * invece di appartenere a chi l'ha scritta: il prezzo del latte non è di nessuno.
+ * → ADR-0041
+ */
+export interface PriceEntry {
+  id: string
+  /** Nome del prodotto, testo libero già ripulito dagli spazi ai bordi. */
+  product: string
+  /** Il supermercato, testo libero come il prodotto. */
+  store: string
+  unit: PriceUnit
+  /** Euro per unità di misura: quello che l'etichetta riporta per legge. */
+  price: number
+  /** ISO `YYYY-MM-DD`: quando è stato visto quel prezzo. */
+  date: string
+  note?: string
+}
+
 export interface Dataset {
   version: number
   /** ISO datetime dell'ultimo aggiornamento. */
@@ -359,6 +387,12 @@ export interface Dataset {
    * nell'app, così da qui in poi il tipo dice la verità.
    */
   settlements: Settlement[]
+  /**
+   * Le rilevazioni di prezzo. Come `settlements`, il campo può mancare nei file
+   * cifrati scritti prima e si normalizza a lista vuota all'ingresso: è
+   * **additivo**, quindi non ha richiesto una migrazione. → ADR-0041
+   */
+  prices: PriceEntry[]
 }
 
 /** Patch che l'app scrive su una spesa (tag 730, note, scontrini, welfare). */
