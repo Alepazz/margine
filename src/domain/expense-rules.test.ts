@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { ledgerKeyOf, ledgerOptions, ledgerParts, presetOf, sharesFor, splitFor } from './expense-rules'
+import { presetOf, sharesFor, splitFor, tricountOptions, validateExpense } from './expense-rules'
 import { toCents } from './money'
-import type { Expense, Payer, PersonId, Source, Trip } from './types'
+import type { Expense, Payer, PersonId, Tricount } from './types'
 
 describe('come si divide una spesa', () => {
   it('«tutta mia» parla di chi guarda, non di una chiave fissa', () => {
@@ -75,7 +75,7 @@ describe('riconoscere la divisione di una spesa che esiste già', () => {
     amount,
     shares,
     paidBy: 'me',
-    source: 'condivise',
+    tricount: 'condivise',
     category: 'spesa',
     recurring: false,
   })
@@ -111,45 +111,51 @@ describe('la traduzione fra chi guarda e le chiavi fisse', () => {
   })
 })
 
-describe('la chiave del tricount', () => {
-  const trip = (id: string, start: string, closed?: boolean): Trip => ({
+describe('i tricount fra cui scegliere', () => {
+  const shared = (id: string): Tricount => ({ id, name: id, members: ['me', 'partner'] })
+  const trip = (id: string, start: string, closed?: boolean): Tricount => ({
     id,
     name: id,
-    place: id,
-    year: Number(start.slice(0, 4)),
-    start,
-    end: start,
+    members: ['me', 'partner'],
     ...(closed ? { closed } : {}),
+    trip: { place: id, year: Number(start.slice(0, 4)), start, end: start },
   })
+  const personale = (id: string, who: PersonId): Tricount => ({ id, name: id, members: [who] })
 
-  it('va e torna: chiave → campi → chiave', () => {
-    for (const key of ['fisse', 'personali', 'condivise', 'vacanze/creta-2025']) {
-      expect(ledgerKeyOf(ledgerParts(key) as { source: Source; trip?: string })).toBe(key)
-    }
-  })
+  const TRICOUNTS: Tricount[] = [
+    shared('condivise'),
+    personale('personali-a', 'me'),
+    personale('personali-b', 'partner'),
+    shared('fisse'),
+    trip('vecchia-2024', '2024-05-01'),
+    trip('nuova-2026', '2026-07-01'),
+  ]
 
-  it('una spesa di vacanza senza viaggio non finge di averne uno', () => {
-    expect(ledgerKeyOf({ source: 'vacanze' })).toBe('vacanze')
-    expect(ledgerParts('vacanze')).toEqual({ source: 'vacanze' })
-  })
-
-  it('offre i tre tricount fissi più le vacanze aperte, dalla più recente', () => {
-    const options = ledgerOptions([
-      trip('vecchia-2024', '2024-05-01'),
-      trip('nuova-2026', '2026-07-01'),
-    ])
-    expect(options.map((o) => o.key)).toEqual([
+  it('offre i registri stabili più le vacanze aperte, dalla più recente', () => {
+    const options = tricountOptions(TRICOUNTS, 'me')
+    expect(options.map((o) => o.tricount.id)).toEqual([
       'condivise',
-      'personali',
+      'personali-a',
       'fisse',
-      'vacanze/nuova-2026',
-      'vacanze/vecchia-2024',
+      'nuova-2026',
+      'vecchia-2024',
     ])
+  })
+
+  /*
+   * La separazione in scrittura, per costruzione: il compartimento personale
+   * dell'altra persona **non compare**, quindi sbagliare tricount verso il suo
+   * non è vietato — è impossibile. → ADR-0037
+   */
+  it('non offre mai il personale dell’altra persona', () => {
+    const perLei = tricountOptions(TRICOUNTS, 'partner')
+    expect(perLei.map((o) => o.tricount.id)).not.toContain('personali-a')
+    expect(perLei.map((o) => o.tricount.id)).toContain('personali-b')
   })
 
   it('nasconde le vacanze concluse', () => {
-    const options = ledgerOptions([trip('finita-2024', '2024-05-01', true)])
-    expect(options.map((o) => o.key)).not.toContain('vacanze/finita-2024')
+    const options = tricountOptions([trip('finita-2024', '2024-05-01', true)], 'me')
+    expect(options.map((o) => o.tricount.id)).not.toContain('finita-2024')
   })
 
   /*
@@ -159,10 +165,59 @@ describe('la chiave del tricount', () => {
    * nessuno l'abbia chiesto.
    */
   it('ma tiene quella della spesa che si sta correggendo, marcata', () => {
-    const options = ledgerOptions([trip('finita-2024', '2024-05-01', true)], {
-      current: 'vacanze/finita-2024',
+    const options = tricountOptions([trip('finita-2024', '2024-05-01', true)], 'me', {
+      current: 'finita-2024',
     })
-    const found = options.find((o) => o.key === 'vacanze/finita-2024')
+    const found = options.find((o) => o.tricount.id === 'finita-2024')
     expect(found?.closed).toBe(true)
+  })
+})
+
+describe('le quote appartengono ai membri', () => {
+  const CATEGORIES = [{ id: 'spesa', label: 'Spesa' }]
+  const TRICOUNTS: Tricount[] = [
+    { id: 'condivise', name: 'Condivise', members: ['me', 'partner'] },
+    { id: 'personali-a', name: 'Personale', members: ['me'] },
+  ]
+  const ctx = { categories: CATEGORIES, tricounts: TRICOUNTS, takenIds: new Set<string>() }
+  const base = (overrides: Partial<Expense>): Expense => ({
+    id: 'x1',
+    date: '2026-08-21',
+    title: 'Voce',
+    amount: 30,
+    shares: { me: 30, partner: 0 },
+    paidBy: 'me',
+    tricount: 'personali-a',
+    category: 'spesa',
+    recurring: false,
+    ...overrides,
+  })
+
+  it('in un tricount con un membro solo la quota dell’altro è zero', () => {
+    expect(validateExpense(base({}), ctx)).toEqual([])
+    const sbagliata = base({ shares: { me: 15, partner: 15 } })
+    expect(validateExpense(sbagliata, ctx).join(' ')).toContain('non ne fa parte')
+  })
+
+  /* Il pagante è un fatto accaduto: una spesa personale anticipata dall'altra
+     persona è un debito, non un errore. → ADR-0028 */
+  it('ma il pagante può essere chiunque', () => {
+    const anticipata = base({ paidBy: 'partner' })
+    expect(validateExpense(anticipata, ctx)).toEqual([])
+  })
+
+  it('la quota di terzi e il pagante di gruppo esistono solo in vacanza', () => {
+    const conTerzi = base({
+      tricount: 'condivise',
+      amount: 90,
+      shares: { me: 30, partner: 30, others: 30 },
+    })
+    expect(validateExpense(conTerzi, ctx).join(' ')).toContain('vacanza')
+    const pagataDaGruppo = base({ tricount: 'condivise', shares: { me: 15, partner: 15 }, paidBy: 'others' })
+    expect(validateExpense(pagataDaGruppo, ctx).join(' ')).toContain('vacanza')
+  })
+
+  it('una spesa in un tricount che non esiste non si salva', () => {
+    expect(validateExpense(base({ tricount: 'fantasma' }), ctx).join(' ')).toContain('tricount')
   })
 })

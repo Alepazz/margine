@@ -16,7 +16,7 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
-import { PersonButton, SyncBadge, ThemeButton } from './Controls'
+import { SyncBadge, ThemeButton } from './Controls'
 import { ExpenseForm } from './ExpenseForm'
 
 type NavSlot = 'tabbar' | 'more' | 'header'
@@ -203,7 +203,6 @@ export function AppShell(): ReactNode {
           </div>
           <div className="topbar-spacer" />
           <SyncBadge />
-          <PersonButton />
           <ThemeButton />
           {/* Solo su telefono: sulla colonna laterale queste voci si vedono già. */}
           <button

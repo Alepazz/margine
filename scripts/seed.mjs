@@ -1,9 +1,11 @@
 /**
  * Dati di esempio, per poter provare l'app prima che arrivino quelli veri.
  *
- * Sono verosimili ma inventati: venti mesi di spese sui quattro tricount, un
- * gatto, quattro viaggi e qualche spesa già segnata per il 730. Deterministici
- * (generatore con seme fisso), così due esecuzioni danno lo stesso risultato.
+ * Sono verosimili ma inventati: venti mesi di spese, un gatto, quattro viaggi,
+ * **due compartimenti personali** — uno per persona, con dentro qualcosa, così
+ * il banco di prova esercita anche la separazione — e qualche spesa già segnata
+ * per il 730. Deterministici (generatore con seme fisso), così due esecuzioni
+ * danno lo stesso risultato.
  *
  * Scrive sempre in `data-example/`; copia in `data/` solo se è vuota, per non
  * sovrascrivere mai i dati reali.
@@ -14,7 +16,7 @@ import {
   CATEGORIES as TAXONOMY,
   CAT_CATEGORY,
   HOUSE_CATEGORY,
-  HOUSE_SOURCE,
+  HOUSE_TRICOUNT,
   TRIP_CATEGORY,
 } from './lib/taxonomy.mjs'
 import { sharesFor } from './lib/money.mjs'
@@ -78,54 +80,77 @@ const MONTHS = monthsUpTo(FIRST_MONTH, TODAY.slice(0, 7))
 
 const CATEGORIES = TAXONOMY
 
-// ─────────────────────── viaggi ───────────────────────
+// ─────────────────────── tricount ───────────────────────
+
+/* I registri stabili: due condivisi e un compartimento personale per persona.
+   «Personale» non è un caso speciale — è un tricount con un membro solo. → ADR-0037 */
+const BASE_TRICOUNTS = [
+  { id: 'condivise', name: 'Spese condivise', emoji: '🧾', members: ['me', 'partner'] },
+  { id: 'personali-alessio', name: 'Le mie spese', emoji: '🙋', members: ['me'] },
+  { id: 'personali-federica', name: 'Le sue spese', emoji: '🙆', members: ['partner'] },
+  { id: 'fisse', name: 'Casa', emoji: '🏡', members: ['me', 'partner'] },
+]
 
 const TRIPS = [
   {
     id: '2025-sicilia',
     emoji: '🍋',
     name: 'Sicilia in macchina',
-    place: 'Sicilia',
-    country: 'Italia',
-    year: 2025,
-    start: '2025-05-24',
-    end: '2025-06-01',
-    coords: { lat: 37.6, lon: 14.0, approx: true },
+    members: ['me', 'partner'],
+    trip: {
+      place: 'Sicilia',
+      country: 'Italia',
+      year: 2025,
+      start: '2025-05-24',
+      end: '2025-06-01',
+      coords: { lat: 37.6, lon: 14.0, approx: true },
+    },
   },
   {
     id: '2025-lofoten',
     emoji: '🇳🇴',
     name: 'Isole Lofoten',
-    place: 'Lofoten',
-    country: 'Norvegia',
-    year: 2025,
-    start: '2025-08-09',
-    end: '2025-08-18',
-    coords: { lat: 68.2, lon: 14.0, approx: true },
+    members: ['me', 'partner'],
+    trip: {
+      place: 'Lofoten',
+      country: 'Norvegia',
+      year: 2025,
+      start: '2025-08-09',
+      end: '2025-08-18',
+      coords: { lat: 68.2, lon: 14.0, approx: true },
+    },
   },
   {
     id: '2026-lisbona',
     emoji: '🇵🇹',
     name: 'Weekend a Lisbona',
-    place: 'Lisbona',
-    country: 'Portogallo',
-    year: 2026,
-    start: '2026-03-12',
-    end: '2026-03-16',
-    coords: { lat: 38.72, lon: -9.14 },
+    members: ['me', 'partner'],
+    trip: {
+      place: 'Lisbona',
+      country: 'Portogallo',
+      year: 2026,
+      start: '2026-03-12',
+      end: '2026-03-16',
+      coords: { lat: 38.72, lon: -9.14 },
+    },
   },
   {
     id: '2026-dolomiti',
     emoji: '⛰️',
     name: 'Dolomiti',
-    place: 'Dolomiti',
-    country: 'Italia',
-    year: 2026,
-    start: '2026-07-04',
-    end: '2026-07-11',
-    coords: { lat: 46.4, lon: 11.8, approx: true },
+    members: ['me', 'partner'],
+    trip: {
+      place: 'Dolomiti',
+      country: 'Italia',
+      year: 2026,
+      start: '2026-07-04',
+      end: '2026-07-11',
+      coords: { lat: 46.4, lon: 11.8, approx: true },
+    },
   },
 ]
+
+const TRICOUNTS = [...BASE_TRICOUNTS, ...TRIPS]
 
 // ─────────────────────── costruzione spese ───────────────────────
 
@@ -144,12 +169,11 @@ function add(expense) {
     amount: expense.amount,
     shares: sharesFor(expense.amount, split, paidBy),
     paidBy,
-    source: expense.source,
+    tricount: expense.tricount,
     category: expense.category,
     recurring: expense.recurring ?? false,
   }
   if (expense.subcategory) entry.subcategory = expense.subcategory
-  if (expense.trip) entry.trip = expense.trip
   if (expense.tax730) entry.tax730 = true
   if (expense.notes) entry.notes = expense.notes
   if (expense.receiptLinks) entry.receiptLinks = expense.receiptLinks
@@ -165,7 +189,7 @@ for (const month of MONTHS) {
     date: dateOf(month, 3),
     title: 'Affitto',
     amount: 950,
-    source: 'fisse',
+    tricount: 'fisse',
     category: 'casa',
     subcategory: 'affitto',
     recurring: true,
@@ -175,7 +199,7 @@ for (const month of MONTHS) {
     date: dateOf(month, 5),
     title: 'Spese condominiali',
     amount: 85,
-    source: 'fisse',
+    tricount: 'fisse',
     category: 'casa',
     subcategory: 'bollette',
     recurring: true,
@@ -184,7 +208,7 @@ for (const month of MONTHS) {
     date: dateOf(month, 12),
     title: winter ? 'Luce e gas (inverno)' : 'Luce e gas',
     amount: winter ? money(115, 168) : money(52, 84),
-    source: 'fisse',
+    tricount: 'fisse',
     category: 'casa',
     subcategory: 'bollette',
     recurring: true,
@@ -193,7 +217,7 @@ for (const month of MONTHS) {
     date: dateOf(month, 8),
     title: 'Internet casa',
     amount: 27.9,
-    source: 'fisse',
+    tricount: 'fisse',
     category: 'casa',
     subcategory: 'bollette',
     recurring: true,
@@ -203,7 +227,7 @@ for (const month of MONTHS) {
     date: dateOf(month, 15),
     title: 'Netflix e Spotify',
     amount: 17.98,
-    source: 'fisse',
+    tricount: 'fisse',
     category: 'tempolibero',
     subcategory: 'abbonamenti',
     recurring: true,
@@ -213,7 +237,7 @@ for (const month of MONTHS) {
       date: dateOf(month, 20),
       title: 'TARI (rata trimestrale)',
       amount: money(58, 72),
-      source: 'fisse',
+      tricount: 'fisse',
       category: 'casa',
       subcategory: 'bollette',
       recurring: true,
@@ -229,7 +253,7 @@ for (const month of MONTHS) {
     date: dateOf(month, 2),
     title: 'Palestra',
     amount: 45,
-    source: 'personali',
+    tricount: 'personali-alessio',
     category: 'tempolibero',
     subcategory: 'sport',
     recurring: true,
@@ -240,7 +264,7 @@ for (const month of MONTHS) {
     date: dateOf(month, 10),
     title: 'Telefono',
     amount: 9.99,
-    source: 'personali',
+    tricount: 'personali-alessio',
     category: 'altro',
     recurring: true,
     split: 'me',
@@ -251,7 +275,7 @@ for (const month of MONTHS) {
       date: dateOf(month, intBetween(1, 28)),
       title: 'Benzina',
       amount: money(48, 78),
-      source: 'personali',
+      tricount: 'personali-alessio',
       category: 'trasporti',
       subcategory: 'carburante',
       split: 'me',
@@ -263,7 +287,7 @@ for (const month of MONTHS) {
       date: dateOf(month, intBetween(1, 28)),
       title: pick(LUNCH),
       amount: money(6.5, 14.5),
-      source: 'personali',
+      tricount: 'personali-alessio',
       category: 'ristoranti',
       split: 'me',
       paidBy: 'me',
@@ -274,7 +298,7 @@ for (const month of MONTHS) {
       date: dateOf(month, intBetween(5, 25)),
       title: 'Barbiere',
       amount: money(18, 25),
-      source: 'personali',
+      tricount: 'personali-alessio',
       category: 'altro',
       split: 'me',
       paidBy: 'me',
@@ -285,7 +309,7 @@ for (const month of MONTHS) {
       date: dateOf(month, intBetween(3, 27)),
       title: pick(['Maglietta', 'Jeans', 'Scarpe', 'Felpa', 'Giacca leggera']),
       amount: money(24, 95),
-      source: 'personali',
+      tricount: 'personali-alessio',
       category: 'abbigliamento',
       split: 'me',
       paidBy: 'me',
@@ -296,7 +320,7 @@ for (const month of MONTHS) {
       date: dateOf(month, intBetween(3, 27)),
       title: pick(BOOKS),
       amount: money(12, 32),
-      source: 'personali',
+      tricount: 'personali-alessio',
       category: 'tempolibero',
       subcategory: 'musica',
       split: 'me',
@@ -308,7 +332,7 @@ for (const month of MONTHS) {
       date: dateOf(month, intBetween(3, 27)),
       title: 'Farmacia',
       amount: money(9, 34),
-      source: 'personali',
+      tricount: 'personali-alessio',
       category: 'salute',
       subcategory: 'farmacia',
       split: 'me',
@@ -334,7 +358,7 @@ for (const month of MONTHS) {
       date: dateOf(month, 2 + i * 6 + intBetween(0, 3)),
       title: `Spesa ${pick(SUPERMARKETS)}`,
       amount: money(48, 118),
-      source: 'condivise',
+      tricount: 'condivise',
       category: 'spesa',
     })
   }
@@ -343,7 +367,7 @@ for (const month of MONTHS) {
       date: dateOf(month, intBetween(1, 28)),
       title: pick(RESTAURANTS),
       amount: money(28, 92),
-      source: 'condivise',
+      tricount: 'condivise',
       category: 'ristoranti',
     })
   }
@@ -353,7 +377,7 @@ for (const month of MONTHS) {
     date: dateOf(month, intBetween(6, 22)),
     title: pick(['Crocchette e umido', 'Cibo gatto (Arcaplanet)', 'Scatolette e crocchette']),
     amount: money(29, 46),
-    source: 'condivise',
+    tricount: 'condivise',
     category: 'gatto',
     subcategory: 'cibo',
   })
@@ -362,7 +386,7 @@ for (const month of MONTHS) {
       date: dateOf(month, intBetween(4, 26)),
       title: 'Lettiera',
       amount: money(9.5, 15),
-      source: 'condivise',
+      tricount: 'condivise',
       category: 'gatto',
       subcategory: 'lettiera',
     })
@@ -372,7 +396,7 @@ for (const month of MONTHS) {
       date: dateOf(month, intBetween(4, 26)),
       title: pick(['Tiragraffi', 'Giochini', 'Trasportino nuovo', 'Spazzola']),
       amount: money(11, 48),
-      source: 'condivise',
+      tricount: 'condivise',
       category: 'gatto',
       subcategory: 'accessori',
     })
@@ -382,7 +406,7 @@ for (const month of MONTHS) {
       date: dateOf(month, intBetween(6, 24)),
       title: 'Spesa per la casa',
       amount: money(18, 120),
-      source: 'condivise',
+      tricount: 'condivise',
       category: 'casa',
       subcategory: 'arredo',
     })
@@ -392,7 +416,7 @@ for (const month of MONTHS) {
       date: dateOf(month, intBetween(6, 24)),
       title: pick(['Cinema', 'Concerto', 'Mostra', 'Teatro']),
       amount: money(18, 64),
-      source: 'condivise',
+      tricount: 'condivise',
       category: 'tempolibero',
       subcategory: 'spettacoli',
     })
@@ -402,7 +426,7 @@ for (const month of MONTHS) {
       date: dateOf(month, intBetween(6, 24)),
       title: pick(['Treno per Milano', 'Biglietti treno', 'Pedaggi e parcheggio']),
       amount: money(14, 68),
-      source: 'condivise',
+      tricount: 'condivise',
       category: 'trasporti',
       subcategory: pick(['autostrada', 'parcheggi']),
     })
@@ -412,7 +436,7 @@ for (const month of MONTHS) {
       date: dateOf(month, intBetween(6, 24)),
       title: pick(['Regalo compleanno', 'Regalo matrimonio', 'Regalo per i suoi']),
       amount: money(25, 110),
-      source: 'condivise',
+      tricount: 'condivise',
       category: 'regali',
     })
   }
@@ -426,7 +450,7 @@ const HEALTH_EVENTS = [
     amount: 130,
     category: 'salute',
     subcategory: 'visite',
-    source: 'condivise',
+    tricount: 'condivise',
     split: 'me',
     tax730: true,
     notes: 'Fattura intestata a me, chiesta via mail e archiviata.',
@@ -438,7 +462,7 @@ const HEALTH_EVENTS = [
     amount: 85,
     category: 'gatto',
     subcategory: 'veterinario',
-    source: 'condivise',
+    tricount: 'condivise',
     tax730: true,
     notes: 'Spese veterinarie: detraibili entro il limite annuale. Ricevuta con codice fiscale mio.',
     receiptLinks: [FAKE_DRIVE('veterinario-vaccino-2025')],
@@ -449,7 +473,7 @@ const HEALTH_EVENTS = [
     amount: 260,
     category: 'salute',
     subcategory: 'visite',
-    source: 'condivise',
+    tricount: 'condivise',
     split: 'me',
     tax730: true,
     notes: 'Pagato con bancomat, fattura elettronica già nel sistema tessera sanitaria.',
@@ -461,7 +485,7 @@ const HEALTH_EVENTS = [
     amount: 142,
     category: 'gatto',
     subcategory: 'veterinario',
-    source: 'condivise',
+    tricount: 'condivise',
     tax730: true,
     notes: 'Controllo per la tiroide. Ricevuta da chiedere di nuovo: la foto è venuta mossa.',
   },
@@ -471,7 +495,7 @@ const HEALTH_EVENTS = [
     amount: 310,
     category: 'salute',
     subcategory: 'occhiali',
-    source: 'personali',
+    tricount: 'personali-alessio',
     split: 'me',
     tax730: true,
     notes: 'Con prescrizione dell’oculista, allegata.',
@@ -483,7 +507,7 @@ const HEALTH_EVENTS = [
     amount: 95,
     category: 'gatto',
     subcategory: 'veterinario',
-    source: 'condivise',
+    tricount: 'condivise',
     tax730: true,
     notes: 'Vaccino trivalente più controllo denti.',
   },
@@ -493,7 +517,7 @@ const HEALTH_EVENTS = [
     amount: 250,
     category: 'salute',
     subcategory: 'visite',
-    source: 'personali',
+    tricount: 'personali-alessio',
     split: 'me',
     tax730: true,
   },
@@ -503,7 +527,7 @@ const HEALTH_EVENTS = [
     amount: 78,
     category: 'salute',
     subcategory: 'visite',
-    source: 'personali',
+    tricount: 'personali-alessio',
     split: 'me',
   },
   {
@@ -511,7 +535,7 @@ const HEALTH_EVENTS = [
     title: 'Abbonamento annuale mezzi pubblici',
     amount: 330,
     category: 'mezzi',
-    source: 'personali',
+    tricount: 'personali-alessio',
     split: 'me',
     notes: 'Da chiedere al commercialista: l’abbonamento ai mezzi è detraibile.',
   },
@@ -581,13 +605,29 @@ function shiftDate(iso, days) {
 for (const trip of TRIPS) {
   for (const item of TRIP_PLAN[trip.id] ?? []) {
     add({
-      date: shiftDate(trip.start, item.day),
+      date: shiftDate(trip.trip.start, item.day),
       title: item.title,
       amount: item.amount,
-      source: 'vacanze',
+      tricount: trip.id,
       category: item.category,
       subcategory: item.subcategory,
-      trip: trip.id,
+    })
+  }
+}
+
+// ── Il compartimento personale di lei: poche voci, ma bastano perché il banco
+//    di prova mostri la separazione — sul dispositivo di lui non compaiono. ──
+const HER = ['Parrucchiere', 'Palestra (lei)', 'Pranzo con le colleghe', 'Libreria']
+for (const month of MONTHS) {
+  for (let i = 0; i < intBetween(1, 3); i += 1) {
+    add({
+      date: dateOf(month, intBetween(2, 26)),
+      title: pick(HER),
+      amount: money(9, 60),
+      tricount: 'personali-federica',
+      category: pick(['tempolibero', 'ristoranti', 'altro']),
+      split: 'partner',
+      paidBy: 'partner',
     })
   }
 }
@@ -597,7 +637,7 @@ expenses.sort((a, b) => (a.date === b.date ? a.id.localeCompare(b.id) : a.date <
 // ─────────────────────── config ───────────────────────
 
 const config = {
-  version: 1,
+  version: 2,
   people: {
     me: { name: 'Alessio', emoji: '🧔' },
     partner: { name: 'Federica', emoji: '👩' },
@@ -616,17 +656,9 @@ const config = {
     partner: null,
   },
   categories: CATEGORIES,
-  /* Nomi generici di proposito: i dati di esempio stanno nel repo pubblico, e i
-     nomi veri dei tricount stanno solo in `data/config.json`. → ADR-0026 */
-  sources: {
-    condivise: { name: 'Spese condivise', emoji: '🧾' },
-    personali: { name: 'Le mie spese', emoji: '🙋' },
-    fisse: { name: 'Casa', emoji: '🏡' },
-    vacanze: { name: 'Vacanze', emoji: '🧳' },
-  },
   catCategory: CAT_CATEGORY,
   tripCategory: TRIP_CATEGORY,
-  houseSource: HOUSE_SOURCE,
+  houseTricount: HOUSE_TRICOUNT,
   houseCategory: HOUSE_CATEGORY,
   balance: {
     /* Qualche giorno indietro, non oggi: con la data di oggi non ci sarebbe
@@ -643,8 +675,8 @@ const config = {
      */
     groups: {
       fisse: { since: BALANCE_SINCE, opening: 12.5, note: 'Punto di partenza di esempio.' },
-      /* La chiave di una vacanza porta il prefisso: un tricount per viaggio. */
-      'vacanze/2025-sicilia': { since: TODAY, opening: 0, note: 'Saldata, di esempio.' },
+      /* La chiave è l'id del tricount: un tricount per viaggio. → ADR-0037 */
+      '2025-sicilia': { since: TODAY, opening: 0, note: 'Saldata, di esempio.' },
     },
   },
   fiscal: {
@@ -667,17 +699,17 @@ const config = {
 }
 
 const dataset = {
-  version: 1,
+  version: 2,
   updatedAt: `${TODAY}T09:00:00.000Z`,
   expenses,
-  trips: TRIPS,
+  tricounts: TRICOUNTS,
   /* I rimborsi si registrano dall'app: nei dati di esempio si parte da zero. */
   settlements: [],
 }
 
 writeJson(`${PATHS.dataExample}/expenses.json`, dataset)
 writeJson(`${PATHS.dataExample}/config.json`, config)
-log(`✓ Dati di esempio: ${expenses.length} spese, ${TRIPS.length} viaggi in data-example/`)
+log(`✓ Dati di esempio: ${expenses.length} spese, ${TRICOUNTS.length} tricount in data-example/`)
 
 if (!exists(PATHS.expenses)) {
   writeJson(PATHS.expenses, dataset)

@@ -9,17 +9,16 @@ const CONFIG = {
   ],
 }
 
+const CONDIVISE = { id: 'condivise', name: 'Condivise', members: ['me', 'partner'] }
 const TRIP = {
   id: 'creta',
   name: 'Creta',
-  place: 'Creta',
-  year: 2025,
-  start: '2025-08-17',
-  end: '2025-08-25',
+  members: ['me', 'partner'],
+  trip: { place: 'Creta', year: 2025, start: '2025-08-17', end: '2025-08-25' },
 }
 
-function dataset(expenses, trips = []) {
-  return { version: 1, updatedAt: '2026-08-19T00:00:00.000Z', expenses, trips }
+function dataset(expenses, tricounts = [CONDIVISE]) {
+  return { version: 1, updatedAt: '2026-08-19T00:00:00.000Z', expenses, tricounts }
 }
 
 function expense(partial) {
@@ -30,7 +29,7 @@ function expense(partial) {
     amount: 100,
     shares: { me: 50, partner: 50 },
     paidBy: 'me',
-    source: 'condivise',
+    tricount: 'condivise',
     category: 'spesa',
     recurring: false,
     ...partial,
@@ -46,13 +45,12 @@ describe('quote', () => {
             amount: 180,
             shares: { me: 30, partner: 30, others: 120 },
             paidBy: 'others',
-            source: 'vacanze',
-            trip: 'creta',
+            tricount: 'creta',
             category: 'viaggi',
             subcategory: 'cibo',
           }),
         ],
-        [TRIP],
+        [CONDIVISE, TRIP],
       ),
       CONFIG,
     )
@@ -66,12 +64,11 @@ describe('quote', () => {
           expense({
             amount: 180,
             shares: { me: 30, partner: 30 },
-            source: 'vacanze',
-            trip: 'creta',
+            tricount: 'creta',
             category: 'viaggi',
           }),
         ],
-        [TRIP],
+        [CONDIVISE, TRIP],
       ),
       CONFIG,
     )
@@ -111,12 +108,11 @@ describe('quote', () => {
           expense({
             amount: 180,
             shares: { me: 30, partner: 30, others: 120 },
-            source: 'vacanze',
-            trip: 'creta',
+            tricount: 'creta',
             category: 'viaggi',
           }),
         ],
-        [TRIP],
+        [CONDIVISE, TRIP],
       ),
       CONFIG,
     )

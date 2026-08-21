@@ -26,7 +26,7 @@ import type {
   IncomeProfile,
   PersonId,
   Settlement,
-  Trip,
+  Tricount,
 } from '../domain/types'
 import { WrongPassphraseError, decryptEnvelope, deriveKeyCached, encryptEnvelope } from './crypto'
 import { isEnvelope, type Envelope } from './envelope'
@@ -99,8 +99,8 @@ export interface StoreApi {
   addExpense: (expense: Expense) => void
   updateExpense: (expenseId: string, fields: Partial<Expense>) => void
   deleteExpense: (expenseId: string) => void
-  addTrip: (trip: Trip) => void
-  updateTrip: (tripId: string, fields: Partial<Trip>) => void
+  addTricount: (tricount: Tricount) => void
+  updateTricount: (tricountId: string, fields: Partial<Tricount>) => void
   /** L'elenco intero delle categorie: si sostituisce, non si modifica in punta. */
   setCategories: (categories: Category[]) => void
   /** Sposta tutte le spese da una categoria a un'altra. */
@@ -126,8 +126,20 @@ async function fetchEnvelope(url: string): Promise<Envelope> {
  * I file cifrati scritti prima di ADR-0019 non hanno `settlements`. Si normalizza
  * appena il dato entra, così il tipo dice la verità in tutto il resto dell'app
  * invece di costringere ogni lettore a un `?? []`.
+ *
+ * Il modello **prima** dei tricount (ADR-0037) invece non si normalizza: si
+ * rifiuta con una frase che dice cosa fare. È un caso che capita davvero per un
+ * minuto — GitHub Pages può servire il file vecchio subito dopo un deploy, e un
+ * telefono può averlo in cache — e senza questo controllo l'app si aprirebbe
+ * mostrando zeri al posto di venti mesi di spese: un guasto che sembra un dato.
  */
-function normaliseDataset(raw: Dataset): Dataset {
+function normaliseDataset(raw: Dataset & { trips?: unknown }): Dataset {
+  if (!Array.isArray(raw.tricounts)) {
+    throw new Error(
+      'Questi dati sono nel formato precedente ai tricount con i membri. ' +
+        'Ricarica la pagina: se insiste, è la cache di GitHub Pages e passa da sé in un minuto.',
+    )
+  }
   return raw.settlements ? raw : { ...raw, settlements: [] }
 }
 
@@ -470,10 +482,13 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
     [enqueue],
   )
 
-  const addTrip = useCallback((trip: Trip) => enqueue({ kind: 'trip', trip }), [enqueue])
+  const addTricount = useCallback(
+    (tricount: Tricount) => enqueue({ kind: 'tricount', tricount }),
+    [enqueue],
+  )
 
-  const updateTrip = useCallback(
-    (tripId: string, fields: Partial<Trip>) => enqueue({ kind: 'trip-edit', tripId, fields }),
+  const updateTricount = useCallback(
+    (tricountId: string, fields: Partial<Tricount>) => enqueue({ kind: 'tricount-edit', tricountId, fields }),
     [enqueue],
   )
 
@@ -571,8 +586,8 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       addExpense,
       updateExpense,
       deleteExpense,
-      addTrip,
-      updateTrip,
+      addTricount,
+      updateTricount,
       setCategories,
       recategorize,
       setIncome,
@@ -584,8 +599,8 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
     [
       addExpense,
       addSettlement,
-      addTrip,
-      updateTrip,
+      addTricount,
+      updateTricount,
       setCategories,
       recategorize,
       setIncome,

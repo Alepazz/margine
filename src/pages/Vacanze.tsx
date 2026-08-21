@@ -11,23 +11,24 @@ import { CategoryDonut, type DonutSlice } from '../components/charts/CategoryDon
 import { Globe, type GlobeMark } from '../components/charts/Globe'
 import { ExpenseList } from '../components/ExpenseList'
 import { ExpenseSheet } from '../components/ExpenseSheet'
-import { TripForm } from '../components/TripForm'
+import { TricountForm } from '../components/TricountForm'
 import { Card, Notice, StatTile, useToast } from '../components/ui'
 import { formatDate } from '../domain/dates'
 import { formatEuro, toCents } from '../domain/money'
 import { tripPlaces, tripStats, tripsByYear } from '../domain/selectors'
-import { tripTitleOf, type Expense } from '../domain/types'
+import { tripTitleOf, tripsOf, type Expense } from '../domain/types'
 import { usePageData } from './usePageData'
 
 export function Vacanze(): ReactNode {
-  const { config, dataset, view, lookup, chart, addTrip, updateTrip } = usePageData()
+  const { config, dataset, view, lookup, chart, addTricount, updateTricount } = usePageData()
   const toast = useToast()
   const person = view.person
   const [selectedTrip, setSelectedTrip] = useState<string | null>(null)
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
   const [creating, setCreating] = useState(false)
   const detail = useRef<HTMLElement | null>(null)
-  const tripIds = useMemo(() => new Set(dataset.trips.map((t) => t.id)), [dataset.trips])
+  const tricountIds = useMemo(() => new Set(dataset.tricounts.map((t) => t.id)), [dataset.tricounts])
+  const trips = useMemo(() => tripsOf(dataset.tricounts), [dataset.tricounts])
 
   /*
    * Il dettaglio di un viaggio si apre sotto l'elenco, cioè mille pixel più in
@@ -45,8 +46,8 @@ export function Vacanze(): ReactNode {
   }, [selectedTrip])
 
   const stats = useMemo(
-    () => tripStats(dataset.expenses, dataset.trips, person),
-    [dataset.expenses, dataset.trips, person],
+    () => tripStats(dataset.expenses, trips, person),
+    [dataset.expenses, person, trips],
   )
   const byYear = useMemo(() => tripsByYear(stats), [stats])
   const [year, setYear] = useState<number | 'all'>('all')
@@ -99,7 +100,7 @@ export function Vacanze(): ReactNode {
     [chart.seq, config.tripCategory, lookup, trip],
   )
 
-  if (dataset.trips.length === 0) {
+  if (trips.length === 0) {
     return (
       <>
         <div className="page-head">
@@ -119,10 +120,11 @@ export function Vacanze(): ReactNode {
           }
         >
           {creating ? (
-            <TripForm
-              takenIds={tripIds}
+            <TricountForm
+              takenIds={tricountIds}
+              vacation
               onCreate={(candidate) => {
-                addTrip(candidate)
+                addTricount(candidate)
                 setCreating(false)
                 toast.show(`Vacanza «${candidate.name}» aperta.`)
               }}
@@ -254,10 +256,11 @@ export function Vacanze(): ReactNode {
         >
           {creating ? (
             <div style={{ marginBottom: 12 }}>
-              <TripForm
-                takenIds={tripIds}
+              <TricountForm
+                takenIds={tricountIds}
+                vacation
                 onCreate={(candidate) => {
-                  addTrip(candidate)
+                  addTricount(candidate)
                   setCreating(false)
                   setSelectedTrip(candidate.id)
                   toast.show(`Vacanza «${candidate.name}» aperta.`)
@@ -350,7 +353,7 @@ export function Vacanze(): ReactNode {
                   className="btn btn-sm"
                   onClick={() => {
                     const closed = trip.trip.closed !== true
-                    updateTrip(trip.trip.id, { closed })
+                    updateTricount(trip.trip.id, { closed })
                     toast.show(
                       closed
                         ? 'Vacanza conclusa: non comparirà fra i tricount in cui inserire una spesa.'

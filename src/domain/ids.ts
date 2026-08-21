@@ -46,12 +46,17 @@ function firstFree(base: string, taken: ReadonlySet<string>): string {
 }
 
 /**
- * Id di un viaggio: leggibile, perché compare nei dati in chiaro durante la
- * sessione mensile e ci si deve capire a occhio di che viaggio si parla.
+ * Id di un tricount di vacanza: leggibile, perché compare nei dati in chiaro
+ * durante la sessione mensile e ci si deve capire a occhio di che viaggio si
+ * parla. Porta l'anno perché due viaggi nello stesso posto succedono.
  */
 export function newTripId(name: string, year: number, taken: ReadonlySet<string>): string {
-  /* Due viaggi nello stesso posto e nello stesso anno: succede. */
   return firstFree(`${slugify(name, 'viaggio', 24)}-${year}`, taken)
+}
+
+/** Id di un tricount senza viaggio: solo lo slug del nome. */
+export function newTricountId(name: string, taken: ReadonlySet<string>): string {
+  return firstFree(slugify(name, 'tricount', 24), taken)
 }
 
 /**

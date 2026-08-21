@@ -23,19 +23,26 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { useStore } from '../data/store'
 import { todayIso } from '../domain/dates'
 import {
-  ledgerKeyOf,
-  ledgerParts,
   presetOf,
   sharesFor,
   splitFor,
+  tricountOptions,
   validateExpense,
   type SplitPreset,
 } from '../domain/expense-rules'
 import { newCategoryId, newExpenseId } from '../domain/ids'
 import { formatEuro, toCents } from '../domain/money'
-import { titleOf, type Category, type Expense, type Payer, type PersonId, type Trip } from '../domain/types'
+import {
+  soleMemberOf,
+  titleOf,
+  type Category,
+  type Expense,
+  type Payer,
+  type PersonId,
+  type Tricount,
+} from '../domain/types'
 import { LedgerSelect } from './LedgerSelect'
-import { TripForm } from './TripForm'
+import { TricountForm } from './TricountForm'
 import { AmountInput, NameFields, Segmented, useToast } from './ui'
 
 /** Accetta la virgola: sulla tastiera del telefono è quello che esce. */
@@ -60,7 +67,7 @@ export function ExpenseForm({
   expense?: Expense
   onClose: () => void
 }): ReactNode {
-  const { config, dataset, view, addExpense, updateExpense, addTrip, setCategories } = useStore()
+  const { config, dataset, view, addExpense, updateExpense, addTricount, setCategories } = useStore()
   const toast = useToast()
   const person = view.person
   const other = person === 'me' ? 'partner' : 'me'
@@ -68,7 +75,13 @@ export function ExpenseForm({
   const [title, setTitle] = useState(editing?.title ?? '')
   const [amount, setAmount] = useState(editing ? amountText(editing.amount) : '')
   const [date, setDate] = useState(editing?.date ?? todayIso())
-  const [ledger, setLedger] = useState(editing ? ledgerKeyOf(editing) : 'condivise')
+  /* Il primo tricount **suo**: non un id cablato, che potrebbe essere di un
+     tricount di cui chi inserisce non è nemmeno membro. */
+  const [ledger, setLedger] = useState<string>(() => {
+    if (editing) return editing.tricount
+    const first = tricountOptions(dataset?.tricounts ?? [], view.person)[0]
+    return first?.tricount.id ?? ''
+  })
   const [category, setCategory] = useState(editing?.category ?? '')
   const [subcategory, setSubcategory] = useState(editing?.subcategory ?? '')
   const [preset, setPreset] = useState<SplitPreset>(editing ? presetOf(editing, person) : 'half')
@@ -91,14 +104,17 @@ export function ExpenseForm({
   const [catLabel, setCatLabel] = useState('')
   const [touched, setTouched] = useState(false)
 
-  const { source, trip } = ledgerParts(ledger)
-  const isVacation = source === 'vacanze'
+  const tricounts = dataset?.tricounts ?? []
+  const chosenTricount = tricounts.find((t) => t.id === ledger)
+  const isVacation = chosenTricount?.trip !== undefined
   /*
-   * Una spesa personale è al 100% di chi la inserisce: le 370 in archivio sono
-   * tutte così, e offrire una divisione qui sarebbe offrire un errore.
+   * In un tricount con un membro solo la spesa è al 100% di quel membro: le 370
+   * in archivio sono tutte così, e offrire una divisione qui sarebbe offrire un
+   * errore. Non «di chi inserisce»: del **membro** — è il tricount a dirlo.
+   * → ADR-0037
    */
-  const personalOnly = source === 'personali'
-  const effectivePreset: SplitPreset = personalOnly ? 'mine' : preset
+  const soleMember = soleMemberOf(chosenTricount)
+  const personalOnly = soleMember !== undefined
 
   const categories = config?.categories ?? []
   const tripCategoryId = config?.tripCategory ?? ''
@@ -133,11 +149,16 @@ export function ExpenseForm({
   const payer = personalOnly ? (editing?.paidBy ?? person) : paidBy
 
   const shares = useMemo(() => {
-    if (effectivePreset === 'custom') {
+    /* Tutta del membro unico, chiunque stia guardando. */
+    if (soleMember) {
+      const whole = Number.isFinite(parsedAmount) ? parsedAmount : 0
+      return { me: soleMember === 'me' ? whole : 0, partner: soleMember === 'partner' ? whole : 0 }
+    }
+    if (preset === 'custom') {
       return sharesFor(person, parseAmount(mineText) || 0, parseAmount(theirsText) || 0)
     }
-    return splitFor(effectivePreset, Number.isFinite(parsedAmount) ? parsedAmount : 0, payer, person)
-  }, [effectivePreset, mineText, parsedAmount, payer, person, theirsText])
+    return splitFor(preset, Number.isFinite(parsedAmount) ? parsedAmount : 0, payer, person)
+  }, [mineText, parsedAmount, payer, person, preset, soleMember, theirsText])
 
   const othersShare = isVacation ? parseAmount(othersText) || 0 : 0
 
@@ -164,15 +185,13 @@ export function ExpenseForm({
       amount: Number.isFinite(parsedAmount) ? parsedAmount : Number.NaN,
       shares: toCents(othersShare) > 0 ? { ...shares, others: othersShare } : shares,
       paidBy: payer,
-      source,
+      tricount: ledger,
       category,
       recurring,
     }
-    /* Sempre presenti, anche vuoti: un `update` applica solo i campi che porta,
-       quindi ometterli vorrebbe dire «lascia com'erano» — e correggendo una
-       spesa di vacanza in una spesa di casa il viaggio resterebbe attaccato. */
+    /* Sempre presente, anche vuota: un `update` applica solo i campi che porta,
+       quindi ometterla vorrebbe dire «lascia com'era». */
     built.subcategory = subcategory
-    built.trip = isVacation && trip ? trip : ''
     /* Le annotazioni già presenti non si perdono correggendo l'importo. */
     if (editing?.tax730 !== undefined) built.tax730 = editing.tax730
     if (editing?.notes !== undefined) built.notes = editing.notes
@@ -183,16 +202,14 @@ export function ExpenseForm({
     category,
     date,
     editing,
-    isVacation,
+    ledger,
     othersShare,
     parsedAmount,
     payer,
     recurring,
     shares,
-    source,
     subcategory,
     title,
-    trip,
   ])
 
   const takenIds = useMemo(
@@ -201,34 +218,29 @@ export function ExpenseForm({
   )
 
   const errors = useMemo(
-    () =>
-      validateExpense(draft, {
-        categories,
-        tripIds: (dataset?.trips ?? []).map((t) => t.id),
-        takenIds,
-      }),
-    [categories, dataset?.trips, draft, takenIds],
+    () => validateExpense(draft, { categories, tricounts, takenIds }),
+    [categories, draft, takenIds, tricounts],
   )
 
-  const tripIds = useMemo(() => new Set((dataset?.trips ?? []).map((t) => t.id)), [dataset?.trips])
+  const tricountIds = useMemo(() => new Set(tricounts.map((t) => t.id)), [tricounts])
 
   /**
    * Cambiare tricount azzera quello che non vale più, invece di lasciarlo
    * invisibile a far fallire il salvataggio.
    */
   const changeLedger = (next: string): void => {
-    const before = ledgerParts(ledger)
-    const after = ledgerParts(next)
+    const wasVacation = isVacation
+    const willBeVacation = tricounts.find((t) => t.id === next)?.trip !== undefined
     setLedger(next)
     setNewTrip(false)
-    if (after.source !== 'vacanze') {
+    if (!willBeVacation) {
       setOthersText('')
       if (paidBy === 'others') setPaidBy(person)
     }
     /* Entrando o uscendo dalle vacanze la categoria cambia mondo: «Viaggi» non
        ha senso a casa, e «Spesa alimentare» non è una fetta di un viaggio. */
-    if ((before.source === 'vacanze') !== (after.source === 'vacanze')) {
-      setCategory(after.source === 'vacanze' ? tripCategoryId : '')
+    if (wasVacation !== willBeVacation) {
+      setCategory(willBeVacation ? tripCategoryId : '')
       setSubcategory('')
     }
   }
@@ -252,9 +264,9 @@ export function ExpenseForm({
     toast.show(`Categoria «${trimmed}» creata e scelta.`)
   }
 
-  const createTrip = (candidate: Trip): void => {
-    addTrip(candidate)
-    setLedger(`vacanze/${candidate.id}`)
+  const createTrip = (candidate: Tricount): void => {
+    addTricount(candidate)
+    setLedger(candidate.id)
     setCategory(tripCategoryId)
     setSubcategory('')
     setNewTrip(false)
@@ -306,8 +318,9 @@ export function ExpenseForm({
                 In quale tricount
               </label>
               {newTrip ? (
-                <TripForm
-                  takenIds={tripIds}
+                <TricountForm
+                  takenIds={tricountIds}
+                  vacation
                   onCreate={createTrip}
                   onCancel={() => setNewTrip(false)}
                   onProblem={(message) => toast.show(message)}
@@ -317,8 +330,8 @@ export function ExpenseForm({
                   <LedgerSelect
                     id="ef-ledger"
                     value={ledger}
-                    trips={dataset?.trips ?? []}
-                    sources={config?.sources}
+                    tricounts={tricounts}
+                    person={person}
                     onChange={changeLedger}
                   />
                   <button
@@ -467,7 +480,9 @@ export function ExpenseForm({
 
             {personalOnly ? (
               <p className="hint">
-                Una spesa personale è tutta tua, quindi la divisione non si sceglie.
+                {soleMember === person
+                  ? 'Una spesa personale è tutta tua, quindi la divisione non si sceglie.'
+                  : `Questo tricount è personale di ${config?.people[soleMember ?? 'me'].name}: la spesa è tutta sua.`}
                 {payer !== person
                   ? ` L'ha anticipata ${
                       payer === 'others' ? 'qualcuno del gruppo' : config.people[payer].name

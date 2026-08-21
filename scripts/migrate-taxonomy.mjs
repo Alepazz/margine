@@ -93,6 +93,13 @@ function euro(value) {
 function main() {
   const dry = process.argv.includes('--dry')
   const dataset = readJson(PATHS.expenses)
+  /* Questo script parla il modello VECCHIO (source + trips). Sui dati migrati
+     al modello a tricount (ADR-0037) non deve fare niente. */
+  if (Array.isArray(dataset.tricounts)) {
+    log('✗ I dati sono già al modello a tricount: questo script è storia, non si rilancia.')
+    process.exitCode = 1
+    return
+  }
   const config = readJson(PATHS.config)
 
   const before = countByCategory(dataset.expenses)

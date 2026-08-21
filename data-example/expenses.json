@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "updatedAt": "2026-08-19T09:00:00.000Z",
   "expenses": [
     {
@@ -12,7 +12,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "sport"
@@ -27,7 +27,7 @@
         "partner": 475
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "affitto"
@@ -42,7 +42,7 @@
         "partner": 44.42
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -56,7 +56,7 @@
         "partner": 31.91
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -70,7 +70,7 @@
         "partner": 42.5
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -85,7 +85,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "salute",
       "recurring": false,
       "subcategory": "farmacia"
@@ -100,7 +100,7 @@
         "partner": 6.7
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "lettiera"
@@ -115,7 +115,7 @@
         "partner": 20.53
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "cibo"
@@ -130,7 +130,7 @@
         "partner": 13.95
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -145,7 +145,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -160,7 +160,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": true
     },
@@ -174,7 +174,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "abbigliamento",
       "recurring": false
     },
@@ -188,7 +188,7 @@
         "partner": 34.01
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -202,7 +202,7 @@
         "partner": 67.96
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -217,10 +217,24 @@
         "partner": 18.35
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "tempolibero",
       "recurring": false,
       "subcategory": "spettacoli"
+    },
+    {
+      "id": "2025-01-12-0615",
+      "date": "2025-01-12",
+      "title": "Parrucchiere",
+      "amount": 12.7,
+      "shares": {
+        "me": 0,
+        "partner": 12.7
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "ristoranti",
+      "recurring": false
     },
     {
       "id": "2025-01-13-0110",
@@ -232,7 +246,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -247,7 +261,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -261,7 +275,7 @@
         "partner": 8.99
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "abbonamenti"
@@ -276,7 +290,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -290,7 +304,7 @@
         "partner": 18.81
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -304,7 +318,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -319,7 +333,7 @@
         "partner": 42.36
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -333,7 +347,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -347,7 +361,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -361,7 +375,7 @@
         "partner": 33.77
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -376,7 +390,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": false,
       "subcategory": "musica"
@@ -391,7 +405,7 @@
         "partner": 43.81
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "regali",
       "recurring": false
     },
@@ -405,7 +419,7 @@
         "partner": 24
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -419,7 +433,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": false
     },
@@ -433,8 +447,22 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
+      "recurring": false
+    },
+    {
+      "id": "2025-01-26-0616",
+      "date": "2025-01-26",
+      "title": "Pranzo con le colleghe",
+      "amount": 11.29,
+      "shares": {
+        "me": 0,
+        "partner": 11.29
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "altro",
       "recurring": false
     },
     {
@@ -447,7 +475,7 @@
         "partner": 56.49
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -461,7 +489,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -475,7 +503,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "sport"
@@ -490,7 +518,7 @@
         "partner": 51.98
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -504,7 +532,7 @@
         "partner": 475
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "affitto"
@@ -519,7 +547,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -533,7 +561,7 @@
         "partner": 42.5
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -548,7 +576,7 @@
         "partner": 13.95
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -563,7 +591,7 @@
         "partner": 9.8
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "accessori"
@@ -578,7 +606,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": true
     },
@@ -592,7 +620,7 @@
         "partner": 55.87
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -606,7 +634,7 @@
         "partner": 70.62
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -621,7 +649,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -636,7 +664,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -651,8 +679,36 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "abbigliamento",
+      "recurring": false
+    },
+    {
+      "id": "2025-02-13-0617",
+      "date": "2025-02-13",
+      "title": "Parrucchiere",
+      "amount": 27.51,
+      "shares": {
+        "me": 0,
+        "partner": 27.51
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "altro",
+      "recurring": false
+    },
+    {
+      "id": "2025-02-13-0618",
+      "date": "2025-02-13",
+      "title": "Libreria",
+      "amount": 23.01,
+      "shares": {
+        "me": 0,
+        "partner": 23.01
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "ristoranti",
       "recurring": false
     },
     {
@@ -665,7 +721,7 @@
         "partner": 26.51
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -679,7 +735,7 @@
         "partner": 8.99
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "abbonamenti"
@@ -694,7 +750,7 @@
         "partner": 16.6
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "tempolibero",
       "recurring": false,
       "subcategory": "spettacoli"
@@ -709,7 +765,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -724,7 +780,7 @@
         "partner": 17.07
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -738,7 +794,7 @@
         "partner": 17.12
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "cibo"
@@ -753,7 +809,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -767,7 +823,7 @@
         "partner": 37.95
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -781,7 +837,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "salute",
       "recurring": false,
       "subcategory": "visite",
@@ -801,7 +857,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -815,7 +871,7 @@
         "partner": 30.38
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -829,7 +885,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -843,7 +899,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -857,7 +913,7 @@
         "partner": 35.27
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -871,7 +927,7 @@
         "partner": 53.62
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -885,7 +941,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "sport"
@@ -900,7 +956,7 @@
         "partner": 43.04
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -914,7 +970,7 @@
         "partner": 475
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "affitto"
@@ -929,7 +985,7 @@
         "partner": 42.5
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -944,7 +1000,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -959,7 +1015,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -973,7 +1029,7 @@
         "partner": 26.24
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -987,7 +1043,7 @@
         "partner": 10.16
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "parcheggi"
@@ -1002,7 +1058,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1016,7 +1072,7 @@
         "partner": 13.95
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -1031,7 +1087,7 @@
         "partner": 17.9
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1045,7 +1101,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": true
     },
@@ -1059,7 +1115,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1073,10 +1129,24 @@
         "partner": 21.69
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "cibo"
+    },
+    {
+      "id": "2025-03-10-0619",
+      "date": "2025-03-10",
+      "title": "Parrucchiere",
+      "amount": 50.92,
+      "shares": {
+        "me": 0,
+        "partner": 50.92
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "ristoranti",
+      "recurring": false
     },
     {
       "id": "2025-03-11-0373",
@@ -1088,7 +1158,7 @@
         "partner": 38.3
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -1102,10 +1172,24 @@
         "partner": 26.47
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "tempolibero",
       "recurring": false,
       "subcategory": "spettacoli"
+    },
+    {
+      "id": "2025-03-11-0620",
+      "date": "2025-03-11",
+      "title": "Parrucchiere",
+      "amount": 11.7,
+      "shares": {
+        "me": 0,
+        "partner": 11.7
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "altro",
+      "recurring": false
     },
     {
       "id": "2025-03-12-0014",
@@ -1117,7 +1201,7 @@
         "partner": 83.49
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -1132,7 +1216,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1146,7 +1230,7 @@
         "partner": 8.99
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "abbonamenti"
@@ -1161,7 +1245,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "abbigliamento",
       "recurring": false
     },
@@ -1175,7 +1259,7 @@
         "partner": 25.89
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -1189,7 +1273,7 @@
         "partner": 34.9
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1203,7 +1287,7 @@
         "partner": 52.95
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -1217,7 +1301,7 @@
         "partner": 37.62
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "regali",
       "recurring": false
     },
@@ -1231,7 +1315,7 @@
         "partner": 19.72
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "casa",
       "recurring": false,
       "subcategory": "arredo"
@@ -1246,7 +1330,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -1261,7 +1345,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1275,7 +1359,7 @@
         "partner": 46.64
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -1289,7 +1373,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1303,7 +1387,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "sport"
@@ -1318,7 +1402,7 @@
         "partner": 475
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "affitto"
@@ -1333,7 +1417,7 @@
         "partner": 30.41
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1347,7 +1431,7 @@
         "partner": 34.96
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -1361,10 +1445,24 @@
         "partner": 42.5
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
+    },
+    {
+      "id": "2025-04-05-0621",
+      "date": "2025-04-05",
+      "title": "Pranzo con le colleghe",
+      "amount": 48.17,
+      "shares": {
+        "me": 0,
+        "partner": 48.17
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "ristoranti",
+      "recurring": false
     },
     {
       "id": "2025-04-08-0020",
@@ -1376,7 +1474,7 @@
         "partner": 13.95
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -1391,7 +1489,7 @@
         "partner": 34.49
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -1405,7 +1503,7 @@
         "partner": 42.5
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "veterinario",
@@ -1425,7 +1523,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": true
     },
@@ -1439,7 +1537,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": false
     },
@@ -1453,7 +1551,7 @@
         "partner": 16.81
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "cibo"
@@ -1468,7 +1566,7 @@
         "partner": 39.38
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -1483,7 +1581,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1497,7 +1595,7 @@
         "partner": 47.24
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -1511,7 +1609,7 @@
         "partner": 8.99
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "abbonamenti"
@@ -1526,7 +1624,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1540,7 +1638,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1554,7 +1652,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1568,7 +1666,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -1583,7 +1681,7 @@
         "partner": 32.82
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -1598,7 +1696,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -1613,7 +1711,7 @@
         "partner": 54.98
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -1627,7 +1725,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1641,7 +1739,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1655,7 +1753,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -1670,7 +1768,7 @@
         "partner": 56.93
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -1684,7 +1782,7 @@
         "partner": 33.71
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1698,7 +1796,7 @@
         "partner": 27.92
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1712,7 +1810,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "sport"
@@ -1727,7 +1825,7 @@
         "partner": 31.8
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1741,7 +1839,7 @@
         "partner": 475
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "affitto"
@@ -1756,7 +1854,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -1771,7 +1869,7 @@
         "partner": 43.2
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1785,7 +1883,7 @@
         "partner": 42.5
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -1800,7 +1898,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1814,7 +1912,7 @@
         "partner": 26.54
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -1828,7 +1926,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -1843,7 +1941,7 @@
         "partner": 13.95
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -1858,7 +1956,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": true
     },
@@ -1872,7 +1970,7 @@
         "partner": 46.36
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -1886,7 +1984,7 @@
         "partner": 40.36
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -1901,7 +1999,7 @@
         "partner": 21.54
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "parcheggi"
@@ -1916,7 +2014,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1930,7 +2028,7 @@
         "partner": 18.19
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1944,7 +2042,7 @@
         "partner": 8.99
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "abbonamenti"
@@ -1959,7 +2057,7 @@
         "partner": 44.29
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -1973,7 +2071,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -1987,7 +2085,7 @@
         "partner": 22.88
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "cibo"
@@ -2002,7 +2100,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": false
     },
@@ -2016,7 +2114,7 @@
         "partner": 53.7
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -2030,11 +2128,10 @@
         "partner": 134
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2025-sicilia",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "trasporti",
-      "trip": "2025-sicilia"
+      "subcategory": "trasporti"
     },
     {
       "id": "2025-05-24-0576",
@@ -2046,11 +2143,24 @@
         "partner": 155
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2025-sicilia",
       "category": "trasporti",
       "recurring": false,
-      "subcategory": "auto",
-      "trip": "2025-sicilia"
+      "subcategory": "auto"
+    },
+    {
+      "id": "2025-05-24-0622",
+      "date": "2025-05-24",
+      "title": "Parrucchiere",
+      "amount": 37.87,
+      "shares": {
+        "me": 0,
+        "partner": 37.87
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "ristoranti",
+      "recurring": false
     },
     {
       "id": "2025-05-25-0159",
@@ -2062,7 +2172,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -2077,11 +2187,10 @@
         "partner": 260
       },
       "paidBy": "partner",
-      "source": "vacanze",
+      "tricount": "2025-sicilia",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "alloggio",
-      "trip": "2025-sicilia"
+      "subcategory": "alloggio"
     },
     {
       "id": "2025-05-26-0163",
@@ -2093,7 +2202,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -2107,10 +2216,9 @@
         "partner": 42
       },
       "paidBy": "partner",
-      "source": "vacanze",
+      "tricount": "2025-sicilia",
       "category": "ristoranti",
-      "recurring": false,
-      "trip": "2025-sicilia"
+      "recurring": false
     },
     {
       "id": "2025-05-27-0580",
@@ -2122,10 +2230,9 @@
         "partner": 23
       },
       "paidBy": "partner",
-      "source": "vacanze",
+      "tricount": "2025-sicilia",
       "category": "ristoranti",
-      "recurring": false,
-      "trip": "2025-sicilia"
+      "recurring": false
     },
     {
       "id": "2025-05-27-0584",
@@ -2137,10 +2244,9 @@
         "partner": 29
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2025-sicilia",
       "category": "spesa",
-      "recurring": false,
-      "trip": "2025-sicilia"
+      "recurring": false
     },
     {
       "id": "2025-05-28-0162",
@@ -2152,7 +2258,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -2166,11 +2272,10 @@
         "partner": 48
       },
       "paidBy": "partner",
-      "source": "vacanze",
+      "tricount": "2025-sicilia",
       "category": "trasporti",
       "recurring": false,
-      "subcategory": "carburante",
-      "trip": "2025-sicilia"
+      "subcategory": "carburante"
     },
     {
       "id": "2025-05-29-0398",
@@ -2182,7 +2287,7 @@
         "partner": 52.03
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -2196,11 +2301,10 @@
         "partner": 172.5
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2025-sicilia",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "alloggio",
-      "trip": "2025-sicilia"
+      "subcategory": "alloggio"
     },
     {
       "id": "2025-05-29-0581",
@@ -2212,11 +2316,10 @@
         "partner": 65
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2025-sicilia",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "attivita",
-      "trip": "2025-sicilia"
+      "subcategory": "attivita"
     },
     {
       "id": "2025-05-30-0582",
@@ -2228,11 +2331,10 @@
         "partner": 13
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2025-sicilia",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "attivita",
-      "trip": "2025-sicilia"
+      "subcategory": "attivita"
     },
     {
       "id": "2025-05-31-0585",
@@ -2244,10 +2346,9 @@
         "partner": 36
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2025-sicilia",
       "category": "ristoranti",
-      "recurring": false,
-      "trip": "2025-sicilia"
+      "recurring": false
     },
     {
       "id": "2025-06-02-0168",
@@ -2259,7 +2360,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "sport"
@@ -2274,8 +2375,22 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
+      "recurring": false
+    },
+    {
+      "id": "2025-06-02-0624",
+      "date": "2025-06-02",
+      "title": "Pranzo con le colleghe",
+      "amount": 27.43,
+      "shares": {
+        "me": 0,
+        "partner": 27.43
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "altro",
       "recurring": false
     },
     {
@@ -2288,7 +2403,7 @@
         "partner": 475
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "affitto"
@@ -2303,7 +2418,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "abbigliamento",
       "recurring": false
     },
@@ -2317,7 +2432,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -2332,7 +2447,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -2346,7 +2461,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -2360,7 +2475,7 @@
         "partner": 54.58
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -2374,10 +2489,24 @@
         "partner": 42.5
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
+    },
+    {
+      "id": "2025-06-06-0625",
+      "date": "2025-06-06",
+      "title": "Parrucchiere",
+      "amount": 9.11,
+      "shares": {
+        "me": 0,
+        "partner": 9.11
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "ristoranti",
+      "recurring": false
     },
     {
       "id": "2025-06-08-0031",
@@ -2389,7 +2518,7 @@
         "partner": 13.95
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -2404,7 +2533,7 @@
         "partner": 33.06
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -2418,7 +2547,7 @@
         "partner": 21.25
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "cibo"
@@ -2433,7 +2562,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": true
     },
@@ -2447,7 +2576,7 @@
         "partner": 32.78
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "regali",
       "recurring": false
     },
@@ -2461,7 +2590,7 @@
         "partner": 35.13
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -2476,7 +2605,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -2490,7 +2619,7 @@
         "partner": 8.99
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "abbonamenti"
@@ -2505,7 +2634,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -2520,7 +2649,7 @@
         "partner": 50.68
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -2534,8 +2663,22 @@
         "partner": 36.97
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
+      "recurring": false
+    },
+    {
+      "id": "2025-06-16-0623",
+      "date": "2025-06-16",
+      "title": "Parrucchiere",
+      "amount": 56.27,
+      "shares": {
+        "me": 0,
+        "partner": 56.27
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "altro",
       "recurring": false
     },
     {
@@ -2548,7 +2691,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": false
     },
@@ -2562,7 +2705,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -2577,7 +2720,7 @@
         "partner": 51.54
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -2591,7 +2734,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -2605,7 +2748,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -2619,7 +2762,7 @@
         "partner": 37.7
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -2633,7 +2776,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -2647,7 +2790,7 @@
         "partner": 51.47
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -2661,7 +2804,7 @@
         "partner": 43.52
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -2675,10 +2818,24 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "sport"
+    },
+    {
+      "id": "2025-07-02-0628",
+      "date": "2025-07-02",
+      "title": "Palestra (lei)",
+      "amount": 24.59,
+      "shares": {
+        "me": 0,
+        "partner": 24.59
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "tempolibero",
+      "recurring": false
     },
     {
       "id": "2025-07-03-0033",
@@ -2690,7 +2847,7 @@
         "partner": 475
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "affitto"
@@ -2705,8 +2862,22 @@
         "partner": 33.48
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
+      "recurring": false
+    },
+    {
+      "id": "2025-07-04-0626",
+      "date": "2025-07-04",
+      "title": "Pranzo con le colleghe",
+      "amount": 15.8,
+      "shares": {
+        "me": 0,
+        "partner": 15.8
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "tempolibero",
       "recurring": false
     },
     {
@@ -2719,7 +2890,7 @@
         "partner": 42.5
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -2734,7 +2905,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -2748,7 +2919,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -2762,7 +2933,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -2776,7 +2947,7 @@
         "partner": 13.95
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -2791,7 +2962,7 @@
         "partner": 21.76
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -2805,7 +2976,7 @@
         "partner": 15.15
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "cibo"
@@ -2820,7 +2991,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": true
     },
@@ -2834,7 +3005,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -2849,7 +3020,7 @@
         "partner": 58.52
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -2863,7 +3034,7 @@
         "partner": 34.07
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -2878,7 +3049,21 @@
         "partner": 22.4
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
+      "category": "ristoranti",
+      "recurring": false
+    },
+    {
+      "id": "2025-07-13-0627",
+      "date": "2025-07-13",
+      "title": "Pranzo con le colleghe",
+      "amount": 44.82,
+      "shares": {
+        "me": 0,
+        "partner": 44.82
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
       "category": "ristoranti",
       "recurring": false
     },
@@ -2892,7 +3077,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -2906,7 +3091,7 @@
         "partner": 8.99
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "abbonamenti"
@@ -2921,7 +3106,7 @@
         "partner": 25.05
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -2935,7 +3120,7 @@
         "partner": 12.36
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "casa",
       "recurring": false,
       "subcategory": "arredo"
@@ -2950,7 +3135,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -2964,7 +3149,7 @@
         "partner": 34.87
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -2979,7 +3164,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -2993,7 +3178,7 @@
         "partner": 56.13
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -3007,7 +3192,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -3022,7 +3207,7 @@
         "partner": 39.97
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -3036,7 +3221,7 @@
         "partner": 41
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -3050,7 +3235,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "sport"
@@ -3065,7 +3250,7 @@
         "partner": 475
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "affitto"
@@ -3080,7 +3265,7 @@
         "partner": 56.03
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -3094,7 +3279,7 @@
         "partner": 15.59
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -3108,7 +3293,7 @@
         "partner": 42.5
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -3123,7 +3308,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "salute",
       "recurring": false,
       "subcategory": "farmacia"
@@ -3138,7 +3323,7 @@
         "partner": 13.95
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -3153,7 +3338,7 @@
         "partner": 17.21
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "tempolibero",
       "recurring": false,
       "subcategory": "spettacoli"
@@ -3168,7 +3353,7 @@
         "partner": 33.21
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -3182,11 +3367,10 @@
         "partner": 231
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2025-lofoten",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "trasporti",
-      "trip": "2025-lofoten"
+      "subcategory": "trasporti"
     },
     {
       "id": "2025-08-09-0587",
@@ -3198,11 +3382,10 @@
         "partner": 69
       },
       "paidBy": "partner",
-      "source": "vacanze",
+      "tricount": "2025-lofoten",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "trasporti",
-      "trip": "2025-lofoten"
+      "subcategory": "trasporti"
     },
     {
       "id": "2025-08-10-0193",
@@ -3214,7 +3397,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": true
     },
@@ -3228,7 +3411,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -3242,11 +3425,10 @@
         "partner": 390
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2025-lofoten",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "alloggio",
-      "trip": "2025-lofoten"
+      "subcategory": "alloggio"
     },
     {
       "id": "2025-08-10-0590",
@@ -3258,11 +3440,10 @@
         "partner": 197.5
       },
       "paidBy": "partner",
-      "source": "vacanze",
+      "tricount": "2025-lofoten",
       "category": "trasporti",
       "recurring": false,
-      "subcategory": "auto",
-      "trip": "2025-lofoten"
+      "subcategory": "auto"
     },
     {
       "id": "2025-08-11-0591",
@@ -3274,10 +3455,9 @@
         "partner": 72.5
       },
       "paidBy": "partner",
-      "source": "vacanze",
+      "tricount": "2025-lofoten",
       "category": "spesa",
-      "recurring": false,
-      "trip": "2025-lofoten"
+      "recurring": false
     },
     {
       "id": "2025-08-12-0041",
@@ -3289,7 +3469,7 @@
         "partner": 27.32
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -3304,10 +3484,9 @@
         "partner": 59
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2025-lofoten",
       "category": "ristoranti",
-      "recurring": false,
-      "trip": "2025-lofoten"
+      "recurring": false
     },
     {
       "id": "2025-08-13-0593",
@@ -3319,11 +3498,10 @@
         "partner": 95
       },
       "paidBy": "partner",
-      "source": "vacanze",
+      "tricount": "2025-lofoten",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "attivita",
-      "trip": "2025-lofoten"
+      "subcategory": "attivita"
     },
     {
       "id": "2025-08-14-0431",
@@ -3335,7 +3513,7 @@
         "partner": 15.5
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "cibo"
@@ -3350,10 +3528,9 @@
         "partner": 17
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2025-lofoten",
       "category": "ristoranti",
-      "recurring": false,
-      "trip": "2025-lofoten"
+      "recurring": false
     },
     {
       "id": "2025-08-15-0043",
@@ -3365,7 +3542,7 @@
         "partner": 8.99
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "abbonamenti"
@@ -3380,7 +3557,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -3394,11 +3571,10 @@
         "partner": 215
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2025-lofoten",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "alloggio",
-      "trip": "2025-lofoten"
+      "subcategory": "alloggio"
     },
     {
       "id": "2025-08-15-0592",
@@ -3410,10 +3586,9 @@
         "partner": 48
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2025-lofoten",
       "category": "spesa",
-      "recurring": false,
-      "trip": "2025-lofoten"
+      "recurring": false
     },
     {
       "id": "2025-08-16-0594",
@@ -3425,11 +3600,10 @@
         "partner": 78
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2025-lofoten",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "attivita",
-      "trip": "2025-lofoten"
+      "subcategory": "attivita"
     },
     {
       "id": "2025-08-17-0426",
@@ -3441,7 +3615,7 @@
         "partner": 26
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -3455,11 +3629,10 @@
         "partner": 21
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2025-lofoten",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "souvenir",
-      "trip": "2025-lofoten"
+      "subcategory": "souvenir"
     },
     {
       "id": "2025-08-18-0201",
@@ -3471,8 +3644,22 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "abbigliamento",
+      "recurring": false
+    },
+    {
+      "id": "2025-08-19-0630",
+      "date": "2025-08-19",
+      "title": "Pranzo con le colleghe",
+      "amount": 24.67,
+      "shares": {
+        "me": 0,
+        "partner": 24.67
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "tempolibero",
       "recurring": false
     },
     {
@@ -3485,7 +3672,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -3500,7 +3687,7 @@
         "partner": 29.56
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -3514,7 +3701,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": false,
       "subcategory": "musica"
@@ -3529,7 +3716,7 @@
         "partner": 19
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -3543,7 +3730,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -3558,10 +3745,24 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
+    },
+    {
+      "id": "2025-08-25-0629",
+      "date": "2025-08-25",
+      "title": "Pranzo con le colleghe",
+      "amount": 45.15,
+      "shares": {
+        "me": 0,
+        "partner": 45.15
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "altro",
+      "recurring": false
     },
     {
       "id": "2025-08-27-0198",
@@ -3573,7 +3774,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -3587,7 +3788,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -3601,7 +3802,7 @@
         "partner": 37.61
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -3615,7 +3816,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "sport"
@@ -3630,7 +3831,7 @@
         "partner": 475
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "affitto"
@@ -3645,8 +3846,22 @@
         "partner": 39.28
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
+      "recurring": false
+    },
+    {
+      "id": "2025-09-04-0632",
+      "date": "2025-09-04",
+      "title": "Libreria",
+      "amount": 49.54,
+      "shares": {
+        "me": 0,
+        "partner": 49.54
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "altro",
       "recurring": false
     },
     {
@@ -3659,7 +3874,7 @@
         "partner": 42.5
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -3674,7 +3889,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": false
     },
@@ -3688,7 +3903,7 @@
         "partner": 32.06
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -3702,7 +3917,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -3717,7 +3932,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -3731,7 +3946,7 @@
         "partner": 13.95
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -3746,7 +3961,7 @@
         "partner": 19.42
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "cibo"
@@ -3761,7 +3976,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": true
     },
@@ -3775,7 +3990,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -3790,7 +4005,7 @@
         "partner": 27.75
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -3804,7 +4019,7 @@
         "partner": 37.57
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -3818,10 +4033,24 @@
         "partner": 19.76
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "casa",
       "recurring": false,
       "subcategory": "arredo"
+    },
+    {
+      "id": "2025-09-11-0631",
+      "date": "2025-09-11",
+      "title": "Parrucchiere",
+      "amount": 23.61,
+      "shares": {
+        "me": 0,
+        "partner": 23.61
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "ristoranti",
+      "recurring": false
     },
     {
       "id": "2025-09-12-0046",
@@ -3833,7 +4062,7 @@
         "partner": 40.45
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -3848,7 +4077,7 @@
         "partner": 11.74
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "tempolibero",
       "recurring": false,
       "subcategory": "spettacoli"
@@ -3863,7 +4092,7 @@
         "partner": 9.58
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "autostrada"
@@ -3878,7 +4107,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -3892,7 +4121,7 @@
         "partner": 27.22
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -3906,7 +4135,7 @@
         "partner": 8.99
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "abbonamenti"
@@ -3921,7 +4150,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -3936,7 +4165,7 @@
         "partner": 26.66
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "regali",
       "recurring": false
     },
@@ -3950,7 +4179,7 @@
         "partner": 34.25
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -3964,7 +4193,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "salute",
       "recurring": false,
       "subcategory": "visite",
@@ -3984,7 +4213,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -3998,7 +4227,7 @@
         "partner": 24.72
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4012,7 +4241,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4026,7 +4255,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4040,7 +4269,7 @@
         "partner": 50.39
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -4054,7 +4283,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "sport"
@@ -4069,7 +4298,7 @@
         "partner": 17.82
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4083,7 +4312,7 @@
         "partner": 475
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "affitto"
@@ -4098,7 +4327,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4112,7 +4341,7 @@
         "partner": 28.53
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -4126,7 +4355,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4140,7 +4369,7 @@
         "partner": 42.5
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -4155,7 +4384,21 @@
         "partner": 40.25
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
+      "category": "ristoranti",
+      "recurring": false
+    },
+    {
+      "id": "2025-10-06-0635",
+      "date": "2025-10-06",
+      "title": "Parrucchiere",
+      "amount": 54.15,
+      "shares": {
+        "me": 0,
+        "partner": 54.15
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4169,7 +4412,7 @@
         "partner": 13.95
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -4184,7 +4427,7 @@
         "partner": 5.69
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "lettiera"
@@ -4199,7 +4442,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4213,7 +4456,7 @@
         "partner": 48.91
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -4227,7 +4470,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": true
     },
@@ -4241,7 +4484,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": false
     },
@@ -4255,7 +4498,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4269,7 +4512,7 @@
         "partner": 40.49
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -4284,7 +4527,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "abbigliamento",
       "recurring": false
     },
@@ -4298,7 +4541,7 @@
         "partner": 21.68
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "cibo"
@@ -4313,7 +4556,7 @@
         "partner": 14.62
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "parcheggi"
@@ -4328,7 +4571,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "salute",
       "recurring": false,
       "subcategory": "farmacia"
@@ -4343,7 +4586,7 @@
         "partner": 22.97
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "accessori"
@@ -4358,7 +4601,7 @@
         "partner": 8.99
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "abbonamenti"
@@ -4373,7 +4616,7 @@
         "partner": 44.95
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -4387,7 +4630,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4401,7 +4644,7 @@
         "partner": 31.23
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -4416,8 +4659,22 @@
         "partner": 49.75
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
+      "recurring": false
+    },
+    {
+      "id": "2025-10-21-0634",
+      "date": "2025-10-21",
+      "title": "Pranzo con le colleghe",
+      "amount": 36.93,
+      "shares": {
+        "me": 0,
+        "partner": 36.93
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "altro",
       "recurring": false
     },
     {
@@ -4430,10 +4687,24 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
+    },
+    {
+      "id": "2025-10-24-0633",
+      "date": "2025-10-24",
+      "title": "Palestra (lei)",
+      "amount": 48.09,
+      "shares": {
+        "me": 0,
+        "partner": 48.09
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "altro",
+      "recurring": false
     },
     {
       "id": "2025-10-25-0224",
@@ -4445,7 +4716,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4459,7 +4730,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -4474,7 +4745,7 @@
         "partner": 32.68
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4488,7 +4759,7 @@
         "partner": 48.89
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -4502,7 +4773,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "sport"
@@ -4517,7 +4788,7 @@
         "partner": 475
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "affitto"
@@ -4532,7 +4803,7 @@
         "partner": 56.97
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -4546,7 +4817,7 @@
         "partner": 42.5
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -4561,7 +4832,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4575,7 +4846,7 @@
         "partner": 38.36
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4589,7 +4860,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -4604,7 +4875,7 @@
         "partner": 13.95
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -4619,7 +4890,7 @@
         "partner": 20.56
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "casa",
       "recurring": false,
       "subcategory": "arredo"
@@ -4634,7 +4905,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -4649,7 +4920,7 @@
         "partner": 22.51
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4663,7 +4934,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": true
     },
@@ -4677,7 +4948,7 @@
         "partner": 47.33
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -4691,7 +4962,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4705,7 +4976,7 @@
         "partner": 32.93
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -4720,7 +4991,7 @@
         "partner": 42.11
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4734,7 +5005,7 @@
         "partner": 71
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "veterinario",
@@ -4751,7 +5022,7 @@
         "partner": 8.99
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "abbonamenti"
@@ -4766,7 +5037,7 @@
         "partner": 54.15
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -4780,7 +5051,7 @@
         "partner": 21.71
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "cibo"
@@ -4795,7 +5066,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": false
     },
@@ -4809,7 +5080,7 @@
         "partner": 58
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -4823,8 +5094,22 @@
         "partner": 27.94
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
+      "recurring": false
+    },
+    {
+      "id": "2025-11-23-0636",
+      "date": "2025-11-23",
+      "title": "Parrucchiere",
+      "amount": 20.12,
+      "shares": {
+        "me": 0,
+        "partner": 20.12
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "altro",
       "recurring": false
     },
     {
@@ -4837,7 +5122,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -4852,7 +5137,7 @@
         "partner": 5.06
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "lettiera"
@@ -4867,7 +5152,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4881,7 +5166,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "salute",
       "recurring": false,
       "subcategory": "farmacia"
@@ -4896,7 +5181,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4910,7 +5195,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "sport"
@@ -4925,7 +5210,7 @@
         "partner": 47.22
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -4939,7 +5224,7 @@
         "partner": 475
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "affitto"
@@ -4954,7 +5239,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4968,7 +5253,7 @@
         "partner": 42.5
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -4983,7 +5268,7 @@
         "partner": 32.52
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -4997,7 +5282,7 @@
         "partner": 13.95
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -5012,7 +5297,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5026,7 +5311,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": true
     },
@@ -5040,7 +5325,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5054,7 +5339,7 @@
         "partner": 29.33
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -5068,7 +5353,7 @@
         "partner": 65.22
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -5083,7 +5368,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5097,7 +5382,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5111,7 +5396,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": false,
       "subcategory": "musica"
@@ -5126,7 +5411,7 @@
         "partner": 8.99
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "abbonamenti"
@@ -5141,10 +5426,24 @@
         "partner": 19.63
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "tempolibero",
       "recurring": false,
       "subcategory": "spettacoli"
+    },
+    {
+      "id": "2025-12-15-0637",
+      "date": "2025-12-15",
+      "title": "Pranzo con le colleghe",
+      "amount": 45.8,
+      "shares": {
+        "me": 0,
+        "partner": 45.8
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "altro",
+      "recurring": false
     },
     {
       "id": "2025-12-16-0249",
@@ -5156,7 +5455,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5170,7 +5469,7 @@
         "partner": 48.56
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -5184,7 +5483,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -5199,7 +5498,7 @@
         "partner": 20.66
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "cibo"
@@ -5214,7 +5513,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "abbigliamento",
       "recurring": false
     },
@@ -5228,7 +5527,7 @@
         "partner": 24.93
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5242,7 +5541,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": false
     },
@@ -5256,7 +5555,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -5271,7 +5570,7 @@
         "partner": 51.39
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -5285,7 +5584,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5299,7 +5598,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5313,7 +5612,7 @@
         "partner": 27.88
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -5327,7 +5626,7 @@
         "partner": 48.96
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -5341,7 +5640,7 @@
         "partner": 27.1
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5355,7 +5654,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "sport"
@@ -5370,7 +5669,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -5385,7 +5684,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5399,7 +5698,7 @@
         "partner": 475
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "affitto"
@@ -5414,7 +5713,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5428,7 +5727,7 @@
         "partner": 26.13
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -5442,7 +5741,7 @@
         "partner": 42.5
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -5457,7 +5756,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -5472,7 +5771,7 @@
         "partner": 13.95
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -5487,7 +5786,7 @@
         "partner": 38.32
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5501,7 +5800,7 @@
         "partner": 40.56
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -5515,7 +5814,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": true
     },
@@ -5529,7 +5828,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5543,7 +5842,7 @@
         "partner": 78.33
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -5558,7 +5857,7 @@
         "partner": 39.69
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "casa",
       "recurring": false,
       "subcategory": "arredo"
@@ -5573,7 +5872,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5587,7 +5886,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": false,
       "subcategory": "musica"
@@ -5602,7 +5901,7 @@
         "partner": 16.39
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "autostrada"
@@ -5617,7 +5916,7 @@
         "partner": 55.79
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -5631,7 +5930,7 @@
         "partner": 8.99
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "abbonamenti"
@@ -5646,7 +5945,7 @@
         "partner": 15.58
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "cibo"
@@ -5661,7 +5960,7 @@
         "partner": 19.94
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "accessori"
@@ -5676,8 +5975,22 @@
         "partner": 23.66
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
+      "recurring": false
+    },
+    {
+      "id": "2026-01-18-0638",
+      "date": "2026-01-18",
+      "title": "Parrucchiere",
+      "amount": 58.88,
+      "shares": {
+        "me": 0,
+        "partner": 58.88
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "altro",
       "recurring": false
     },
     {
@@ -5690,7 +6003,7 @@
         "partner": 29.36
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -5705,7 +6018,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5719,7 +6032,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5733,7 +6046,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": false
     },
@@ -5747,7 +6060,7 @@
         "partner": 41.22
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -5761,7 +6074,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -5776,7 +6089,7 @@
         "partner": 45.49
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5790,7 +6103,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "salute",
       "recurring": false,
       "subcategory": "occhiali",
@@ -5811,7 +6124,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "sport"
@@ -5826,7 +6139,7 @@
         "partner": 475
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "affitto"
@@ -5841,7 +6154,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5855,7 +6168,7 @@
         "partner": 44.33
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5869,7 +6182,7 @@
         "partner": 42.5
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -5884,8 +6197,22 @@
         "partner": 52.39
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
+      "recurring": false
+    },
+    {
+      "id": "2026-02-05-0639",
+      "date": "2026-02-05",
+      "title": "Pranzo con le colleghe",
+      "amount": 45.28,
+      "shares": {
+        "me": 0,
+        "partner": 45.28
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "altro",
       "recurring": false
     },
     {
@@ -5898,7 +6225,7 @@
         "partner": 13.95
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -5913,7 +6240,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "abbigliamento",
       "recurring": false
     },
@@ -5927,7 +6254,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5941,7 +6268,7 @@
         "partner": 56.69
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -5955,7 +6282,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": true
     },
@@ -5969,7 +6296,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -5983,7 +6310,7 @@
         "partner": 19.09
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "cibo"
@@ -5998,7 +6325,7 @@
         "partner": 59.46
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -6013,7 +6340,7 @@
         "partner": 5.39
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "lettiera"
@@ -6028,7 +6355,7 @@
         "partner": 24.17
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "tempolibero",
       "recurring": false,
       "subcategory": "spettacoli"
@@ -6043,7 +6370,7 @@
         "partner": 8.99
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "abbonamenti"
@@ -6058,7 +6385,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -6073,7 +6400,7 @@
         "partner": 40.87
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -6087,7 +6414,7 @@
         "partner": 24.7
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -6101,7 +6428,7 @@
         "partner": 53.16
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -6115,7 +6442,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -6129,7 +6456,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -6144,7 +6471,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -6158,7 +6485,7 @@
         "partner": 36.59
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -6172,7 +6499,7 @@
         "partner": 26.02
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -6186,7 +6513,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "sport"
@@ -6201,7 +6528,7 @@
         "partner": 475
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "affitto"
@@ -6216,7 +6543,7 @@
         "partner": 42.31
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -6230,10 +6557,24 @@
         "partner": 42.5
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
+    },
+    {
+      "id": "2026-03-07-0640",
+      "date": "2026-03-07",
+      "title": "Palestra (lei)",
+      "amount": 43.06,
+      "shares": {
+        "me": 0,
+        "partner": 43.06
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "ristoranti",
+      "recurring": false
     },
     {
       "id": "2026-03-08-0079",
@@ -6245,7 +6586,7 @@
         "partner": 13.95
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -6260,7 +6601,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -6274,7 +6615,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": true
     },
@@ -6288,7 +6629,7 @@
         "partner": 37.15
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -6302,7 +6643,7 @@
         "partner": 36.83
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -6316,7 +6657,7 @@
         "partner": 74.36
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -6331,7 +6672,7 @@
         "partner": 5.63
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "lettiera"
@@ -6346,11 +6687,10 @@
         "partner": 98
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2026-lisbona",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "trasporti",
-      "trip": "2026-lisbona"
+      "subcategory": "trasporti"
     },
     {
       "id": "2026-03-12-0599",
@@ -6362,11 +6702,10 @@
         "partner": 222.5
       },
       "paidBy": "partner",
-      "source": "vacanze",
+      "tricount": "2026-lisbona",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "alloggio",
-      "trip": "2026-lisbona"
+      "subcategory": "alloggio"
     },
     {
       "id": "2026-03-13-0600",
@@ -6378,10 +6717,9 @@
         "partner": 11
       },
       "paidBy": "partner",
-      "source": "vacanze",
+      "tricount": "2026-lisbona",
       "category": "ristoranti",
-      "recurring": false,
-      "trip": "2026-lisbona"
+      "recurring": false
     },
     {
       "id": "2026-03-13-0601",
@@ -6393,10 +6731,9 @@
         "partner": 38
       },
       "paidBy": "partner",
-      "source": "vacanze",
+      "tricount": "2026-lisbona",
       "category": "ristoranti",
-      "recurring": false,
-      "trip": "2026-lisbona"
+      "recurring": false
     },
     {
       "id": "2026-03-14-0504",
@@ -6408,7 +6745,7 @@
         "partner": 51.5
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -6422,7 +6759,7 @@
         "partner": 26.82
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -6436,11 +6773,10 @@
         "partner": 14
       },
       "paidBy": "partner",
-      "source": "vacanze",
+      "tricount": "2026-lisbona",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "trasporti",
-      "trip": "2026-lisbona"
+      "subcategory": "trasporti"
     },
     {
       "id": "2026-03-14-0603",
@@ -6452,11 +6788,10 @@
         "partner": 12
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2026-lisbona",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "attivita",
-      "trip": "2026-lisbona"
+      "subcategory": "attivita"
     },
     {
       "id": "2026-03-15-0080",
@@ -6468,7 +6803,7 @@
         "partner": 8.99
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "abbonamenti"
@@ -6483,11 +6818,10 @@
         "partner": 34
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2026-lisbona",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "attivita",
-      "trip": "2026-lisbona"
+      "subcategory": "attivita"
     },
     {
       "id": "2026-03-15-0605",
@@ -6499,10 +6833,9 @@
         "partner": 44
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2026-lisbona",
       "category": "ristoranti",
-      "recurring": false,
-      "trip": "2026-lisbona"
+      "recurring": false
     },
     {
       "id": "2026-03-17-0284",
@@ -6514,7 +6847,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -6528,7 +6861,7 @@
         "partner": 16.22
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "cibo"
@@ -6543,7 +6876,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -6558,7 +6891,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": false
     },
@@ -6572,7 +6905,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "salute",
       "recurring": false,
       "subcategory": "farmacia"
@@ -6587,7 +6920,7 @@
         "partner": 37.64
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -6601,7 +6934,7 @@
         "partner": 22.59
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "tempolibero",
       "recurring": false,
       "subcategory": "spettacoli"
@@ -6616,7 +6949,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -6630,7 +6963,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -6644,7 +6977,7 @@
         "partner": 55.62
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -6658,7 +6991,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -6673,7 +7006,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -6687,7 +7020,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "sport"
@@ -6702,7 +7035,7 @@
         "partner": 24.97
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -6716,7 +7049,7 @@
         "partner": 475
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "affitto"
@@ -6731,7 +7064,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -6745,7 +7078,7 @@
         "partner": 42.5
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -6760,7 +7093,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -6775,7 +7108,7 @@
         "partner": 47.75
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -6789,7 +7122,7 @@
         "partner": 27.54
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -6803,7 +7136,21 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
+      "category": "ristoranti",
+      "recurring": false
+    },
+    {
+      "id": "2026-04-06-0641",
+      "date": "2026-04-06",
+      "title": "Palestra (lei)",
+      "amount": 15.91,
+      "shares": {
+        "me": 0,
+        "partner": 15.91
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
       "category": "ristoranti",
       "recurring": false
     },
@@ -6817,7 +7164,7 @@
         "partner": 19.97
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -6831,7 +7178,7 @@
         "partner": 13.95
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -6846,7 +7193,7 @@
         "partner": 40.69
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -6860,8 +7207,22 @@
         "partner": 39.13
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "regali",
+      "recurring": false
+    },
+    {
+      "id": "2026-04-09-0642",
+      "date": "2026-04-09",
+      "title": "Pranzo con le colleghe",
+      "amount": 48.49,
+      "shares": {
+        "me": 0,
+        "partner": 48.49
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "altro",
       "recurring": false
     },
     {
@@ -6874,7 +7235,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": true
     },
@@ -6888,7 +7249,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -6902,7 +7263,7 @@
         "partner": 47.84
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -6916,7 +7277,7 @@
         "partner": 30.65
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -6931,7 +7292,7 @@
         "partner": 37.26
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -6945,7 +7306,7 @@
         "partner": 20.99
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "cibo"
@@ -6960,7 +7321,7 @@
         "partner": 8.99
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "abbonamenti"
@@ -6975,7 +7336,7 @@
         "partner": 47.5
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "veterinario",
@@ -6992,7 +7353,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -7007,7 +7368,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": false
     },
@@ -7021,7 +7382,7 @@
         "partner": 35.53
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -7036,7 +7397,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -7050,7 +7411,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": false,
       "subcategory": "musica"
@@ -7065,7 +7426,7 @@
         "partner": 36.27
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -7079,7 +7440,7 @@
         "partner": 8.93
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "accessori"
@@ -7094,7 +7455,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -7108,7 +7469,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -7123,7 +7484,7 @@
         "partner": 36.6
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -7137,7 +7498,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "sport"
@@ -7152,7 +7513,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -7166,7 +7527,7 @@
         "partner": 475
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "affitto"
@@ -7181,7 +7542,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -7195,7 +7556,7 @@
         "partner": 15.47
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -7209,7 +7570,7 @@
         "partner": 42.5
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -7224,7 +7585,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -7239,7 +7600,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "abbigliamento",
       "recurring": false
     },
@@ -7253,7 +7614,7 @@
         "partner": 49.83
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -7267,7 +7628,7 @@
         "partner": 14.87
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -7281,7 +7642,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "salute",
       "recurring": false,
       "subcategory": "visite",
@@ -7297,7 +7658,7 @@
         "partner": 13.95
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -7312,7 +7673,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -7327,7 +7688,7 @@
         "partner": 32.66
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -7341,7 +7702,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": true
     },
@@ -7355,7 +7716,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -7369,7 +7730,7 @@
         "partner": 18.13
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "cibo"
@@ -7384,7 +7745,7 @@
         "partner": 58.85
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -7398,7 +7759,7 @@
         "partner": 37.86
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -7413,7 +7774,7 @@
         "partner": 12.75
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "accessori"
@@ -7428,7 +7789,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -7442,7 +7803,7 @@
         "partner": 5.11
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "lettiera"
@@ -7457,7 +7818,7 @@
         "partner": 32.58
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -7471,7 +7832,7 @@
         "partner": 28.77
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -7485,7 +7846,7 @@
         "partner": 8.99
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "abbonamenti"
@@ -7500,7 +7861,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -7514,7 +7875,7 @@
         "partner": 9.7
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "tempolibero",
       "recurring": false,
       "subcategory": "spettacoli"
@@ -7529,8 +7890,36 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
+      "recurring": false
+    },
+    {
+      "id": "2026-05-20-0643",
+      "date": "2026-05-20",
+      "title": "Libreria",
+      "amount": 42.39,
+      "shares": {
+        "me": 0,
+        "partner": 42.39
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "altro",
+      "recurring": false
+    },
+    {
+      "id": "2026-05-22-0644",
+      "date": "2026-05-22",
+      "title": "Pranzo con le colleghe",
+      "amount": 15.2,
+      "shares": {
+        "me": 0,
+        "partner": 15.2
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "tempolibero",
       "recurring": false
     },
     {
@@ -7543,7 +7932,7 @@
         "partner": 35.03
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -7557,7 +7946,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -7571,7 +7960,7 @@
         "partner": 47.28
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -7585,7 +7974,7 @@
         "partner": 37.03
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -7599,7 +7988,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -7613,7 +8002,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "sport"
@@ -7628,7 +8017,7 @@
         "partner": 475
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "affitto"
@@ -7643,7 +8032,7 @@
         "partner": 56.23
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -7657,7 +8046,7 @@
         "partner": 42.5
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -7672,7 +8061,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -7687,8 +8076,22 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
+      "recurring": false
+    },
+    {
+      "id": "2026-06-07-0646",
+      "date": "2026-06-07",
+      "title": "Palestra (lei)",
+      "amount": 12.47,
+      "shares": {
+        "me": 0,
+        "partner": 12.47
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "tempolibero",
       "recurring": false
     },
     {
@@ -7701,7 +8104,7 @@
         "partner": 13.95
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -7716,7 +8119,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -7731,7 +8134,7 @@
         "partner": 24.95
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -7745,7 +8148,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": true
     },
@@ -7759,7 +8162,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -7773,7 +8176,7 @@
         "partner": 41.3
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -7787,7 +8190,7 @@
         "partner": 40.41
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -7802,7 +8205,7 @@
         "partner": 14.38
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "parcheggi"
@@ -7817,8 +8220,22 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
+      "recurring": false
+    },
+    {
+      "id": "2026-06-13-0645",
+      "date": "2026-06-13",
+      "title": "Pranzo con le colleghe",
+      "amount": 14.84,
+      "shares": {
+        "me": 0,
+        "partner": 14.84
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "altro",
       "recurring": false
     },
     {
@@ -7831,7 +8248,7 @@
         "partner": 8.99
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "abbonamenti"
@@ -7846,7 +8263,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -7860,7 +8277,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -7874,7 +8291,7 @@
         "partner": 57.43
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -7888,7 +8305,7 @@
         "partner": 34.46
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -7902,7 +8319,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": false,
       "subcategory": "musica"
@@ -7917,7 +8334,7 @@
         "partner": 21.67
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "cibo"
@@ -7932,7 +8349,7 @@
         "partner": 19.53
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "tempolibero",
       "recurring": false,
       "subcategory": "spettacoli"
@@ -7947,7 +8364,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "salute",
       "recurring": false,
       "subcategory": "visite"
@@ -7962,7 +8379,7 @@
         "partner": 31.75
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -7976,7 +8393,7 @@
         "partner": 14.71
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -7990,7 +8407,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -8005,7 +8422,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -8019,7 +8436,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -8033,7 +8450,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -8047,7 +8464,7 @@
         "partner": 31.78
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -8061,7 +8478,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -8076,7 +8493,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "sport"
@@ -8091,7 +8508,7 @@
         "partner": 21.11
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -8105,7 +8522,7 @@
         "partner": 475
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "affitto"
@@ -8120,7 +8537,7 @@
         "partner": 27.53
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -8134,11 +8551,10 @@
         "partner": 89
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2026-dolomiti",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "trasporti",
-      "trip": "2026-dolomiti"
+      "subcategory": "trasporti"
     },
     {
       "id": "2026-07-04-0607",
@@ -8150,11 +8566,10 @@
         "partner": 455
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2026-dolomiti",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "alloggio",
-      "trip": "2026-dolomiti"
+      "subcategory": "alloggio"
     },
     {
       "id": "2026-07-04-0610",
@@ -8166,10 +8581,9 @@
         "partner": 66
       },
       "paidBy": "partner",
-      "source": "vacanze",
+      "tricount": "2026-dolomiti",
       "category": "spesa",
-      "recurring": false,
-      "trip": "2026-dolomiti"
+      "recurring": false
     },
     {
       "id": "2026-07-05-0098",
@@ -8181,7 +8595,7 @@
         "partner": 42.5
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -8196,7 +8610,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -8211,7 +8625,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -8225,11 +8639,10 @@
         "partner": 62
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2026-dolomiti",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "attivita",
-      "trip": "2026-dolomiti"
+      "subcategory": "attivita"
     },
     {
       "id": "2026-07-05-0609",
@@ -8241,10 +8654,9 @@
         "partner": 31
       },
       "paidBy": "partner",
-      "source": "vacanze",
+      "tricount": "2026-dolomiti",
       "category": "ristoranti",
-      "recurring": false,
-      "trip": "2026-dolomiti"
+      "recurring": false
     },
     {
       "id": "2026-07-06-0556",
@@ -8256,7 +8668,7 @@
         "partner": 16.98
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "cibo"
@@ -8271,7 +8683,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -8285,10 +8697,23 @@
         "partner": 39
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2026-dolomiti",
       "category": "ristoranti",
-      "recurring": false,
-      "trip": "2026-dolomiti"
+      "recurring": false
+    },
+    {
+      "id": "2026-07-07-0647",
+      "date": "2026-07-07",
+      "title": "Parrucchiere",
+      "amount": 27.9,
+      "shares": {
+        "me": 0,
+        "partner": 27.9
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "altro",
+      "recurring": false
     },
     {
       "id": "2026-07-08-0100",
@@ -8300,7 +8725,7 @@
         "partner": 13.95
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -8315,7 +8740,7 @@
         "partner": 51.07
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -8329,11 +8754,10 @@
         "partner": 48
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2026-dolomiti",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "attivita",
-      "trip": "2026-dolomiti"
+      "subcategory": "attivita"
     },
     {
       "id": "2026-07-09-0558",
@@ -8345,7 +8769,7 @@
         "partner": 7.29
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "accessori"
@@ -8360,11 +8784,10 @@
         "partner": 29
       },
       "paidBy": "me",
-      "source": "vacanze",
+      "tricount": "2026-dolomiti",
       "category": "viaggi",
       "recurring": false,
-      "subcategory": "attivita",
-      "trip": "2026-dolomiti"
+      "subcategory": "attivita"
     },
     {
       "id": "2026-07-10-0328",
@@ -8376,7 +8799,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": true
     },
@@ -8390,7 +8813,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -8404,7 +8827,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -8418,7 +8841,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -8432,7 +8855,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -8446,10 +8869,9 @@
         "partner": 27
       },
       "paidBy": "partner",
-      "source": "vacanze",
+      "tricount": "2026-dolomiti",
       "category": "ristoranti",
-      "recurring": false,
-      "trip": "2026-dolomiti"
+      "recurring": false
     },
     {
       "id": "2026-07-12-0099",
@@ -8461,7 +8883,7 @@
         "partner": 39.55
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -8476,7 +8898,7 @@
         "partner": 45.17
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -8490,7 +8912,7 @@
         "partner": 8.99
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "abbonamenti"
@@ -8505,7 +8927,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -8520,7 +8942,7 @@
         "partner": 30.92
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -8535,7 +8957,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": false
     },
@@ -8549,7 +8971,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": false,
       "subcategory": "musica"
@@ -8564,7 +8986,7 @@
         "partner": 25.71
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -8578,7 +9000,7 @@
         "partner": 33.51
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -8592,7 +9014,7 @@
         "partner": 7.37
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "lettiera"
@@ -8607,7 +9029,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -8621,7 +9043,7 @@
         "partner": 46.24
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -8635,7 +9057,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "mezzi",
       "recurring": false,
       "notes": "Da chiedere al commercialista: l’abbonamento ai mezzi è detraibile."
@@ -8650,7 +9072,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "sport"
@@ -8665,7 +9087,7 @@
         "partner": 24.85
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -8679,7 +9101,7 @@
         "partner": 475
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "affitto"
@@ -8694,7 +9116,7 @@
         "partner": 42.5
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -8709,7 +9131,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "trasporti",
       "recurring": false,
       "subcategory": "carburante"
@@ -8724,7 +9146,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -8738,7 +9160,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -8752,7 +9174,7 @@
         "partner": 13.95
       },
       "paidBy": "partner",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -8767,8 +9189,22 @@
         "partner": 46.86
       },
       "paidBy": "partner",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
+      "recurring": false
+    },
+    {
+      "id": "2026-08-08-0648",
+      "date": "2026-08-08",
+      "title": "Parrucchiere",
+      "amount": 26.75,
+      "shares": {
+        "me": 0,
+        "partner": 26.75
+      },
+      "paidBy": "partner",
+      "tricount": "personali-federica",
+      "category": "tempolibero",
       "recurring": false
     },
     {
@@ -8781,7 +9217,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": false
     },
@@ -8795,7 +9231,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "altro",
       "recurring": true
     },
@@ -8809,7 +9245,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -8823,7 +9259,7 @@
         "partner": 41.25
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "casa",
       "recurring": true,
       "subcategory": "bollette"
@@ -8838,7 +9274,7 @@
         "partner": 19.86
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "gatto",
       "recurring": false,
       "subcategory": "cibo"
@@ -8853,7 +9289,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -8867,7 +9303,7 @@
         "partner": 8.99
       },
       "paidBy": "me",
-      "source": "fisse",
+      "tricount": "fisse",
       "category": "tempolibero",
       "recurring": true,
       "subcategory": "abbonamenti"
@@ -8882,7 +9318,7 @@
         "partner": 0
       },
       "paidBy": "me",
-      "source": "personali",
+      "tricount": "personali-alessio",
       "category": "ristoranti",
       "recurring": false
     },
@@ -8896,7 +9332,7 @@
         "partner": 34.35
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "spesa",
       "recurring": false
     },
@@ -8910,7 +9346,7 @@
         "partner": 22.42
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -8924,7 +9360,7 @@
         "partner": 24.44
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     },
@@ -8938,69 +9374,127 @@
         "partner": 29.55
       },
       "paidBy": "me",
-      "source": "condivise",
+      "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
     }
   ],
-  "trips": [
+  "tricounts": [
+    {
+      "id": "condivise",
+      "name": "Spese condivise",
+      "emoji": "🧾",
+      "members": [
+        "me",
+        "partner"
+      ]
+    },
+    {
+      "id": "personali-alessio",
+      "name": "Le mie spese",
+      "emoji": "🙋",
+      "members": [
+        "me"
+      ]
+    },
+    {
+      "id": "personali-federica",
+      "name": "Le sue spese",
+      "emoji": "🙆",
+      "members": [
+        "partner"
+      ]
+    },
+    {
+      "id": "fisse",
+      "name": "Casa",
+      "emoji": "🏡",
+      "members": [
+        "me",
+        "partner"
+      ]
+    },
     {
       "id": "2025-sicilia",
       "emoji": "🍋",
       "name": "Sicilia in macchina",
-      "place": "Sicilia",
-      "country": "Italia",
-      "year": 2025,
-      "start": "2025-05-24",
-      "end": "2025-06-01",
-      "coords": {
-        "lat": 37.6,
-        "lon": 14,
-        "approx": true
+      "members": [
+        "me",
+        "partner"
+      ],
+      "trip": {
+        "place": "Sicilia",
+        "country": "Italia",
+        "year": 2025,
+        "start": "2025-05-24",
+        "end": "2025-06-01",
+        "coords": {
+          "lat": 37.6,
+          "lon": 14,
+          "approx": true
+        }
       }
     },
     {
       "id": "2025-lofoten",
       "emoji": "🇳🇴",
       "name": "Isole Lofoten",
-      "place": "Lofoten",
-      "country": "Norvegia",
-      "year": 2025,
-      "start": "2025-08-09",
-      "end": "2025-08-18",
-      "coords": {
-        "lat": 68.2,
-        "lon": 14,
-        "approx": true
+      "members": [
+        "me",
+        "partner"
+      ],
+      "trip": {
+        "place": "Lofoten",
+        "country": "Norvegia",
+        "year": 2025,
+        "start": "2025-08-09",
+        "end": "2025-08-18",
+        "coords": {
+          "lat": 68.2,
+          "lon": 14,
+          "approx": true
+        }
       }
     },
     {
       "id": "2026-lisbona",
       "emoji": "🇵🇹",
       "name": "Weekend a Lisbona",
-      "place": "Lisbona",
-      "country": "Portogallo",
-      "year": 2026,
-      "start": "2026-03-12",
-      "end": "2026-03-16",
-      "coords": {
-        "lat": 38.72,
-        "lon": -9.14
+      "members": [
+        "me",
+        "partner"
+      ],
+      "trip": {
+        "place": "Lisbona",
+        "country": "Portogallo",
+        "year": 2026,
+        "start": "2026-03-12",
+        "end": "2026-03-16",
+        "coords": {
+          "lat": 38.72,
+          "lon": -9.14
+        }
       }
     },
     {
       "id": "2026-dolomiti",
       "emoji": "⛰️",
       "name": "Dolomiti",
-      "place": "Dolomiti",
-      "country": "Italia",
-      "year": 2026,
-      "start": "2026-07-04",
-      "end": "2026-07-11",
-      "coords": {
-        "lat": 46.4,
-        "lon": 11.8,
-        "approx": true
+      "members": [
+        "me",
+        "partner"
+      ],
+      "trip": {
+        "place": "Dolomiti",
+        "country": "Italia",
+        "year": 2026,
+        "start": "2026-07-04",
+        "end": "2026-07-11",
+        "coords": {
+          "lat": 46.4,
+          "lon": 11.8,
+          "approx": true
+        }
       }
     }
   ],

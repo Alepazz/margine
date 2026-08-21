@@ -19,8 +19,7 @@ import {
   type MonthKey,
 } from './dates'
 import { round2, sumBy, toCents } from './money'
-import { ledgerKeyOf } from './expense-rules'
-import type { Expense, PersonId, Settlement, Source, Trip } from './types'
+import type { Expense, PersonId, Settlement, Tricount, Trip } from './types'
 
 export interface ViewOptions {
   person: PersonId
@@ -32,6 +31,15 @@ export interface ViewOptions {
 }
 
 export const DEFAULT_VIEW: ViewOptions = { person: 'me', includeVacations: false }
+
+/**
+ * Gli id dei tricount che sono viaggi: è l'insieme con cui «vacanze incluse»
+ * decide. Prima bastava `source === 'vacanze'`; ora la vacanza è una proprietà
+ * del tricount, quindi il filtro ha bisogno di sapere quali lo sono. → ADR-0037
+ */
+export function vacationIdsOf(tricounts: readonly Tricount[]): Set<string> {
+  return new Set(tricounts.filter((t) => t.trip).map((t) => t.id))
+}
 
 export function shareOf(expense: Expense, person: PersonId): number {
   return expense.shares[person] ?? 0
@@ -75,11 +83,15 @@ export function welfareShare(expense: Expense): number {
  * confronti. Le pagine che raccontano un fatto invece di misurare un budget — Spese,
  * Vacanze, 730, Gatto — hanno il loro perimetro e non passano da qui.
  */
-export function visibleFor(expenses: readonly Expense[], view: ViewOptions): Expense[] {
+export function visibleFor(
+  expenses: readonly Expense[],
+  view: ViewOptions,
+  vacationIds: ReadonlySet<string>,
+): Expense[] {
   return expenses.filter(
     (e) =>
       toCents(shareOf(e, view.person)) > 0 &&
-      (view.includeVacations || e.source !== 'vacanze') &&
+      (view.includeVacations || !vacationIds.has(e.tricount)) &&
       !fundedByWelfare(e, view.person),
   )
 }
@@ -732,17 +744,17 @@ export function catStats(
  */
 
 /** Il tricount di casa così com'è, telefonia e auto comprese. */
-export function houseLedger(allExpenses: readonly Expense[], houseSource: Source): Expense[] {
-  return allExpenses.filter((e) => e.source === houseSource)
+export function houseLedger(allExpenses: readonly Expense[], houseTricount: string): Expense[] {
+  return allExpenses.filter((e) => e.tricount === houseTricount)
 }
 
 /** Spese di casa registrate altrove: stessa categoria, tricount diverso. */
 export function houseOutside(
   allExpenses: readonly Expense[],
-  houseSource: Source,
+  houseTricount: string,
   houseCategory: string,
 ): Expense[] {
-  return allExpenses.filter((e) => e.category === houseCategory && e.source !== houseSource)
+  return allExpenses.filter((e) => e.category === houseCategory && e.tricount !== houseTricount)
 }
 
 /*
@@ -909,7 +921,7 @@ export function coupleBalance(
   for (const key of Object.keys(opts.groups ?? {})) bucketOf(key)
 
   for (const expense of allExpenses) {
-    const key = ledgerKeyOf(expense)
+    const key = expense.tricount
     const bucket = bucketOf(key)
     const owed = owedOf(expense)
     if (expense.paidBy !== 'others' && toCents(owed) !== 0) bucket.history += 1
@@ -1037,7 +1049,7 @@ export function tripStats(
 ): TripStats[] {
   return trips
     .map((trip) => {
-      const scope = allExpenses.filter((e) => e.trip === trip.id)
+      const scope = allExpenses.filter((e) => e.tricount === trip.id)
       const days = daysInclusive(trip.start, trip.end)
       const share = totalShare(scope, person)
       const total = totalAmount(scope)
@@ -1175,7 +1187,7 @@ export interface ExpenseFilter {
   query: string
   month: MonthKey | 'all'
   category: string | 'all'
-  source: Source | 'all'
+  tricount: string | 'all'
   paidBy: PersonId | 'all'
   tax730Only: boolean
 }
@@ -1184,7 +1196,7 @@ export const EMPTY_FILTER: ExpenseFilter = {
   query: '',
   month: 'all',
   category: 'all',
-  source: 'all',
+  tricount: 'all',
   paidBy: 'all',
   tax730Only: false,
 }
@@ -1196,7 +1208,7 @@ export function applyFilter(scope: readonly Expense[], filter: ExpenseFilter): E
   return scope.filter((e) => {
     if (filter.month !== 'all' && monthKeyOf(e.date) !== filter.month) return false
     if (filter.category !== 'all' && e.category !== filter.category) return false
-    if (filter.source !== 'all' && e.source !== filter.source) return false
+    if (filter.tricount !== 'all' && e.tricount !== filter.tricount) return false
     if (filter.paidBy !== 'all' && e.paidBy !== filter.paidBy) return false
     if (filter.tax730Only && e.tax730 !== true) return false
     if (q.length > 0) {

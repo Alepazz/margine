@@ -40,13 +40,13 @@ export function Casa(): ReactNode {
   const person = view.person
   const [selected, setSelected] = useState<Expense | null>(null)
 
-  const { houseSource, houseCategory } = config
+  const { houseTricount, houseCategory } = config
   const expenses = dataset.expenses
 
-  const ledger = useMemo(() => houseLedger(expenses, houseSource), [expenses, houseSource])
+  const ledger = useMemo(() => houseLedger(expenses, houseTricount), [expenses, houseTricount])
   const outside = useMemo(
-    () => houseOutside(expenses, houseSource, houseCategory),
-    [expenses, houseCategory, houseSource],
+    () => houseOutside(expenses, houseTricount, houseCategory),
+    [expenses, houseCategory, houseTricount],
   )
 
   const stats = useMemo(() => subsetStats(ledger, person), [ledger, person])
@@ -79,7 +79,7 @@ export function Casa(): ReactNode {
   )
   const average = useMemo(() => averageMonthly(stats.series), [stats.series])
 
-  const ledgerLabel = lookup.sourceLabel(houseSource)
+  const ledgerLabel = lookup.tricountLabel(houseTricount)
   const houseCategoryLabel = lookup.label(houseCategory)
 
   if (stats.count === 0 && outsideStats.count === 0) {

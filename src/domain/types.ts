@@ -7,68 +7,130 @@
  * lavora in centesimi per non accumulare errori in virgola mobile.
  */
 
-/** Le due persone. `partner` non ha spese personali finché non deciderà di importarle. */
+/** Le due persone. Sono le uniche che un tricount può avere come membri, oggi. */
 export type PersonId = 'me' | 'partner'
 
 export const PERSON_IDS: readonly PersonId[] = ['me', 'partner'] as const
 
 /**
- * Le quattro origini. «vacanze» ne raccoglie diverse: ogni viaggio ha il suo
- * tricount, e il viaggio a cui appartiene sta in `Expense.trip`.
+ * La parte di viaggio di un tricount di vacanza: date, luogo, e il puntino sul
+ * mappamondo. Sta **dentro** il tricount perché su Tricount ogni vacanza è un
+ * gruppo come gli altri: non esiste «l'origine vacanze» con dentro i viaggi,
+ * esistono tricount che sono viaggi. → ADR-0037
  */
-export type Source = 'fisse' | 'personali' | 'condivise' | 'vacanze'
-
-export const SOURCES: readonly Source[] = ['fisse', 'personali', 'condivise', 'vacanze'] as const
-
-/**
- * Nomi di ripiego, generici di proposito: i nomi **veri** dei tricount stanno in
- * `config.sourceLabels`, che vive nei dati e non nel codice. I nomi che due
- * persone danno ai propri tricount sono roba loro, il repo è pubblico e i dati
- * no: qui ci sta la descrizione del tipo di tricount, non il suo nome. → ADR-0026
- */
-export const SOURCE_LABELS: Record<Source, string> = {
-  fisse: 'Spese fisse condivise',
-  personali: 'Spese personali',
-  condivise: 'Altre spese condivise',
-  vacanze: 'Vacanze',
+export interface TripInfo {
+  place: string
+  country?: string
+  year: number
+  /** ISO `YYYY-MM-DD`, incluso. */
+  start: string
+  /** ISO `YYYY-MM-DD`, incluso. */
+  end: string
+  /**
+   * Dove finisce il puntino sul mappamondo. Facoltativa: un viaggio senza
+   * coordinate esiste come tutti gli altri, semplicemente compare nell'elenco
+   * sotto il globo invece che sopra.
+   *
+   * `approx: true` quando il posto è una regione o un paese e non un luogo —
+   * «Germania» e «Campania e Calabria» non hanno un punto, quindi ne è stato
+   * scelto uno centrale. Il mappamondo lo dice, invece di far credere a una
+   * precisione che non c'è. → ADR-0020
+   */
+  coords?: { lat: number; lon: number; approx?: boolean }
 }
 
 /**
- * Come si chiama un tricount **da lui**: nome ed emoji, come li vedi in cima
- * alla schermata di Tricount. L'emoji fa parte dell'identità, non è decorazione:
- * in un menù di otto voci è quello che riconosci prima del testo.
+ * Un tricount: il registro in cui una spesa vive, **con i suoi membri**.
+ *
+ * «Personale» non è più un caso speciale del modello: è un tricount con un
+ * membro solo, e da questo discende tutto — le sue spese sono al 100% di quel
+ * membro, non compare nei menù dell'altra persona, e non ha mai un saldo.
+ * → ADR-0037
+ *
+ * Nome ed emoji sono **dati**, non codice: vivono nel file cifrato, perché il
+ * repo è pubblico e i nomi che due persone danno ai propri tricount sono roba
+ * loro. → ADR-0026
  */
-export interface SourceMeta {
+export interface Tricount {
+  id: string
   name: string
   emoji?: string
+  /** Chi vi partecipa. Mai vuoto; oggi le persone possibili sono due. */
+  members: PersonId[]
+  /**
+   * Vero quando il tricount è chiuso: smette di comparire fra quelli in cui si
+   * può inserire una spesa.
+   *
+   * **Non** significa «saldato»: quello è il punto di partenza in
+   * `config.balance.groups`. Una vacanza può essere finita e avere ancora un
+   * debito aperto — deve restare nel saldo e sparire dal menù, e con un campo
+   * solo una delle due cose sarebbe sbagliata. → ADR-0027
+   */
+  closed?: boolean
+  /** Presente = questo tricount è una vacanza. */
+  trip?: TripInfo
 }
 
-/** I tricount così come li conosce chi li usa. Vive nei dati: il repo è pubblico. */
-export type SourceMap = Partial<Record<Source, SourceMeta>>
+/** Vero se la persona partecipa al tricount: è il filtro dei menù di inserimento. */
+export function isMember(tricount: Tricount, person: PersonId): boolean {
+  return tricount.members.includes(person)
+}
 
 /**
- * Il nome vero di un tricount, col generico come ripiego. **Senza emoji**: lo
- * vogliono così l'export CSV e i posti dove il nome finisce in mezzo a una frase.
+ * L'unico membro di un tricount, se ne ha uno solo.
  *
- * Sta qui, accanto alle etichette che rimpiazza, e non nel `lookup` delle
- * categorie: i nomi dei tricount non hanno niente a che fare coi colori dei
- * grafici, e chi ne ha bisogno non deve costruirsi un tema per averlo.
+ * È la definizione di «tricount personale», e sta in una funzione perché da lei
+ * discendono tre comportamenti in punti distanti — il modulo non offre la
+ * divisione, lo spostamento rifà le quote, l'import le assume tutte di quel
+ * membro. Scritta a mano in tre posti, il giorno che i membri possibili
+ * diventano tre uno dei tre resterebbe indietro.
  */
-export function sourceLabelOf(sources: SourceMap | undefined, source: Source): string {
-  return sources?.[source]?.name ?? SOURCE_LABELS[source]
+export function soleMemberOf(tricount: Tricount | undefined): PersonId | undefined {
+  return tricount?.members.length === 1 ? tricount.members[0] : undefined
 }
 
 /**
- * Emoji e nome di qualcosa che ha un'identità: un tricount, un viaggio, una
- * persona. Senza emoji è il nome, senza spazi appesi.
+ * Emoji e nome di qualcosa che ha un'identità: un tricount, una persona.
+ * Senza emoji è il nome, senza spazi appesi.
  */
 export function titleOf(thing: { name: string; emoji?: string }): string {
   return thing.emoji ? `${thing.emoji} ${thing.name}` : thing.name
 }
 
 /** Emoji e nome di un tricount, per i menù e i titoli: «🏡 Spese casa». */
-export function sourceTitleOf(sources: SourceMap | undefined, source: Source): string {
-  return titleOf({ name: sourceLabelOf(sources, source), emoji: sources?.[source]?.emoji })
+export function tricountTitleOf(tricount: { name: string; emoji?: string }): string {
+  return titleOf(tricount)
+}
+
+/**
+ * Un viaggio come lo vogliono la pagina Vacanze, il mappamondo e le
+ * statistiche: il tricount e la sua parte di viaggio **appiattiti** in un
+ * oggetto solo. È una vista di lettura — il dato vero è il `Tricount` — e
+ * esiste perché `trip.start` si legge meglio di `tricount.trip.start` in
+ * trenta punti che non hanno bisogno di sapere dei membri.
+ */
+export interface Trip extends TripInfo {
+  id: string
+  name: string
+  emoji?: string
+  closed?: boolean
+}
+
+/** I tricount che sono viaggi, appiattiti. L'ordine è quello dell'elenco. */
+export function tripsOf(tricounts: readonly Tricount[]): Trip[] {
+  return tricounts.flatMap((tricount) =>
+    tricount.trip
+      ? [
+          {
+            id: tricount.id,
+            name: tricount.name,
+            ...(tricount.emoji !== undefined ? { emoji: tricount.emoji } : {}),
+            ...(tricount.closed !== undefined ? { closed: tricount.closed } : {}),
+            ...tricount.trip,
+          },
+        ]
+      : [],
+  )
 }
 
 /** Emoji e nome di un viaggio. */
@@ -108,13 +170,17 @@ export interface Expense {
   shares: Shares
   /** Chi ha materialmente pagato. */
   paidBy: Payer
-  source: Source
+  /**
+   * L'id del tricount in cui la spesa vive. È **la** chiave: la stessa con cui
+   * il saldo raggruppa (`balance.groups`) e con cui i menù scelgono. Prima
+   * erano due campi — un'«origine» più il viaggio — e ogni spostamento doveva
+   * tenerli d'accordo a mano. → ADR-0037
+   */
+  tricount: string
   category: string
   subcategory?: string
   /** true per le spese ricorrenti/incomprimibili (affitto, bollette, abbonamenti). */
   recurring: boolean
-  /** Id del viaggio, solo per `source === 'vacanze'`. */
-  trip?: string
 
   // ── Campi scritti dall'app (annotazioni) ──
   tax730?: boolean
@@ -130,41 +196,6 @@ export interface Expense {
    * quella la rimborsa in contanti. → ADR-0014
    */
   welfare?: boolean
-}
-
-export interface Trip {
-  id: string
-  name: string
-  place: string
-  country?: string
-  year: number
-  /** ISO `YYYY-MM-DD`, incluso. */
-  start: string
-  /** ISO `YYYY-MM-DD`, incluso. */
-  end: string
-  /**
-   * Dove finisce il puntino sul mappamondo. Facoltativa: un viaggio senza
-   * coordinate esiste come tutti gli altri, semplicemente compare nell'elenco
-   * sotto il globo invece che sopra.
-   *
-   * `approx: true` quando il posto è una regione o un paese e non un luogo —
-   * «Germania» e «Campania e Calabria» non hanno un punto, quindi ne è stato
-   * scelto uno centrale. Il mappamondo lo dice, invece di far credere a una
-   * precisione che non c'è. → ADR-0020
-   */
-  coords?: { lat: number; lon: number; approx?: boolean }
-  /** L'emoji del tricount del viaggio: 🇫🇷 per Parigi, 🏝️ per Creta. */
-  emoji?: string
-  /**
-   * Vero quando il viaggio è finito: smette di comparire fra i tricount in cui
-   * si può inserire una spesa.
-   *
-   * **Non** significa «saldato»: quello è il punto di partenza in
-   * `config.balance.groups`. Una vacanza può essere finita e avere ancora un
-   * debito aperto — deve restare nel saldo e sparire dal menù, e con un campo
-   * solo una delle due cose sarebbe sbagliata. → ADR-0027
-   */
-  closed?: boolean
 }
 
 export interface Subcategory {
@@ -237,12 +268,6 @@ export interface AppConfig {
   people: Record<PersonId, Person>
   income: { me: IncomeProfile; partner: IncomeProfile | null }
   /**
-   * I tricount come li vedi su Tricount: nome ed emoji. Stanno nei dati e non
-   * nel codice — il repo è pubblico, i dati no. Quello che manca ricade su
-   * `SOURCE_LABELS`, che è generico di proposito. → ADR-0026
-   */
-  sources?: SourceMap
-  /**
    * Le categorie sono **dato scrivibile dall'app**: si creano, si rinominano e
    * si cancellano da Impostazioni, e l'app riscrive `config.json.enc`. Prima
    * erano una copia di `scripts/lib/taxonomy.mjs`, che da ora è solo il valore
@@ -259,7 +284,7 @@ export interface AppConfig {
    * tricount finiscono anche telefonia e assicurazione auto, e spese di casa
    * vere finiscono nell'altro tricount condiviso.
    */
-  houseSource: Source
+  houseTricount: string
   houseCategory: string
   /**
    * Da dove parte il saldo fra le due persone. Calcolarlo da tutta la storia
@@ -284,10 +309,9 @@ export interface AppConfig {
     opening: number
     note?: string
     /**
-     * Punto di partenza per tricount. La chiave è `fisse` | `condivise` |
-     * `personali` | `vacanze/<idViaggio>`. Un tricount che non compare qui non
-     * ha un numero confrontabile con Tricount, e la pagina lo dichiara invece di
-     * mostrare uno zero che sembra un fatto.
+     * Punto di partenza per tricount. La chiave è **l'id del tricount**. Un
+     * tricount che non compare qui non ha un numero confrontabile con Tricount,
+     * e la pagina lo dichiara invece di mostrare uno zero che sembra un fatto.
      */
     groups?: Record<string, { since: string; opening: number; note?: string }>
   }
@@ -327,7 +351,8 @@ export interface Dataset {
   /** ISO datetime dell'ultimo aggiornamento. */
   updatedAt: string
   expenses: Expense[]
-  trips: Trip[]
+  /** I tricount, viaggi compresi: sono loro a dire chi partecipa a cosa. */
+  tricounts: Tricount[]
   /**
    * I rimborsi registrati. Il file cifrato scritto prima di ADR-0019 non ha
    * questo campo: viene normalizzato a lista vuota appena i dati entrano
