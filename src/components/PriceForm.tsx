@@ -9,9 +9,16 @@
  * Prodotto e supermercato sono testo libero con i nomi già usati proposti sotto
  * il campo. Riusare un suggerimento non è una comodità: è ciò che tiene unita la
  * serie di quel prodotto, perché il confronto raggruppa per nome.
+ *
+ * **Il modulo non si chiude quando salva.** Registrare i prezzi è una sessione,
+ * non un gesto singolo: si fa il giro degli scaffali con cinque prodotti in
+ * mente, e supermercato e data sono gli stessi per tutti. Dopo un salvataggio
+ * restano quelli e si azzera il resto, col fuoco di nuovo sul prodotto — cinque
+ * prodotti passano da cinque moduli interi a un supermercato più cinque coppie
+ * nome/prezzo. Chiudere lo dice chi ha finito, col suo pulsante.
  */
 
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode, type Ref } from 'react'
 
 import { todayIso } from '../domain/dates'
 import { newPriceId } from '../domain/ids'
@@ -28,6 +35,7 @@ function NameWithSuggestions({
   value,
   known,
   onChange,
+  inputRef,
 }: {
   id: string
   label: string
@@ -36,6 +44,7 @@ function NameWithSuggestions({
   /** Tutti i valori già scritti, in ordine di inserimento. */
   known: readonly string[]
   onChange: (value: string) => void
+  inputRef?: Ref<HTMLInputElement>
 }): ReactNode {
   /* Non si propone quello che è già scritto per intero: sarebbe un pulsante che
      non fa niente. */
@@ -53,6 +62,7 @@ function NameWithSuggestions({
         autoComplete="off"
         placeholder={placeholder}
         value={value}
+        ref={inputRef}
         onChange={(event) => onChange(event.target.value)}
       />
       {options.length > 0 ? (
@@ -76,13 +86,15 @@ function NameWithSuggestions({
 export function PriceForm({
   prices,
   onSave,
-  onCancel,
+  onDone,
   onProblem,
 }: {
   /** Le rilevazioni già registrate: da qui vengono i suggerimenti e l'unità. */
   prices: readonly PriceEntry[]
+  /** Chiamata a ogni rilevazione salvata: il modulo resta aperto per la prossima. */
   onSave: (entry: PriceEntry) => void
-  onCancel: () => void
+  /** Ha finito il giro: chiude. */
+  onDone: () => void
   /** I problemi li mostra chi chiama, dove ha senso nella sua pagina. */
   onProblem: (message: string) => void
 }): ReactNode {
@@ -92,6 +104,9 @@ export function PriceForm({
   const [date, setDate] = useState(todayIso())
   const [note, setNote] = useState('')
   const [unit, setUnit] = useState<PriceUnit>('kg')
+  /** Quante ne ha registrate in questo giro: lo dice il pulsante che chiude. */
+  const [saved, setSaved] = useState(0)
+  const productRef = useRef<HTMLInputElement | null>(null)
   /*
    * Finché non si tocca il controllo, l'unità è quella con cui il prodotto è già
    * stato rilevato: è l'unica cosa che evita di spaccare in due gruppi un
@@ -124,6 +139,23 @@ export function PriceForm({
       ...(note.trim() !== '' ? { note: note.trim() } : {}),
     }
     onSave(entry)
+
+    /*
+     * Resta il contesto del giro — supermercato e data — e si azzera la
+     * rilevazione. L'unità torna al valore di partenza **e** a «non scelta»:
+     * servono entrambe le cose, e la seconda da sola non basta. Con `unit`
+     * ancora a «al pezzo», il prodotto dopo — che non ha una sua unità nei dati,
+     * quindi non ha niente da suggerire — ripartiva da lì: l'unità del pecorino
+     * appiccicata al latte, che è esattamente lo sbaglio da un tocco che spacca
+     * in due gruppi un prodotto da confrontare.
+     */
+    setProduct('')
+    setAmount('')
+    setNote('')
+    setUnit('kg')
+    setUnitTouched(false)
+    setSaved((n) => n + 1)
+    productRef.current?.focus()
   }
 
   return (
@@ -135,6 +167,7 @@ export function PriceForm({
         value={product}
         known={prices.map((entry) => entry.product)}
         onChange={setProduct}
+        inputRef={productRef}
       />
 
       <NameWithSuggestions
@@ -209,13 +242,20 @@ export function PriceForm({
       </div>
 
       <div className="row" style={{ gap: 6 }}>
-        <button type="button" className="btn btn-primary btn-sm" onClick={save}>
-          Registra il prezzo
+        <button type="button" className="btn btn-primary" onClick={save}>
+          Registra
         </button>
-        <button type="button" className="btn btn-sm" onClick={onCancel}>
-          Annulla
+        <button type="button" className="btn" onClick={onDone}>
+          {saved === 0 ? 'Annulla' : 'Ho finito'}
         </button>
       </div>
+
+      {saved > 0 ? (
+        <p className="hint">
+          {saved === 1 ? '1 prezzo registrato' : `${saved} prezzi registrati`} in questo giro.
+          Supermercato e data restano: scrivi il prossimo prodotto.
+        </p>
+      ) : null}
     </div>
   )
 }

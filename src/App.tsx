@@ -6,6 +6,7 @@ import { Gate } from './components/Gate'
 import { IdentityGate } from './components/IdentityGate'
 import { useStore } from './data/store'
 import { Casa } from './pages/Casa'
+import { Esplora } from './pages/Esplora'
 import { Gatto } from './pages/Gatto'
 import { Home } from './pages/Home'
 import { Impostazioni } from './pages/Impostazioni'
@@ -32,6 +33,7 @@ export function App(): ReactNode {
         <Route element={<AppShell />}>
           <Route path="/" element={<Home />} />
           <Route path="/spese" element={<Spese />} />
+          <Route path="/esplora" element={<Esplora />} />
           <Route path="/casa" element={<Casa />} />
           <Route path="/gatto" element={<Gatto />} />
           <Route path="/vacanze" element={<Vacanze />} />

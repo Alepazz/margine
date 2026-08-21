@@ -1,50 +1,82 @@
 /**
- * Guscio: colonna laterale su schermo grande, barra in basso su telefono.
+ * Guscio: colonna laterale su schermo grande, isola fluttuante su telefono.
  *
- * Le destinazioni sono più dei posti disponibili in una barra, quindi hanno tre
- * case diverse. Nella **barra** stanno le quattro che si aprono ogni giorno.
- * Nel **menu `⋯`** della testata stanno le viste che si aprono di tanto in
- * tanto: le statistiche di tutta la storia, l'elenco completo delle spese e il
- * 730, che è una scena da una volta l'anno. Le **impostazioni** restano sul loro
- * ingranaggio, perché un menu che mescola viste e configurazione diventa il
- * cassetto dove finisce tutto.
+ * L'app ha **due scopi** — il tricount con le sue statistiche, e i prezzi al
+ * supermercato — e la barra li serve entrambi: Riepilogo e Spese per il primo,
+ * Prezzi per il secondo, che prima stava in fondo a un menù nella testata, cioè
+ * nel posto più lontano dal pollice per l'attività che si fa in piedi col
+ * carrello. La quinta voce, **Esplora**, è una pagina con le anteprime e non un
+ * menù: è ciò che rende accettabile aver spostato Casa, Gatto e Vacanze da un
+ * tocco a due. → ADR-0044
  *
- * Sulla colonna laterale, dove lo spazio c'è, non si nasconde niente: il menu
- * `⋯` è una concessione al telefono, non un'architettura.
+ * Sulla colonna laterale non si nasconde niente: le voci ci stanno tutte, e
+ * Esplora non compare — l'hub è una concessione al telefono, non
+ * un'architettura.
  */
 
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 
 import { SyncBadge, ThemeButton } from './Controls'
 import { ExpenseForm } from './ExpenseForm'
+import { PriceSheet } from './PriceSheet'
 
-type NavSlot = 'tabbar' | 'more' | 'header'
+/** I due gruppi dell'hub e della colonna. Le voci di barra non ne hanno. */
+type NavGroup = 'raccolte' | 'analisi'
 
-interface NavItem {
+interface NavBase {
   to: string
   label: string
   glyph: string
-  slot: NavSlot
 }
+
+/**
+ * Dove vive una voce: nell'isola, dentro l'hub, o sull'ingranaggio della
+ * testata. Le voci `hub` non stanno nell'isola ma **sono in colonna**: è la
+ * stessa lista, mostrata in due modi.
+ *
+ * Il gruppo è obbligatorio per le voci dell'hub e assente per le altre, e lo
+ * dice il tipo perché la colonna scorre i gruppi: una voce dell'hub che restasse
+ * senza sparirebbe **in silenzio** da lì — raggiungibile per URL, invisibile in
+ * navigazione — e nessun test la coglierebbe. Con l'unione discriminata non
+ * compila.
+ */
+type NavItem =
+  | (NavBase & { slot: 'tabbar' | 'header'; group?: never })
+  | (NavBase & { slot: 'hub'; group: NavGroup })
+
+/** La rotta su cui il `+` registra un prezzo invece di aggiungere una spesa. */
+const PRICE_ROUTE = '/prezzi'
+/** L'hub: il `+` non la guarda, ma la barra e il link di ritorno sì. */
+const HUB_ROUTE = '/esplora'
 
 const NAV: NavItem[] = [
   { to: '/', label: 'Riepilogo', glyph: '◧', slot: 'tabbar' },
-  { to: '/casa', label: 'Casa', glyph: '🏠', slot: 'tabbar' },
-  { to: '/gatto', label: 'Gatto', glyph: '🐈', slot: 'tabbar' },
-  { to: '/vacanze', label: 'Vacanze', glyph: '🌍', slot: 'tabbar' },
-  { to: '/statistiche', label: 'Statistiche', glyph: '📊', slot: 'more' },
+  { to: '/spese', label: 'Spese', glyph: '≡', slot: 'tabbar' },
   /* L'etichetta col selettore di variazione (U+FE0F): senza, `🏷` è un glifo di
      testo e il browser lo disegna come un rettangolo pallido invece dell'emoji. */
-  { to: '/prezzi', label: 'Prezzi al supermercato', glyph: '🏷️', slot: 'more' },
-  { to: '/spese', label: 'Tutte le spese', glyph: '≡', slot: 'more' },
-  { to: '/730', label: 'Spese da 730', glyph: '🧾', slot: 'more' },
-  { to: '/saldo', label: 'Saldo con chi vive con te', glyph: '⚖️', slot: 'more' },
+  { to: '/prezzi', label: 'Prezzi', glyph: '🏷️', slot: 'tabbar' },
+  { to: HUB_ROUTE, label: 'Esplora', glyph: '🧭', slot: 'tabbar' },
+  { to: '/casa', label: 'Casa', glyph: '🏠', slot: 'hub', group: 'raccolte' },
+  { to: '/gatto', label: 'Il gatto', glyph: '🐈', slot: 'hub', group: 'raccolte' },
+  { to: '/vacanze', label: 'Vacanze', glyph: '🌍', slot: 'hub', group: 'raccolte' },
+  { to: '/statistiche', label: 'Statistiche', glyph: '📊', slot: 'hub', group: 'analisi' },
+  { to: '/730', label: 'Spese da 730', glyph: '🧾', slot: 'hub', group: 'analisi' },
+  { to: '/saldo', label: 'Saldo', glyph: '⚖️', slot: 'hub', group: 'analisi' },
   { to: '/impostazioni', label: 'Impostazioni', glyph: '⚙', slot: 'header' },
 ]
 
 const TABBAR = NAV.filter((item) => item.slot === 'tabbar')
-const MORE = NAV.filter((item) => item.slot === 'more')
+const HUB = NAV.filter((item) => item.slot === 'hub')
+/** Le rotte dentro l'hub: su di esse la voce «Esplora» resta accesa. */
+const HUB_ROUTES = new Set(HUB.map((item) => item.to))
+
+/* L'ordine dei gruppi vive qui e solo qui: la colonna li scorre da questo
+   oggetto invece di riscriverne i nomi in JSX. */
+const GROUPS: [NavGroup, string][] = [
+  ['raccolte', 'Raccolte'],
+  ['analisi', 'Analisi'],
+]
 
 /**
  * Pubblica l'altezza vera dell'isola in `--tabbar-h`, che `--tabbar-reserve` usa
@@ -53,8 +85,8 @@ const MORE = NAV.filter((item) => item.slot === 'more')
  * Si misura invece di calcolarla perché è emergente: la decidono glifo,
  * etichetta e scala del carattere, non il `min-height` del link — un `calc` in
  * CSS la sbagliava di 6px, e le ultime righe della pagina finivano sotto il
- * vetro. Con la misura resta esatta anche quando l'isola cambierà (il pulsante
- * al centro) o quando cambierà la scala del carattere.
+ * vetro. Con la misura resta esatta anche quando l'isola cambia composizione,
+ * come è appena successo.
  */
 function useTabbarHeight(): RefObject<HTMLElement | null> {
   const ref = useRef<HTMLElement | null>(null)
@@ -84,62 +116,8 @@ function Brand(): ReactNode {
       <span className="brand-rule" aria-hidden="true" />
       <div>
         <div className="brand-name">Margine</div>
-        <div className="brand-sub">spese e statistiche</div>
-      </div>
-    </div>
-  )
-}
-
-/** Le viste che non stanno nella barra, in un foglio dal basso. */
-function MoreMenu({ onClose }: { onClose: () => void }): ReactNode {
-  const sheet = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    sheet.current?.focus()
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  return (
-    <div
-      className="sheet-backdrop"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose()
-      }}
-    >
-      <div
-        className="sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Altre viste"
-        tabIndex={-1}
-        ref={sheet}
-      >
-        <div className="sheet-grip" aria-hidden="true" />
-        <div className="sheet-head">
-          <h2 style={{ fontSize: '1.15rem' }}>Altre viste</h2>
-          <button type="button" className="btn btn-icon btn-ghost" onClick={onClose} aria-label="Chiudi">
-            ✕
-          </button>
-        </div>
-        <nav className="menu-list">
-          {MORE.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) => `menu-item${isActive ? ' is-active' : ''}`}
-              onClick={onClose}
-            >
-              <span className="menu-glyph" aria-hidden="true">
-                {item.glyph}
-              </span>
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
+        {/* I due scopi, non uno: era «spese e statistiche» da prima dei prezzi. */}
+        <div className="brand-sub">spese e prezzi</div>
       </div>
     </div>
   )
@@ -147,24 +125,61 @@ function MoreMenu({ onClose }: { onClose: () => void }): ReactNode {
 
 export function AppShell(): ReactNode {
   const tabbar = useTabbarHeight()
-  const [moreOpen, setMoreOpen] = useState(false)
-  const [adding, setAdding] = useState(false)
+  /** Cosa si sta aggiungendo. Il `+` è uno, i verbi sono due. */
+  const [adding, setAdding] = useState<'expense' | 'price' | null>(null)
   const { pathname } = useLocation()
 
-  /* Un cambio di rotta da fuori il menu (un link nel corpo della pagina) non
-     deve lasciare il foglio aperto sopra la pagina nuova. */
-  useEffect(() => setMoreOpen(false), [pathname])
+  const addsPrice = pathname === PRICE_ROUTE
+  const addLabel = addsPrice ? 'Registra un prezzo' : 'Aggiungi una spesa'
 
-  const onMoreRoute = MORE.some((item) => item.to === pathname)
+  const tab = (item: NavItem): ReactNode => {
+    /* «Esplora» resta acceso anche dentro le sue sei viste: sei lì dentro, e una
+       barra che si spegne tutta non dice più dove sei. */
+    const litByHub = item.to === HUB_ROUTE && HUB_ROUTES.has(pathname)
+    const body = (
+      <>
+        <span className="tabbar-glyph" aria-hidden="true">
+          {item.glyph}
+        </span>
+        {item.label}
+      </>
+    )
 
-  const tab = (item: NavItem): ReactNode => (
+    /*
+     * In quel caso serve un `Link` e non un `NavLink`: `NavLink` applica
+     * `aria-current` **solo** quando la rotta è la sua, quindi passarglielo da
+     * fuori non fa niente — provato, l'attributo non compariva. Senza, chi
+     * naviga con la voce su `/casa` non riceve l'unica informazione per cui
+     * quella riga esiste: che sei dentro Esplora.
+     */
+    if (litByHub) {
+      return (
+        <Link key={item.to} to={item.to} className="tabbar-link is-active" aria-current="page">
+          {body}
+        </Link>
+      )
+    }
+
+    return (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        end={item.to === '/'}
+        className={({ isActive }) => `tabbar-link${isActive ? ' is-active' : ''}`}
+      >
+        {body}
+      </NavLink>
+    )
+  }
+
+  const sideLink = (item: NavItem): ReactNode => (
     <NavLink
       key={item.to}
       to={item.to}
       end={item.to === '/'}
-      className={({ isActive }) => `tabbar-link${isActive ? ' is-active' : ''}`}
+      className={({ isActive }) => `nav-link${isActive ? ' is-active' : ''}`}
     >
-      <span className="tabbar-glyph" aria-hidden="true">
+      <span className="nav-glyph" aria-hidden="true">
         {item.glyph}
       </span>
       {item.label}
@@ -175,24 +190,28 @@ export function AppShell(): ReactNode {
     <div className="app">
       <aside className="sidebar">
         <Brand />
-        {/* Su schermo grande l'isola non c'è: l'azione trova posto qui. */}
-        <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>
-          + Aggiungi una spesa
-        </button>
+        {/* Su schermo grande l'isola non c'è: le due azioni trovano posto qui,
+            entrambe, invece di dipendere dalla pagina aperta. */}
+        <div className="stack" style={{ gap: 6 }}>
+          <button type="button" className="btn btn-primary" onClick={() => setAdding('expense')}>
+            + Aggiungi una spesa
+          </button>
+          <button type="button" className="btn" onClick={() => setAdding('price')}>
+            + Registra un prezzo
+          </button>
+        </div>
         <nav className="nav" aria-label="Sezioni">
-          {NAV.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/'}
-              className={({ isActive }) => `nav-link${isActive ? ' is-active' : ''}`}
-            >
-              <span className="nav-glyph" aria-hidden="true">
-                {item.glyph}
-              </span>
-              {item.label}
-            </NavLink>
+          {/* Le tre viste di ogni giorno, poi i due gruppi dell'hub: la colonna
+              mostra la stessa lista che il telefono mette dietro «Esplora»,
+              senza l'hub in mezzo. */}
+          {TABBAR.filter((item) => item.to !== HUB_ROUTE).map(sideLink)}
+          {GROUPS.map(([group, label]) => (
+            <div className="nav-group" key={group}>
+              <div className="nav-group-title">{label}</div>
+              {HUB.filter((item) => item.group === group).map(sideLink)}
+            </div>
           ))}
+          {NAV.filter((item) => item.slot === 'header').map(sideLink)}
         </nav>
         <div className="sidebar-foot">
           <SyncBadge />
@@ -207,17 +226,6 @@ export function AppShell(): ReactNode {
           <div className="topbar-spacer" />
           <SyncBadge />
           <ThemeButton />
-          {/* Solo su telefono: sulla colonna laterale queste voci si vedono già. */}
-          <button
-            type="button"
-            className={`btn btn-icon btn-ghost topbar-more${onMoreRoute ? ' is-active' : ''}`}
-            aria-label="Altre viste"
-            aria-expanded={moreOpen}
-            title="Altre viste"
-            onClick={() => setMoreOpen(true)}
-          >
-            <span aria-hidden="true">⋯</span>
-          </button>
           <NavLink
             to="/impostazioni"
             className="btn btn-icon btn-ghost"
@@ -229,6 +237,19 @@ export function AppShell(): ReactNode {
         </header>
 
         <div className="content">
+          {/*
+            La via del ritorno, dentro le sei viste dell'hub. La rende il guscio
+            e non le pagine: è lui che sa quali rotte stanno dentro «Esplora»
+            (`HUB_ROUTES`), quindi sei pagine non possono divergere dalla barra
+            il giorno che una voce cambia posto. Su schermo grande spare — là ci
+            si arriva dalla colonna, e un «indietro» punterebbe a una pagina che
+            non si è attraversata.
+          */}
+          {HUB_ROUTES.has(pathname) ? (
+            <NavLink to={HUB_ROUTE} className="hub-back">
+              <span aria-hidden="true">‹</span> Esplora
+            </NavLink>
+          ) : null}
           <Outlet />
         </div>
       </div>
@@ -236,24 +257,26 @@ export function AppShell(): ReactNode {
       {/*
         Due voci, il pulsante, due voci. Il «+» sta al centro perché è l'unica
         azione fra cose che sono tutte navigazione, e perché al centro il pollice
-        ci arriva da entrambe le mani.
+        ci arriva da entrambe le mani. Aggiunge **la cosa della pagina in cui
+        sei**: un foglio di scelta costerebbe un tocco su ogni spesa per
+        risparmiarne uno sui prezzi, e il rapporto d'uso va al contrario.
       */}
       <nav className="tabbar" aria-label="Sezioni" ref={tabbar}>
         {TABBAR.slice(0, 2).map(tab)}
         <button
           type="button"
           className="tabbar-add"
-          onClick={() => setAdding(true)}
-          aria-label="Aggiungi una spesa"
-          title="Aggiungi una spesa"
+          onClick={() => setAdding(addsPrice ? 'price' : 'expense')}
+          aria-label={addLabel}
+          title={addLabel}
         >
           <span aria-hidden="true">+</span>
         </button>
         {TABBAR.slice(2).map(tab)}
       </nav>
 
-      {moreOpen ? <MoreMenu onClose={() => setMoreOpen(false)} /> : null}
-      {adding ? <ExpenseForm onClose={() => setAdding(false)} /> : null}
+      {adding === 'expense' ? <ExpenseForm onClose={() => setAdding(null)} /> : null}
+      {adding === 'price' ? <PriceSheet onClose={() => setAdding(null)} /> : null}
     </div>
   )
 }

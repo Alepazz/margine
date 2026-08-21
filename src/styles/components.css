@@ -1059,47 +1059,141 @@ button.hero-value:focus-visible {
   outline-offset: 3px;
 }
 
-/* ────────────────── menu delle altre viste ────────────────── */
+/*
+ * ────────────────── le schede dell'hub ──────────────────
+ *
+ * Una scheda per vista, col suo numero a destra: il primo tocco informa, il
+ * secondo apre. Sostituiscono il foglio-menù, che portava senza dire niente.
+ * → ADR-0044
+ */
 
-.menu-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+/*
+ * `minmax(0, 1fr)` e non `1fr`: il minimo implicito di `1fr` è `auto`, cioè il
+ * min-content, quindi un contenuto non comprimibile allarga la traccia — e la
+ * traccia è **condivisa** da tutte le righe, quindi la sparkline larga 76px del
+ * gruppo Analisi sfondava di 27px anche le schede del 730 e del saldo, che non
+ * hanno grafici. È la lezione di ADR-0033 con un vestito nuovo: la larghezza del
+ * contenitore non la decide il suo contenuto. Misurato, non previsto.
+ */
+.hub-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
 }
 
-.menu-item {
+.hub-card {
   display: flex;
   align-items: center;
   gap: 12px;
-  /* Bersaglio pieno: in un elenco si tocca la riga, non la parola. */
-  min-height: 52px;
-  padding: 8px 12px;
+  /* Bersaglio pieno: si tocca la riga, non il nome. */
+  min-height: 62px;
+  min-width: 0;
+  padding: 10px 8px;
   border-radius: var(--r-md);
   color: var(--ink);
   text-decoration: none;
-  font-weight: 500;
 }
 
-.menu-item:hover {
+.hub-card:hover {
   background: var(--surface-2);
   text-decoration: none;
 }
 
-.menu-item.is-active {
-  background: color-mix(in srgb, var(--ink) 9%, transparent);
-}
-
-.menu-glyph {
-  font-size: 1.25rem;
+.hub-glyph {
+  font-size: 1.4rem;
   line-height: 1;
-  width: 1.6rem;
+  width: 1.7rem;
   text-align: center;
+  flex: none;
 }
 
-/* Sei su una vista che vive nel menu: il pulsante nella testata lo dice. */
-.topbar-more.is-active {
-  background: color-mix(in srgb, var(--ink) 10%, transparent);
+.hub-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  /* Cede spazio al numero invece di spingerlo fuori dalla scheda. */
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.hub-name {
+  font-weight: 600;
+  font-size: 0.98rem;
+}
+
+.hub-hint {
+  color: var(--ink-3);
+  font-size: 0.82rem;
+  /* Un nome di viaggio lungo non allarga la scheda: si accorcia. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hub-value {
+  font-family: var(--font-num);
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+
+.hub-chevron {
+  color: var(--ink-3);
+  font-size: 1.2rem;
+  line-height: 1;
+  flex: none;
+}
+
+/*
+ * ────────────────── spunte di scelta ──────────────────
+ *
+ * Una scelta sola fra poche, tutte in vista: il tricount di una spesa. Va a capo
+ * e non scorre di lato, e non allarga il foglio che la contiene — è la lezione
+ * di ADR-0033: la larghezza del foglio non la decide il suo contenuto.
+ */
+
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.choice-chip {
+  min-height: 44px;
+  padding: 9px 13px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 0.18s var(--ease),
+    color 0.18s var(--ease),
+    border-color 0.18s var(--ease);
+}
+
+.choice-chip:hover {
+  border-color: var(--ink-3);
   color: var(--ink);
+}
+
+.choice-chip.is-active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+/* Non è una scelta, è un'azione: bordo tratteggiato, come un posto da riempire. */
+.choice-chip.is-action {
+  border-style: dashed;
+  background: transparent;
 }
 
 /* ────────────────── mappamondo ────────────────── */

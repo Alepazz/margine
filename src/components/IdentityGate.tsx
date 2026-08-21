@@ -31,7 +31,7 @@ export function IdentityGate(): ReactNode {
           <span className="brand-rule" aria-hidden="true" />
           <div>
             <div className="brand-name">Margine</div>
-            <div className="brand-sub">spese e statistiche</div>
+            <div className="brand-sub">spese e prezzi</div>
           </div>
         </div>
 
