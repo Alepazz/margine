@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { filterBoard, nameKey, priceBoard, suggest, unitOf } from './prices'
+import { filterBoard, priceBoard, suggest, unitOf } from './prices'
+import { nameKey } from './text'
 import type { PriceEntry } from './types'
 
 /** Una rilevazione, con i campi che al test non servono già riempiti. */

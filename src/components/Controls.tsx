@@ -8,40 +8,42 @@
 import type { ReactNode } from 'react'
 
 import { useStore } from '../data/store'
-import { PERSON_IDS, type PersonId } from '../domain/types'
+import { formatDate } from '../domain/dates'
 import { useTheme, type ThemeMode } from '../theme/theme'
 import { Segmented } from './ui'
 
 /**
- * Di chi è questo dispositivo: **l'identità**, non una lente.
+ * Di chi è questo dispositivo: si **mostra**, non si cambia.
  *
- * Prima era un avatar nella testata che scambiava la vista a ogni tocco. Con i
- * compartimenti personali quel gesto è diventato ambiguo — «di chi sono questi
- * numeri?» non deve avere due risposte a un tocco di distanza — quindi la
- * scelta sta qui, si fa una volta per telefono, e resta (in localStorage, come
- * il tema e il token). Cambiarla è possibile ma volutamente scomodo. → ADR-0038
+ * Era un controllo con due opzioni. Non lo è più: la scelta si fa una volta alla
+ * prima apertura (`IdentityGate`) e da lì è quella. Un controllo qui sarebbe
+ * esattamente il gesto che ADR-0042 ha tolto — passare alla vista dell'altra
+ * persona, compreso il suo compartimento personale, in due tocchi.
+ *
+ * Il testo dice anche cosa **non** è: la separazione resta una convenzione
+ * dell'interfaccia, perché la passphrase è una sola e apre tutto il file
+ * (→ ADR-0039). Toglie il gesto, non la possibilità.
  */
-export function PersonSwitch(): ReactNode {
-  const { config, view, setPerson } = useStore()
-  if (!config) return null
+export function DeviceIdentity(): ReactNode {
+  const { config, identity, identitySince } = useStore()
+  if (!config || !identity) return null
+  const person = config.people[identity]
   return (
-    <Segmented<PersonId>
-      ariaLabel="Di chi è questo dispositivo"
-      value={view.person}
-      onChange={setPerson}
-      options={PERSON_IDS.map((id) => ({
-        value: id,
-        title: config.people[id].name,
-        label: (
-          <>
-            <span className="avatar" aria-hidden="true">
-              {config.people[id].emoji}
-            </span>
-            <span>{config.people[id].name}</span>
-          </>
-        ),
-      }))}
-    />
+    <div className="stack" style={{ gap: 6 }}>
+      <div className="row" style={{ gap: 10 }}>
+        <span className="avatar" aria-hidden="true">
+          {person.emoji}
+        </span>
+        <strong style={{ fontSize: '1.05rem' }}>{person.name}</strong>
+      </div>
+      <p className="hint">
+        {identitySince
+          ? `Scelto su questo dispositivo il ${formatDate(identitySince)}.`
+          : 'Scelto su questo dispositivo.'}{' '}
+        Non si cambia dall'app: per assegnarlo all'altra persona si svuotano i dati del sito dal
+        browser, e si rimettono passphrase e token.
+      </p>
+    </div>
   )
 }
 

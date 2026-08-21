@@ -3,6 +3,7 @@ import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 
 import { AppShell } from './components/AppShell'
 import { Gate } from './components/Gate'
+import { IdentityGate } from './components/IdentityGate'
 import { useStore } from './data/store'
 import { Casa } from './pages/Casa'
 import { Gatto } from './pages/Gatto'
@@ -16,9 +17,13 @@ import { Tax730 } from './pages/Tax730'
 import { Vacanze } from './pages/Vacanze'
 
 export function App(): ReactNode {
-  const { status } = useStore()
+  const { status, identity } = useStore()
 
   if (status !== 'ready') return <Gate />
+  /* Due porte in fila: la passphrase apre i dati, l'identità dice di chi sono i
+     numeri. Senza la seconda non si entra — e non c'è un ripiego, perché un
+     ripiego sarebbe la vista di una persona vera. → ADR-0042 */
+  if (!identity) return <IdentityGate />
 
   // HashRouter: su GitHub Pages non c'è un server che possa riscrivere le rotte.
   return (

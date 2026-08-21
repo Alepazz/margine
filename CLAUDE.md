@@ -2,7 +2,7 @@
 
 Cruscotto personale delle spese di Alessio, alimentato dai tricount (spese fisse condivise, personali, altre condivise, e uno per ogni vacanza). L'altra persona è **Federica**.
 
-**Prima di una scelta tecnica o architetturale, leggi [`docs/adr/`](docs/adr/).** Contiene le quarantuno decisioni che tengono in piedi il progetto, con i vincoli che le hanno forzate. Una decisione nuova che ne cambia una vecchia è un ADR nuovo, scritto nello stesso commit del codice.
+**Prima di una scelta tecnica o architetturale, leggi [`docs/adr/`](docs/adr/).** Contiene le quarantadue decisioni che tengono in piedi il progetto, con i vincoli che le hanno forzate. Una decisione nuova che ne cambia una vecchia è un ADR nuovo, scritto nello stesso commit del codice.
 
 ## In tre righe
 
@@ -20,7 +20,7 @@ Sito **statico** su GitHub Pages, nessun backend. I dati vivono **cifrati** nel 
 - **La separazione del personale è una convenzione dell'interfaccia, non una garanzia.** Una passphrase sola apre tutto il file: con gli strumenti del browser, o con `npm run decrypt`, si legge anche il compartimento dell'altro. Protegge dall'errore e dall'averlo davanti, non dalla volontà — ed è scritto anche a schermo, in Impostazioni, perché fra sei mesi il ricordo sarà «sono separati». → ADR-0039
 - **Una rilevazione di prezzo non è una spesa, e `import.mjs` la deve riportare a mano.** `dataset.prices` è una lista di fatti condivisi (nessuna quota, nessun tricount, fuori da margine, saldo e statistiche) e la pagina Prezzi è l'unica che **ignora `view.person`**. Il campo è additivo, quindi non ha richiesto migrazione — ma l'import ricostruisce il master da zero: **tutto ciò che nasce nell'app va ricopiato lì** (i rimborsi e i prezzi), altrimenti la sessione mensile lo cancella in silenzio. → ADR-0041, ADR-0019
 - **Il token di un collaboratore è classic con `public_repo`, e non è una svista da modernizzare.** Un token fine-grained non può scrivere su un repo di un altro account personale: nel suo elenco di repository non compare niente da spuntare, e il sintomo — «non trovo il tuo repo» — non somiglia a un permesso sbagliato. Le istruzioni si biforcano in tre posti (`Impostazioni.tsx`, README, il 403 in `github.ts`) e devono restare d'accordo. → ADR-0040, ADR-0005
-- **L'identità sta nel dispositivo, non nella testata.** Un telefono, una persona, scelta in Impostazioni e ricordata in `localStorage`. Rimetterla nella testata riaprirebbe la porta che ADR-0038 ha chiuso: un tocco accanto all'orologio aprirebbe il compartimento personale dell'altra persona. → ADR-0038, ADR-0007
+- **L'identità si sceglie una volta e non si cambia dall'app**, e non esiste un valore di ripiego. `readIdentity()` torna `undefined` finché nessuno ha scelto (prima era `'me'`: ogni installazione nuova partiva dalla vista di Alessio, compreso il suo personale). Tre guardie, non una: `chooseIdentity()` non riscrive una scelta esistente — e lo verifica su `localStorage`, non sullo stato di React, perché due schede condividono il primo; `App` mostra `IdentityGate` prima delle pagine; `useReadyStore()` **lancia** senza identità, così nessuna pagina può renderizzare col ripiego. Rimettere un controllo in Impostazioni o nella testata riaprirebbe il gesto che ADR-0042 ha tolto. → ADR-0042, ADR-0038, ADR-0007
 - **Le spunte della divisione non sono uno stato: sono la lettura del preset.** `half | mine | theirs` sono le tre combinazioni di due caselle, quindi «nessuno dei due partecipa» non è un errore da respingere, è uno stato irraggiungibile. Il modello sotto (`splitFor`, `presetOf`, il centesimo dispari) non è cambiato. → ADR-0032
 - **Nei campi importo si passa da `AmountInput`**, che filtra con `sanitizeAmount` e apre il tastierino: `type` resta testo perché il tipo numerico litiga con la virgola. Un campo importo scritto a mano con `type="number"` è un difetto, non una scorciatoia.
 - **`Tricount.closed` non è «saldato»**: toglie la vacanza dal menù di inserimento e non tocca il saldo. Il selettore però mostra sempre il tricount della spesa che si sta correggendo, anche se concluso — un menù che non contiene il valore corrente lo cambierebbe da sé, spostando un debito senza che nessuno l'abbia chiesto. → ADR-0027, ADR-0026
@@ -39,7 +39,6 @@ Sito **statico** su GitHub Pages, nessun backend. I dati vivono **cifrati** nel 
 - **Il contorno delle terre del mappamondo è generato, non importato.** `npm run globe` scrive `src/domain/globe-land.ts` da `world-atlas`; quel file **non si modifica a mano**. `world-atlas` e `topojson-client` restano dipendenze di sviluppo: nel pacchetto entra il dato, non la libreria. La proiezione ortografica è trenta righe in `domain/globe.ts` invece di `d3-geo`, e i gradi non diventano mai radianti fuori da quel file. → ADR-0020
 - **Il mappamondo parte inquadrato sui viaggi, non a zoom 1.** Cinque viaggi europei a zoom 1 cadono in 48×70px e due di essi a 8px: i puntini si sovrappongono e mirarli è impossibile. `fitMarks()` stringe finché il più lontano non sta al 62% del raggio. Il test che lo presidia misura **la distanza minima fra due puntini** con le coordinate vere, non l'avvicinamento: è la grandezza che descrive il difetto. → ADR-0021
 - **`data-example/` è generato da `scripts/seed.mjs`, non si modifica a mano.** Anche `data-example/config.json`: `seed` lo riscrive, quindi una modifica a mano sparisce al primo `npm run seed`. La configurazione di esempio si cambia nello script.
-- **Chi guarda sta nella testata dell'app, non nelle pagine.** Era ripetuto in sei testate: `PersonButton` è uno solo, e `view.person` resta la lente globale.
 - **`--tabbar-h` si misura, non si calcola.** L'altezza dell'isola dipende da glifo, etichetta e scala del carattere: la pubblica `AppShell` con un ResizeObserver. Un `calc` in CSS la sbagliava di 6px, e prima un numero a mano di 38.
 - **Un'entrata entra nel profilo se e solo se ciò che paga è tracciato come uscita.** I buoni pasto stanno a zero perché i pranzi che pagano non sono nei tricount; contarli gonfierebbe il margine contro spese che non esistono. → ADR-0014
 - **La categoria si ricava dalla descrizione**, con la tabella `RULES` in `scripts/from-tricount.mjs`, dove **l'ordine è logica**: il gatto prima del cibo, i trasporti e il cibo prima dello sport. Il campo `category` di Tricount non si usa. → ADR-0013
@@ -69,10 +68,10 @@ L'app si usa in piedi, con un pollice, e in secondo luogo dal Mac.
 ## Struttura
 
 ```
-src/domain/      logica pura, testata: types, money, dates, selectors, income, categories,
-                 expense-rules, prices, ids, globe, export · globe-land.ts è generato
+src/domain/      logica pura, testata: types, money, dates, text, selectors, income,
+                 categories, expense-rules, prices, ids, globe, export · globe-land.ts è generato
 src/data/        envelope + crypto (WebCrypto), outbox (registro operazioni), github, store (contesto React)
-src/components/  AppShell, Gate, Controls, MonthStrip, MarginMeter, ExpenseList,
+src/components/  AppShell, Gate, IdentityGate, Controls, MonthStrip, MarginMeter, ExpenseList,
                  ExpenseSheet, ExpenseForm, LedgerSelect, TricountForm, PriceForm,
                  CategoryEditor, IncomeEditor, ui, charts/ (compreso Globe)
 src/pages/       Home · Spese · Casa · Gatto · Vacanze · Statistiche · Prezzi · Tax730 ·
@@ -105,6 +104,8 @@ Vale la regola globale: `/simplify`, poi una review strutturata del diff, poi si
 - **I suggerimenti del 730 hanno perso «Tasse e burocrazia»**, cancellata nella revisione della tassonomia: commercialista, 730 e rinnovo patente sono in «Altro», che non è un suggerimento sensato. Se servono, vanno rimessi con una categoria propria.
 
 Fatto il 19/08/2026: primo import dei dati veri (1253 voci da otto tricount, ottobre 2024 → agosto 2026, riconciliate al centesimo).
+
+Fatto il 21/08/2026 (quarto giro): **l'identità si sceglie una volta e non si cambia dall'app** (ADR-0042), chiesto da Alessio — «da Fede non deve essere possibile passare a vedere la mia UI, e viceversa». Nel farlo è emerso il difetto vero: il valore di ripiego dell'identità era `'me'`, quindi ogni dispositivo nuovo partiva dalla vista di Alessio. Nello stesso giro: il controllo sui decimali di una spesa in `validate-core.mjs` era `X !== X` e non è mai scattato dalla sua scrittura, e `nameKey` è passata in `src/domain/text.ts`, condivisa fra prezzi e spese ricorrenti.
 
 Fatto il 21/08/2026 (terzo giro): **l'osservatorio dei prezzi al supermercato** (ADR-0041), chiesto da Federica. `dataset.prices` è un campo additivo — nessuna migrazione — con `src/domain/prices.ts` che raggruppa per prodotto e unità, due operazioni nella coda (`price`, `price-delete`), e la pagina Prezzi. Nello stesso giro, la correzione del token per i collaboratori: un fine-grained non può scrivere su un repo di un altro account, serve un classic con `public_repo` (ADR-0040).
 

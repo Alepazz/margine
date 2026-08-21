@@ -12,9 +12,10 @@
  * **L'identità di un prodotto è il suo nome normalizzato.** Non c'è un elenco da
  * gestire: si scrive, e l'app suggerisce quello che è già stato scritto. Perché
  * il confronto funzioni, «Passata di pomodoro» e «passata  di pomodoro» devono
- * essere lo stesso prodotto, e questo lo fa `nameKey`. Un refuso vero — «pasata»
- * — crea invece un prodotto nuovo: è il prezzo dichiarato di non avere schermate
- * di gestione, e si corregge cancellando la rilevazione.
+ * essere lo stesso prodotto, e questo lo fa `nameKey` (in `domain/text.ts`, che
+ * è neutro perché la stessa normalizzazione serve alle spese ricorrenti). Un
+ * refuso vero — «pasata» — crea invece un prodotto nuovo: è il prezzo dichiarato
+ * di non avere schermate di gestione, e si corregge cancellando la rilevazione.
  *
  * **I confronti si fanno in centesimi interi.** Non è pignoleria: `(2,15 − 2,00)
  * / 2,00` in virgola mobile dà 0,0749999… e arrotonda a «+7%», mentre
@@ -23,6 +24,7 @@
  */
 
 import { toCents } from './money'
+import { nameKey } from './text'
 import type { PriceEntry, PriceUnit } from './types'
 
 /** Quante grafie proporre mentre si scrive: sei stanno in due righe sul telefono. */
@@ -42,17 +44,6 @@ export const UNIT_CHOICE: Record<PriceUnit, string> = {
   kg: 'al kg',
   l: 'al litro',
   pezzo: 'al pezzo',
-}
-
-/**
- * La chiave con cui due nomi sono lo stesso nome: senza spazi ai bordi, con gli
- * spazi interni collassati, minuscolo. Vale per i prodotti **e** per i
- * supermercati, che hanno lo stesso problema.
- *
- * Gli accenti restano: in italiano distinguono parole, e «pere» non è «però».
- */
-export function nameKey(text: string): string {
-  return text.trim().replace(/\s+/g, ' ').toLowerCase()
 }
 
 /** Una rilevazione con la sua posizione nell'elenco: serve a sciogliere i pari data. */

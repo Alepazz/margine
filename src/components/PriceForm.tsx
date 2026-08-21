@@ -15,7 +15,8 @@ import { useState, type ReactNode } from 'react'
 
 import { todayIso } from '../domain/dates'
 import { newPriceId } from '../domain/ids'
-import { nameKey, suggest, unitOf, UNIT_CHOICE, UNIT_LABEL, PRICE_UNITS } from '../domain/prices'
+import { suggest, unitOf, UNIT_CHOICE, UNIT_LABEL, PRICE_UNITS } from '../domain/prices'
+import { nameKey } from '../domain/text'
 import type { PriceEntry, PriceUnit } from '../domain/types'
 import { AmountInput, Segmented } from './ui'
 

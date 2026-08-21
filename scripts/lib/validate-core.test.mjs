@@ -140,6 +140,29 @@ function withPrices(prices) {
   return { ...dataset([]), prices }
 }
 
+describe('decimali di una spesa', () => {
+  /* Il controllo era `X !== X`: sempre falso, quindi muto da sempre. Questi due
+     test esistono perché la versione ingenua che verrebbe in mente per
+     ripararlo (`Math.round(x*100) !== x*100`) sarebbe un falso positivo. */
+  it('avvisa su tre decimali', () => {
+    const { warnings } = validateDataset(
+      dataset([expense({ amount: 100.005, shares: { me: 50, partner: 50.005 } })]),
+      CONFIG,
+    )
+    expect(warnings.some((w) => w.includes('più di due decimali'))).toBe(true)
+  })
+
+  it('e tace su un importo che in virgola mobile sembrerebbe sbagliato', () => {
+    /* 2.15 * 100 = 214.99999999999997 */
+    const { warnings, errors } = validateDataset(
+      dataset([expense({ amount: 2.15, shares: { me: 1.08, partner: 1.07 } })]),
+      CONFIG,
+    )
+    expect(errors).toEqual([])
+    expect(warnings).toEqual([])
+  })
+})
+
 describe('prezzi', () => {
   it('accetta una rilevazione completa', () => {
     const { errors, warnings } = validateDataset(withPrices([price({})]), CONFIG)
