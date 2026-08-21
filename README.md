@@ -88,7 +88,7 @@ Serve un token GitHub, una volta per dispositivo, e il tipo dipende da chi lo cr
 
 **Se vi accedi come collaboratore** — nell'elenco dei fine-grained il repo **non c'è**, e non è un errore tuo: quel tipo di token vede solo i repo del proprio account o di un'organizzazione. Serve un token **classic** con la sola spunta **`public_repo`**: il modulo sta su **`github.com/settings/tokens/new`**, che sono le impostazioni *del tuo account* — non la linguetta *Settings* del repo, dove un collaboratore trova solo «You don't have access to repository options». → [ADR-0040](docs/adr/0040-il-token-di-chi-non-possiede-il-repo.md)
 
-In entrambi i casi il token si incolla in Margine → Impostazioni → «Scrittura nel repo», poi «Verifica accesso».
+In entrambi i casi il token si incolla in Margine → Impostazioni → «Scrittura nel repo», poi «Verifica la scrittura». Quel controllo prova a **scrivere** (crea un blob non referenziato, che non lascia traccia) e non a leggere: su un repo pubblico la lettura riesce senza alcun token, quindi un controllo in lettura direbbe «va tutto bene» anche con un token in sola lettura o scaduto.
 
 Il token resta in questo browser, non entra mai nel repo. Quando scade, il salvataggio fallisce con un messaggio esplicito e le modifiche restano in coda: nulla va perso. [ADR-0005](docs/adr/0005-annotazioni-730-via-api-github.md), [ADR-0018](docs/adr/0018-l-app-scrive-le-spese-non-solo-le-annotazioni.md)
 

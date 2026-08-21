@@ -289,7 +289,7 @@ export function Impostazioni(): ReactNode {
                     })
                   }}
                 >
-                  {checking ? 'Verifico…' : 'Verifica accesso'}
+                  {checking ? 'Verifico…' : 'Verifica la scrittura'}
                 </button>
                 <button
                   type="button"
