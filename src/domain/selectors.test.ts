@@ -8,19 +8,24 @@ import {
   balanceDeltaOf,
   catStats,
   categoryBreakdown,
+  compareSameDays,
   comparePeriods,
   coupleBalance,
+  extremeMonths,
   fillMonthGaps,
+  fixedShareSeries,
   houseLedger,
   houseOutside,
   monthlySeries,
   owedOf,
   projectMonth,
+  recurringProfile,
   subsetStats,
   tax730ByYear,
   tax730Suggestions,
   tripStats,
   visibleFor,
+  yearlyTotals,
 } from './selectors'
 import type { Expense, Trip } from './types'
 
@@ -612,5 +617,105 @@ describe('portare una spesa in «Personale»', () => {
     const saldo = coupleBalance([mia], [], { since: '2026-08-01', opening: 0 })
     expect(saldo.balance).toBe(-50)
     expect(saldo.groups.map((g) => g.key)).toEqual(['personali'])
+  })
+})
+
+describe('confronto col mese scorso a pari giorni', () => {
+  /*
+   * Il difetto che questo presidia: confrontare un mese a metà con un mese
+   * intero. Luglio chiude a 300, agosto è al 15 con 100: il paragone giusto è
+   * con i primi 15 giorni di luglio (50), non con tutto luglio.
+   */
+  const storia: Expense[] = [
+    expense({ id: 'l1', date: '2026-07-05', amount: 100, shares: { me: 50, partner: 50 } }),
+    expense({ id: 'l2', date: '2026-07-25', amount: 500, shares: { me: 250, partner: 250 } }),
+    expense({ id: 'a1', date: '2026-08-10', amount: 200, shares: { me: 100, partner: 100 } }),
+  ]
+
+  it('taglia anche il mese scorso ai giorni trascorsi', () => {
+    const r = compareSameDays(storia, 'me', '2026-08', '2026-08-15')
+    expect(r.days).toBe(15)
+    expect(r.current).toBe(100)
+    expect(r.previous).toBe(50)
+    expect(r.deltaPct).toBe(1)
+    expect(r.wholePrevious).toBe(false)
+  })
+
+  it('a mese chiuso confronta due mesi interi, senza dover cambiare metodo', () => {
+    const r = compareSameDays(storia, 'me', '2026-08', '2026-09-04')
+    expect(r.days).toBe(31)
+    expect(r.current).toBe(100)
+    expect(r.previous).toBe(300)
+    expect(r.wholePrevious).toBe(true)
+  })
+
+  it('trentuno giorni contro un mese da trenta sono il mese intero, e lo dichiara', () => {
+    const r = compareSameDays(storia, 'me', '2026-08', '2026-08-31')
+    expect(r.days).toBe(31)
+    expect(r.previous).toBe(300)
+    expect(r.wholePrevious).toBe(true)
+  })
+
+  it('senza mese precedente lo scostamento relativo non esiste', () => {
+    const r = compareSameDays(storia, 'me', '2026-07', '2026-07-10')
+    expect(r.previous).toBe(0)
+    expect(r.deltaPct).toBeNull()
+    expect(r.previousMonth).toBe('2026-06')
+  })
+})
+
+describe('statistiche di lungo periodo', () => {
+  const serie = monthlySeries(visibleFor(DATA, { person: 'me', includeVacations: false }), 'me')
+
+  it('l’anno per anno conta i mesi osservati, non dodici', () => {
+    const anni = yearlyTotals(serie)
+    expect(anni.map((a) => a.year)).toEqual([2026])
+    const y = anni[0]!
+    expect(y.months).toBe(2)
+    /* 75 (giugno) + 30 + 200 (agosto) = 305, e la media è sui due mesi visti. */
+    expect(y.total).toBe(305)
+    expect(y.perMonth).toBe(152.5)
+  })
+
+  it('il mese più leggero non è il mese in corso, che è parziale', () => {
+    const senza = extremeMonths(serie)
+    expect(senza.lowest?.month).toBe('2026-06')
+    const con = extremeMonths(serie, { excludeMonth: '2026-06' })
+    expect(con.lowest?.month).toBe('2026-08')
+    expect(con.highest?.month).toBe('2026-08')
+  })
+
+  it('un mese senza spese non ha una quota di fisse', () => {
+    const quota = fixedShareSeries(fillMonthGaps(serie))
+    /* Luglio è vuoto: tre mesi nella serie riempita, due punti qui. */
+    expect(fillMonthGaps(serie)).toHaveLength(3)
+    expect(quota.points.map((p) => p.month)).toEqual(['2026-06', '2026-08'])
+    expect(quota.highest?.month).toBe('2026-06')
+    expect(quota.lowest?.month).toBe('2026-08')
+  })
+
+  it('e il mese in corso resta fuori: a inizio mese sarebbe quasi tutto fisse', () => {
+    const quota = fixedShareSeries(serie, { excludeMonth: '2026-08' })
+    expect(quota.points.map((p) => p.month)).toEqual(['2026-06'])
+    expect(quota.highest?.month).toBe('2026-06')
+  })
+
+  it('le fisse ricorrenti si raggruppano per titolo, e i mesi dicono se il gruppo è giusto', () => {
+    const affitti: Expense[] = [
+      expense({ id: 'r1', date: '2026-06-03', amount: 950, recurring: true, title: 'Affitto' }),
+      expense({ id: 'r2', date: '2026-07-03', amount: 950, recurring: true, title: ' affitto ' }),
+      expense({ id: 'r3', date: '2026-07-04', amount: 30, recurring: true, title: 'Netflix' }),
+      expense({ id: 'r4', date: '2026-07-06', amount: 80, title: 'Cena' }),
+    ]
+    const { rows, monthlyBase } = recurringProfile(affitti, 'me')
+    /* Raggruppa ignorando maiuscole e spazi, ma mostra il titolo dell'ultima
+       occorrenza — qui « affitto », scritto male di proposito. */
+    expect(rows.map((r) => r.title)).toEqual(['affitto', 'Netflix'])
+    expect(rows[0]?.months).toBe(2)
+    expect(rows[0]?.perMonth).toBe(475)
+    /* Netflix una volta sola: il mese solitario è la spia, non un errore. */
+    expect(rows[1]?.months).toBe(1)
+    expect(rows[1]?.perMonth).toBe(15)
+    expect(monthlyBase).toBe(490)
   })
 })

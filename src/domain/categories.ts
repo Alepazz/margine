@@ -8,8 +8,16 @@
  * sarebbe indistinguibile da una esistente.
  */
 
-import type { CategorySlice } from './selectors'
-import { sourceLabelOf, sourceTitleOf, type Category, type Source, type SourceMap } from './types'
+import { categoryBreakdown, type CategorySlice } from './selectors'
+import {
+  sourceLabelOf,
+  sourceTitleOf,
+  type Category,
+  type Expense,
+  type PersonId,
+  type Source,
+  type SourceMap,
+} from './types'
 import type { ChartTheme } from '../theme/palette'
 
 export const REST_KEY = '__altre__'
@@ -168,6 +176,23 @@ export function labelSlices(
     pct: slice.pct,
     color: lookup.color(slice.key),
   }))
+}
+
+/**
+ * Le fette pronte per la torta, da un insieme di spese: la sequenza completa
+ * **suddividi → piega → etichetta**.
+ *
+ * Sta qui perché l'ordine è logica e non stile — piegare dopo aver etichettato
+ * produrrebbe una fetta «Altre» con l'etichetta di un'altra categoria — e
+ * perché la stessa riga era ripetuta in tre pagine, dove la quarta l'avrebbe
+ * copiata a occhio dalla terza.
+ */
+export function donutSlices(
+  scope: readonly Expense[],
+  person: PersonId,
+  lookup: CategoryLookup,
+): LabelledSlice[] {
+  return labelSlices(foldSlices(categoryBreakdown(scope, person), lookup), lookup)
 }
 
 /**

@@ -10,6 +10,7 @@ import { Home } from './pages/Home'
 import { Impostazioni } from './pages/Impostazioni'
 import { Saldo } from './pages/Saldo'
 import { Spese } from './pages/Spese'
+import { Statistiche } from './pages/Statistiche'
 import { Tax730 } from './pages/Tax730'
 import { Vacanze } from './pages/Vacanze'
 
@@ -28,6 +29,7 @@ export function App(): ReactNode {
           <Route path="/casa" element={<Casa />} />
           <Route path="/gatto" element={<Gatto />} />
           <Route path="/vacanze" element={<Vacanze />} />
+          <Route path="/statistiche" element={<Statistiche />} />
           <Route path="/730" element={<Tax730 />} />
           <Route path="/saldo" element={<Saldo />} />
           <Route path="/impostazioni" element={<Impostazioni />} />

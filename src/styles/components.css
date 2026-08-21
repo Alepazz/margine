@@ -355,8 +355,18 @@ button.hero-value:focus-visible {
 /* Controllo segmentato: persona, vacanze sì/no, ordinamento. */
 .segmented {
   display: inline-flex;
-  /* Non sborda mai dal contenitore, qualunque siano le etichette. */
+  /*
+   * Non sborda mai dal contenitore, qualunque siano le etichette — e a farlo è
+   * `flex-wrap`, non il `max-width`.
+   *
+   * Il `max-width` limita la larghezza del gruppo, non quella delle voci: con
+   * `white-space: nowrap` le voci restavano larghe quanto il loro testo e
+   * uscivano comunque. Andare a capo costa una riga in più in altezza, che in
+   * un foglio che scorre non è niente, ed è preferibile ai puntini di
+   * `is-tight`: qui l'etichetta si legge per intero. → ADR-0033
+   */
   max-width: 100%;
+  flex-wrap: wrap;
   padding: 2px;
   gap: 2px;
   background: var(--surface-2);
@@ -367,6 +377,15 @@ button.hero-value:focus-visible {
 .segmented-option {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  /*
+   * Cresce solo quando c'è spazio da distribuire, cioè **solo quando il gruppo
+   * è andato a capo**: il gruppo è `inline-flex` e su una riga sola si stringe
+   * addosso alle etichette, quindi qui non c'è niente da spartire e niente
+   * cambia. Andato a capo, invece, la voce rimasta sola riempie la sua riga
+   * invece di restare un mozzicone appoggiato a sinistra.
+   */
+  flex: 1 1 auto;
   gap: 6px;
   padding: 5px 12px;
   border: none;
@@ -1126,9 +1145,9 @@ button.hero-value:focus-visible {
   scroll-snap-align: center;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 1px;
-  padding: 6px 12px;
+  padding: 6px 12px 7px;
   border-radius: var(--r-md);
   border: 1px solid var(--line);
   background: var(--surface);
@@ -1140,6 +1159,9 @@ button.hero-value:focus-visible {
 }
 
 .month-chip-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--ink-2);
@@ -1147,11 +1169,68 @@ button.hero-value:focus-visible {
   letter-spacing: 0.04em;
 }
 
+/* Il mese in corso è parziale: il filo del margine lo dice, in un punto. */
+.month-chip-now {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--rule);
+}
+
 .month-chip-total {
   font-family: var(--font-num);
   font-size: 0.88rem;
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Lo scostamento dalla media: tacca al centro, barretta a destra sopra la media
+ * e a sinistra sotto. È il pezzo che rende la striscia leggibile e non solo
+ * tappabile — tre totali simili si distinguono solo leggendoli, tre scostamenti
+ * si vedono. Il lato porta il segno; il colore resta inchiostro, perché la
+ * cromia satura è dei dati e questa è una manopola.
+ */
+.month-chip-track {
+  position: relative;
+  display: block;
+  height: 4px;
+  margin-top: 5px;
+  background: var(--surface-2);
+  border-radius: 2px;
+}
+
+.month-chip-tick {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: 50%;
+  width: 1px;
+  background: var(--ink-3);
+}
+
+.month-chip-dev {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px;
+}
+
+/* Sopra la media: inchiostro più marcato, perché è la notizia. */
+.month-chip-dev.is-over {
+  left: 50%;
+  background: var(--ink-2);
+}
+
+/*
+ * Sotto la media: la stessa famiglia, un tono più leggero. Non `--line-strong`,
+ * che a tema scuro fa #35424c su #1d262d e sparisce: `--ink-3` si legge su
+ * entrambi i fondi, ed è la ragione per cui i toni si scelgono guardando i due
+ * temi e non uno.
+ */
+.month-chip-dev.is-under {
+  right: 50%;
+  background: var(--ink-3);
 }
 
 .month-chip.is-active {
@@ -1165,9 +1244,54 @@ button.hero-value:focus-visible {
   color: var(--paper);
 }
 
+/*
+ * Sulla scheda scelta il fondo è `--ink`, che a tema scuro è **chiaro**: un
+ * bianco trasparente scritto a mano qui sparirebbe. Si impasta `--paper`, che
+ * gira col tema insieme al fondo.
+ */
+.month-chip.is-active .month-chip-track {
+  background: color-mix(in srgb, var(--paper) 22%, transparent);
+}
+
+.month-chip.is-active .month-chip-tick {
+  background: color-mix(in srgb, var(--paper) 55%, transparent);
+}
+
+.month-chip.is-active .month-chip-dev.is-over {
+  background: var(--paper);
+}
+
+.month-chip.is-active .month-chip-dev.is-under {
+  background: color-mix(in srgb, var(--paper) 60%, transparent);
+}
+
+/* Il rosso su fondo scuro non si legge: sulla scheda scelta il punto è carta. */
+.month-chip.is-active .month-chip-now {
+  background: var(--paper);
+}
+
 .month-chip:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
+}
+
+/*
+ * Il confine fra due anni, con l'anno scritto per il lungo: «mag 26» e «mag 25»
+ * si distinguono per due caratteri, e scorrendo col pollice non si leggono.
+ */
+.month-strip-year {
+  flex: 0 0 auto;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1px;
+  writing-mode: vertical-rl;
+  font-family: var(--font-num);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+  border-left: 1px solid var(--line);
 }
 
 /* Foglio di dettaglio: dal basso su telefono, al centro su desktop. */
@@ -1192,6 +1316,17 @@ button.hero-value:focus-visible {
 .sheet {
   width: 100%;
   max-width: 560px;
+  /*
+   * **La larghezza del foglio la decide il foglio, non il suo contenuto.**
+   *
+   * Il foglio è un elemento flex, e un elemento flex non scende sotto la
+   * larghezza minima di ciò che contiene: bastava una fila di pulsanti da 377px
+   * dove ce n'erano 356 perché il foglio si allargasse da 370 a 390,
+   * mangiandosi i suoi margini laterali e scivolando di 10px a sinistra ogni
+   * volta che comparivano quei pulsanti. Il `width: 100%` qui sopra non basta:
+   * senza questa riga non vince. → ADR-0033
+   */
+  min-width: 0;
   max-height: 90dvh;
   display: flex;
   flex-direction: column;

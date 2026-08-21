@@ -1,6 +1,11 @@
 /**
  * Riepilogo: la risposta a «quanto margine ho questo mese», e subito sotto il
  * perché — dove sono finiti i soldi e se è tanto o poco rispetto al solito.
+ *
+ * Tutto quello che sta qui **guarda il mese scelto**. L'andamento su diciotto
+ * mesi e la composizione mese per mese sono in Statistiche: un selettore del
+ * mese che non cambia metà della pagina è una promessa non mantenuta.
+ * → ADR-0034
  */
 
 import { useMemo, useState, type ReactNode } from 'react'
@@ -9,21 +14,13 @@ import { Link } from 'react-router-dom'
 import { BarList } from '../components/charts/BarList'
 import { CategoryDonut, type DonutSlice } from '../components/charts/CategoryDonut'
 import { Sparkline } from '../components/charts/Sparkline'
-import { StackedMonths, type StackRow, type StackSeries } from '../components/charts/StackedMonths'
-import { TrendChart } from '../components/charts/TrendChart'
 import { VacationToggle } from '../components/Controls'
 import { ExpenseList } from '../components/ExpenseList'
 import { ExpenseSheet } from '../components/ExpenseSheet'
 import { MarginMeter } from '../components/MarginMeter'
 import { MonthStrip } from '../components/MonthStrip'
 import { Card, DeltaLabel, Notice, StatTile } from '../components/ui'
-import {
-  MAX_STACK_SERIES,
-  REST_KEY,
-  foldSlices,
-  labelSlices,
-  stackSeriesKeys,
-} from '../domain/categories'
+import { donutSlices } from '../domain/categories'
 import { currentMonthKey, monthLabel, monthLabelShort } from '../domain/dates'
 import { EMPTY_INCOME, computeMargin, marginView } from '../domain/income'
 import { formatEuro, relativeChange, toCents } from '../domain/money'
@@ -31,22 +28,18 @@ import {
   averageByCategory,
   averageMonthly,
   categoryBreakdown,
+  compareSameDays,
   compareToAverage,
   comparePeriods,
   compareYearOverYear,
   expensesOfMonth,
   fillMonthGaps,
-  groupByMonth,
   findMonth,
   projectMonth,
-  shareOf,
   topExpenses,
 } from '../domain/selectors'
 import type { Expense } from '../domain/types'
 import { usePageData } from './usePageData'
-
-const TREND_MONTHS = 18
-const STACK_MONTHS = 12
 
 export function Home(): ReactNode {
   const {
@@ -86,7 +79,7 @@ export function Home(): ReactNode {
   const marginShown = useMemo(() => marginView(margin, { hideIncome }), [hideIncome, margin])
 
   const slices = useMemo<DonutSlice[]>(
-    () => labelSlices(foldSlices(categoryBreakdown(monthExpenses, person), lookup), lookup),
+    () => donutSlices(monthExpenses, person, lookup),
     [lookup, monthExpenses, person],
   )
 
@@ -100,38 +93,17 @@ export function Home(): ReactNode {
   }, [monthExpenses, partialMonth, person, visible])
 
   const filled = useMemo(() => fillMonthGaps(series), [series])
-  const trendPoints = useMemo(
-    () => filled.slice(-TREND_MONTHS).map((row) => ({ month: row.month, value: row.total })),
-    [filled],
-  )
   const sparkValues = useMemo(() => filled.slice(-12).map((row) => row.total), [filled])
-
-  const stack = useMemo(() => {
-    const keys = stackSeriesKeys(categoryBreakdown(visible, person), lookup, MAX_STACK_SERIES)
-    const months = filled.slice(-STACK_MONTHS).map((row) => row.month)
-    /* Un raggruppamento solo, invece di dodici passate sull'intero elenco. */
-    const byMonth = groupByMonth(visible)
-    const rows: StackRow[] = months.map((m) => {
-      const cents = new Map<string, number>(keys.map((key) => [key, 0]))
-      for (const expense of byMonth.get(m) ?? []) {
-        const key = cents.has(expense.category) ? expense.category : REST_KEY
-        if (!cents.has(key)) continue
-        cents.set(key, (cents.get(key) ?? 0) + toCents(shareOf(expense, person)))
-      }
-      const row: StackRow = { month: m }
-      for (const key of keys) row[key] = (cents.get(key) ?? 0) / 100
-      return row
-    })
-    const series3: StackSeries[] = keys.map((key) => ({
-      key,
-      label: lookup.label(key),
-      color: lookup.color(key),
-    }))
-    return { rows, series: series3 }
-  }, [filled, lookup, person, visible])
 
   const quarter = useMemo(() => comparePeriods(series, month, 3), [month, series])
   const yoy = useMemo(() => compareYearOverYear(series, month), [month, series])
+  /* A pari giorni, non contro il mese scorso intero: vedi ADR-0035. */
+  const lastMonth = useMemo(() => compareSameDays(visible, person, month, today), [
+    month,
+    person,
+    today,
+    visible,
+  ])
   const top = useMemo(() => topExpenses(monthExpenses, person, 5), [monthExpenses, person])
 
   /*
@@ -165,7 +137,13 @@ export function Home(): ReactNode {
           comando principale del Riepilogo, e cercarlo cinque schede più in
           basso per cambiare mese sarebbe peggio del menù che sostituisce.
           `filled` va bene com'è: ha già `month` e `total`. */}
-      <MonthStrip items={filled} selected={month} onSelect={setMonth} />
+      <MonthStrip
+        items={filled}
+        selected={month}
+        current={partialMonth}
+        average={average.perMonth}
+        onSelect={setMonth}
+      />
 
       <div className="stack">
         {!marginShown.known ? (
@@ -183,6 +161,45 @@ export function Home(): ReactNode {
             lastYear={toCents(yoy.lastYear) > 0 ? { month: yoy.lastYearMonth, total: yoy.lastYear } : null}
             onToggleHidden={toggleHideIncome}
           />
+        </Card>
+
+        {/*
+          Il confronto col mese scorso sta in alto perché è la statistica che si
+          guarda per prima sul mese in corso: sapere di aver speso 968 € serve a
+          poco senza sapere che a luglio, agli stessi giorni, erano 1050 €.
+        */}
+        <Card title="Confronti" note={`Quota di ${config.people[person].name}`}>
+          <div className="kpi-row">
+            <StatTile
+              label={`Contro ${monthLabelShort(lastMonth.previousMonth)}`}
+              value={formatEuro(lastMonth.current, { decimals: 0 })}
+              hint={
+                lastMonth.wholePrevious
+                  ? `${monthLabelShort(lastMonth.previousMonth)} intero: ${formatEuro(lastMonth.previous, { decimals: 0 })}`
+                  : `nei primi ${lastMonth.days} giorni: ${formatEuro(lastMonth.previous, { decimals: 0 })}`
+              }
+              delta={<DeltaLabel change={lastMonth.deltaPct} />}
+            />
+            <StatTile
+              label="Ultimi 3 mesi"
+              value={formatEuro(quarter.current, { decimals: 0 })}
+              hint={`3 precedenti: ${formatEuro(quarter.previous, { decimals: 0 })}`}
+              delta={<DeltaLabel change={quarter.deltaPct} />}
+            />
+            <StatTile
+              label={`${monthLabelShort(month)} contro ${monthLabelShort(yoy.lastYearMonth)}`}
+              value={formatEuro(yoy.current, { decimals: 0 })}
+              hint={`anno scorso: ${formatEuro(yoy.lastYear, { decimals: 0 })}`}
+              delta={<DeltaLabel change={yoy.deltaPct} />}
+            />
+          </div>
+          <div className="card-foot">
+            {inProgress
+              ? `Il mese è in corso, quindi il confronto col mese scorso è tagliato agli stessi ${lastMonth.days} giorni: un mese a metà contro un mese intero direbbe «vai benissimo» ogni 5 del mese. `
+              : ''}
+            Il confronto sui tre mesi parte dal mese precedente a quello selezionato, per la stessa
+            ragione.
+          </div>
         </Card>
 
         <div className="kpi-row">
@@ -269,40 +286,7 @@ export function Home(): ReactNode {
           </Card>
         </div>
 
-        <Card
-          title="Andamento mensile"
-          note={`Quota di ${config.people[person].name}, ultimi ${Math.min(TREND_MONTHS, trendPoints.length)} mesi`}
-        >
-          {/* Solo da leggere: il mese si sceglie dalla striscia in testa alla pagina. */}
-          <TrendChart points={trendPoints} average={average.perMonth} highlightMonth={month} />
-        </Card>
-
-        <Card title="Composizione della spesa" note={`Categorie mese per mese, ultimi ${STACK_MONTHS} mesi`}>
-          <StackedMonths rows={stack.rows} series={stack.series} />
-        </Card>
-
         <div className="grid-2">
-          <Card title="Confronti">
-            <div className="kpi-row">
-              <StatTile
-                label="Ultimi 3 mesi"
-                value={formatEuro(quarter.current, { decimals: 0 })}
-                hint={`3 precedenti: ${formatEuro(quarter.previous, { decimals: 0 })}`}
-                delta={<DeltaLabel change={quarter.deltaPct} />}
-              />
-              <StatTile
-                label={`${monthLabelShort(month)} contro ${monthLabelShort(yoy.lastYearMonth)}`}
-                value={formatEuro(yoy.current, { decimals: 0 })}
-                hint={`anno scorso: ${formatEuro(yoy.lastYear, { decimals: 0 })}`}
-                delta={<DeltaLabel change={yoy.deltaPct} />}
-              />
-            </div>
-            <div className="card-foot">
-              Il confronto sui tre mesi parte dal mese precedente a quello selezionato: il mese in
-              corso è parziale e falserebbe il paragone.
-            </div>
-          </Card>
-
           <Card title="Le voci più pesanti del mese">
             <ExpenseList
               expenses={top}
@@ -315,36 +299,41 @@ export function Home(): ReactNode {
               <Link to="/spese">Vedi tutte le spese →</Link>
             </div>
           </Card>
-        </div>
 
-        <Card title="Fisse contro variabili" note="Quanto del mese è incomprimibile">
-          {/* Una sola famiglia di dati, due tonalità dello stesso blu: non sono categorie diverse. */}
-          <BarList
-            items={[
-              {
-                key: 'fisse',
-                label: 'Fisse',
-                value: monthTotal.fixed,
-                color: chart.seq[5] ?? '#256abf',
-                sub:
-                  average.fixedPerMonth > 0
-                    ? `media ${formatEuro(average.fixedPerMonth, { decimals: 0 })}`
-                    : undefined,
-              },
-              {
-                key: 'variabili',
-                label: 'Variabili',
-                value: monthTotal.variable,
-                color: chart.seq[3] ?? '#3987e5',
-                sub:
-                  average.variablePerMonth > 0
-                    ? `media ${formatEuro(average.variablePerMonth, { decimals: 0 })}`
-                    : undefined,
-              },
-            ]}
-            max={Math.max(monthTotal.fixed, monthTotal.variable)}
-          />
-        </Card>
+          <Card title="Fisse contro variabili" note="Quanto del mese è incomprimibile">
+            {/* Una sola famiglia di dati, due tonalità dello stesso blu: non sono categorie diverse. */}
+            <BarList
+              items={[
+                {
+                  key: 'fisse',
+                  label: 'Fisse',
+                  value: monthTotal.fixed,
+                  color: chart.seq[5] ?? '#256abf',
+                  sub:
+                    average.fixedPerMonth > 0
+                      ? `media ${formatEuro(average.fixedPerMonth, { decimals: 0 })}`
+                      : undefined,
+                },
+                {
+                  key: 'variabili',
+                  label: 'Variabili',
+                  value: monthTotal.variable,
+                  color: chart.seq[3] ?? '#3987e5',
+                  sub:
+                    average.variablePerMonth > 0
+                      ? `media ${formatEuro(average.variablePerMonth, { decimals: 0 })}`
+                      : undefined,
+                },
+              ]}
+              max={Math.max(monthTotal.fixed, monthTotal.variable)}
+            />
+            <div className="card-foot">
+              {/* Chi cercava l'andamento su diciotto mesi lo cercava qui: dirgli
+                  dov'è andato costa una riga. */}
+              <Link to="/statistiche">Andamento, composizione e storia → Statistiche</Link>
+            </div>
+          </Card>
+        </div>
       </div>
 
       {selected ? (

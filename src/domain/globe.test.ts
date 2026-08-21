@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
-import { centreOn, clampZoom, drag, fitMarks, isVisible, MAX_ZOOM, project, wrapLon } from './globe'
+import {
+  CLUSTER_DISTANCE,
+  centreOn,
+  clampZoom,
+  drag,
+  fitMarks,
+  groupNearby,
+  isVisible,
+  MAX_ZOOM,
+  project,
+  wrapLon,
+} from './globe'
 
 const CENTRO = { lon: 0, lat: 0 }
 
@@ -177,5 +188,96 @@ describe('inquadratura', () => {
     expect(clampZoom(1000)).toBe(MAX_ZOOM)
     expect(clampZoom(Number.NaN)).toBe(1)
     expect(clampZoom(3)).toBe(3)
+  })
+})
+
+describe('puntini troppo vicini', () => {
+  /* I cinque viaggi europei più New York: due continenti, cioè il caso in cui
+     nessuna inquadratura va bene per tutti. */
+  const EUROPA = [
+    { id: 'germania', lon: 10.4, lat: 51.2 },
+    { id: 'parigi', lon: 2.35, lat: 48.86 },
+    { id: 'ortona', lon: 14.4, lat: 42.35 },
+    { id: 'creta', lon: 24.81, lat: 35.24 },
+    { id: 'sud-italia', lon: 16.2, lat: 39.5 },
+  ]
+  const NEW_YORK = { id: 'new-york', lon: -74.01, lat: 40.71 }
+  const RAGGIO = 152
+
+  /** Dove cadono i puntini con una certa inquadratura. */
+  function posati(posti: readonly { id: string; lon: number; lat: number }[], framing: { view: { lon: number; lat: number }; zoom: number }) {
+    return posti.flatMap((posto) => {
+      const at = project(posto.lon, posto.lat, framing.view, RAGGIO * framing.zoom)
+      return at ? [{ id: posto.id, at }] : []
+    })
+  }
+
+  function minimaDistanza(punti: readonly { at: { x: number; y: number } }[]): number {
+    let min = Infinity
+    for (let i = 0; i < punti.length; i += 1) {
+      for (let j = i + 1; j < punti.length; j += 1) {
+        const a = punti[i]?.at
+        const b = punti[j]?.at
+        if (!a || !b) continue
+        min = Math.min(min, Math.hypot(a.x - b.x, a.y - b.y))
+      }
+    }
+    return min
+  }
+
+  it('un viaggio in un altro continente riporta l’Europa a un grumo di otto pixel', () => {
+    /* Il numero che giustifica tutto il resto: senza New York la distanza
+       minima è oltre 24px, con New York scende sotto i 10. */
+    const soloEuropa = posati(EUROPA, fitMarks(EUROPA))
+    expect(minimaDistanza(soloEuropa)).toBeGreaterThan(24)
+
+    const conNewYork = [...EUROPA, NEW_YORK]
+    const tutti = posati(conNewYork, fitMarks(conNewYork))
+    expect(minimaDistanza(tutti)).toBeLessThan(10)
+  })
+
+  it('e allora quelli che si pestano diventano uno', () => {
+    const conNewYork = [...EUROPA, NEW_YORK]
+    const gruppi = groupNearby(posati(conNewYork, fitMarks(conNewYork)))
+    /* Sei viaggi, tre puntini: l'Italia e la Grecia in un grumo, la Germania con
+       Parigi, e New York da sola a un oceano di distanza. */
+    expect(gruppi.map((g) => g.items.map((i) => i.id).sort())).toEqual([
+      ['germania', 'parigi'],
+      ['creta', 'ortona', 'sud-italia'],
+      ['new-york'],
+    ])
+  })
+
+  it('e i puntini che restano sono tutti mirabili, uno per uno', () => {
+    const conNewYork = [...EUROPA, NEW_YORK]
+    const gruppi = groupNearby(posati(conNewYork, fitMarks(conNewYork)))
+    /* La garanzia vera: fra i puntini disegnati non ce ne sono due più vicini
+       del bersaglio di un dito. */
+    expect(minimaDistanza(gruppi)).toBeGreaterThanOrEqual(CLUSTER_DISTANCE)
+  })
+
+  it('toccando il gruppo, l’inquadratura dei suoi li separa', () => {
+    const gruppo = [
+      { id: 'ortona', lon: 14.4, lat: 42.35 },
+      { id: 'sud-italia', lon: 16.2, lat: 39.5 },
+    ]
+    /* È `fitMarks` a fare il lavoro, quella già testata: il tocco sul gruppo
+       non fa altro che inquadrare i suoi. */
+    const dopo = posati(gruppo, fitMarks(gruppo))
+    expect(minimaDistanza(dopo)).toBeGreaterThan(40)
+  })
+
+  it('due posti nello stesso punto restano un gruppo solo, senza girare a vuoto', () => {
+    /* Il caso limite: due viaggi con le stesse coordinate. Inquadrarli non li
+       separa, quindi chi disegna deve saperlo — qui basta che il gruppo esista
+       e non si sdoppi. */
+    const stessoPosto = [
+      { id: 'a', lon: 12, lat: 42 },
+      { id: 'b', lon: 12, lat: 42 },
+    ]
+    const gruppi = groupNearby(posati(stessoPosto, fitMarks(stessoPosto)))
+    expect(gruppi).toHaveLength(1)
+    expect(gruppi[0]?.items).toHaveLength(2)
+    expect(fitMarks(stessoPosto).zoom).toBe(1)
   })
 })

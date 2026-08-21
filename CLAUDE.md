@@ -2,7 +2,7 @@
 
 Cruscotto personale delle spese di Alessio, alimentato dai tricount (spese fisse condivise, personali, altre condivise, e uno per ogni vacanza). L'altra persona è **Federica**.
 
-**Prima di una scelta tecnica o architetturale, leggi [`docs/adr/`](docs/adr/).** Contiene le trentadue decisioni che tengono in piedi il progetto, con i vincoli che le hanno forzate. Una decisione nuova che ne cambia una vecchia è un ADR nuovo, scritto nello stesso commit del codice.
+**Prima di una scelta tecnica o architetturale, leggi [`docs/adr/`](docs/adr/).** Contiene le trentasei decisioni che tengono in piedi il progetto, con i vincoli che le hanno forzate. Una decisione nuova che ne cambia una vecchia è un ADR nuovo, scritto nello stesso commit del codice.
 
 ## In tre righe
 
@@ -43,6 +43,11 @@ Sito **statico** su GitHub Pages, nessun backend. I dati vivono **cifrati** nel 
 - **Le vacanze stanno fuori dalle statistiche mensili** per impostazione predefinita, e sempre dentro nelle pagine Spese, Vacanze, 730 e Gatto. → ADR-0010
 - **Il mese in corso si confronta con la sua proiezione**, non con il parziale; la media storica esclude il mese in corso e conta i mesi vuoti. → ADR-0011
 - **Colori, raggi, font e vetro solo via i token di `src/styles/tokens.css`.** Niente esadecimali, niente `px` di raggio, niente font ad hoc nei componenti. Se serve qualcosa che non c'è, prima si aggiunge il token.
+- **La larghezza del foglio non la decide il suo contenuto**: `min-width: 0` su `.sheet`. Un elemento flex non scende sotto la larghezza minima di ciò che contiene, e il `width: 100%` non vince: bastava una fila di tre pulsanti da 377px in 356 perché il foglio si allargasse a tutto schermo e scivolasse di 10px a sinistra sotto il dito. Il controllo segmentato va a capo (`flex-wrap`) invece di sfondare — e la vecchia guardia contava le **voci** invece di misurare le etichette, che è la ragione per cui non ha visto niente. → ADR-0033
+- **Le statistiche di lungo periodo lavorano sulla serie osservata, la media sui mesi riempiti.** Sono opposte di proposito: un mese senza spese non è «il mese più leggero» e non accorcia un anno, ma nella media storica un mese a zero deve pesare. E la domanda «dove va un numero nuovo?» ha una regola: se cambia scegliendo un mese sta nel Riepilogo, altrimenti in Statistiche. → ADR-0034, ADR-0011
+- **Il mese in corso si confronta col precedente a pari giorni, con la media per proiezione.** Due metodi diversi per lo stesso mese parziale, e non è un'incoerenza: contro un mese solo il taglio ai giorni trascorsi è banale e non ha stime dentro; contro la media non esiste, perché la media è di mesi interi. `compareSameDays` è l'unico selettore statistico che riceve le spese e non la serie: per tagliare a un giorno servono le date. → ADR-0035, ADR-0011
+- **Sul mappamondo i puntini sotto i 24px diventano uno**, e il raggruppamento fonde **la coppia più vicina alla volta**: la versione «ognuno nel primo gruppo che lo accoglie» spostava il centro e finiva a 23,9px da un terzo. Il test misura la distanza minima fra i puntini disegnati, non il meccanismo. Un tocco su un gruppo non apre: reinquadra con `fitMarks` dei suoi. → ADR-0036, ADR-0021
+- **Un viaggio può esistere senza spese** (New York, aprile 2024: i tricount partono da ottobre 2024). I suoi giorni contano in «Giorni di viaggio» e **non** nella «Media al giorno», che è il costo di un giorno di vacanza. Le coordinate non si mettono dall'app — nessuno digita una latitudine col pollice — ma da `scripts/add-trip.mjs`. → ADR-0036, ADR-0020
 - **I dati in chiaro non entrano nel repo.** `data/` e `.secrets/` sono in `.gitignore`; nel repo va solo `public/data/*.enc`.
 
 ## Ergonomia: prima il telefono
@@ -64,10 +69,10 @@ src/data/        envelope + crypto (WebCrypto), outbox (registro operazioni), gi
 src/components/  AppShell, Gate, Controls, MonthStrip, MarginMeter, ExpenseList,
                  ExpenseSheet, ExpenseForm, LedgerSelect, TripForm, CategoryEditor,
                  IncomeEditor, ui, charts/ (compreso Globe)
-src/pages/       Home · Spese · Casa · Gatto · Vacanze · Tax730 · Saldo · Impostazioni
-                 (+ usePageData)
+src/pages/       Home · Spese · Casa · Gatto · Vacanze · Statistiche · Tax730 · Saldo ·
+                 Impostazioni (+ usePageData)
 scripts/         from-tricount, import, validate, encrypt, decrypt, seed, make-icon,
-                 make-globe, migrate-taxonomy (+ lib/)
+                 make-globe, migrate-taxonomy, add-trip (+ lib/)
 ```
 
 La logica statistica sta **tutta** in `src/domain/`, senza React: è il posto dove aggiungere calcoli e dove i test hanno senso. `usePageData()` prepara ciò che serve a quasi tutte le pagine (lookup delle categorie, spese filtrate per vista, serie mensile).
@@ -93,5 +98,7 @@ Vale la regola globale: `/simplify`, poi una review strutturata del diff, poi si
 - **I suggerimenti del 730 hanno perso «Tasse e burocrazia»**, cancellata nella revisione della tassonomia: commercialista, 730 e rinnovo patente sono in «Altro», che non è un suggerimento sensato. Se servono, vanno rimessi con una categoria propria.
 
 Fatto il 19/08/2026: primo import dei dati veri (1253 voci da otto tricount, ottobre 2024 → agosto 2026, riconciliate al centesimo).
+
+Fatto il 21/08/2026: giro di rifiniture. Il foglio non si muove più di lato (ADR-0033), la striscia dei mesi porta lo scostamento dalla media, la pagina **Statistiche** raccoglie tutto quello che non guarda il mese scelto (ADR-0034), il confronto col mese scorso sta in alto e si fa a pari giorni (ADR-0035), e il mappamondo raggruppa i puntini troppo vicini — serviva per New York, aprile 2024, che è senza spese e da sola riportava la distanza minima fra i puntini europei da 25,6px a 8,2px (ADR-0036).
 
 Fatto il 20/08/2026: revisione della tassonomia validata da Alessio (da 14 a **13 categorie**: Trasporti→Auto, 💊→🦷 su Salute, 🍝→🍔 su Bar e ristoranti, nuove «Telefono» e «Treni e mezzi», via Tecnologia e Tasse e burocrazia, la rete di casa in `casa/internet`). La migrazione è in `scripts/migrate-taxonomy.mjs`, ha spostato **60 voci** e la regola che la rende verificabile è che il totale generale non cambi di un centesimo: 60.298,29 € prima e dopo.
