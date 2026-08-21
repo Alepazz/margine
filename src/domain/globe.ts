@@ -153,6 +153,71 @@ export function fitMarks(places: readonly { lon: number; lat: number }[]): Frami
   return { view, zoom: clampZoom(FILL / spread) }
 }
 
+/** Quanto devono essere vicini due puntini perché il dito non li distingua. */
+export const CLUSTER_DISTANCE = 24
+
+export interface Group<T> {
+  items: T[]
+  /** Il centro del gruppo sullo schermo: è lì che si disegna il puntino unico. */
+  at: ScreenPoint
+}
+
+/**
+ * Raggruppa i puntini che cadono troppo vicini per essere mirati.
+ *
+ * Serve perché l'inquadratura non basta più. `fitMarks` allontana i puntini
+ * finché **tutti** stanno nel disco, quindi un solo viaggio lontano — New York
+ * fra cinque viaggi europei — riporta l'avvicinamento a 1 e l'Europa a un
+ * grumo: misurato, la distanza minima crolla da 25,6px a 8,2px, che è
+ * esattamente il difetto da cui nasce l'ADR-0021. Con più continenti non esiste
+ * un'inquadratura che vada bene per tutti, quindi i puntini che si pestano
+ * diventano uno, con scritto quanti sono. → ADR-0036
+ *
+ * Si fonde **la coppia più vicina alla volta**, finché non ne resta nessuna
+ * sotto `minDistance`. La versione ovvia — ogni puntino nel primo gruppo che lo
+ * accoglie — non garantiva niente: fondendo due puntini il centro si sposta, e
+ * si ritrovava a 23,9px da un terzo, cioè di nuovo sotto il bersaglio del dito.
+ * Così invece la garanzia vale per costruzione, ed è quella che misura il test.
+ *
+ * I pareggi li decide l'ordine dell'elenco, che è sempre lo stesso: il
+ * raggruppamento non balla da un fotogramma all'altro.
+ */
+export function groupNearby<T extends { at: ScreenPoint }>(
+  placed: readonly T[],
+  minDistance = CLUSTER_DISTANCE,
+): Group<T>[] {
+  const groups: Group<T>[] = placed.map((entry) => ({
+    items: [entry],
+    at: { x: entry.at.x, y: entry.at.y },
+  }))
+
+  for (;;) {
+    let best: { a: number; b: number; d: number } | null = null
+    for (let i = 0; i < groups.length; i += 1) {
+      for (let j = i + 1; j < groups.length; j += 1) {
+        const a = groups[i]!
+        const b = groups[j]!
+        const d = Math.hypot(a.at.x - b.at.x, a.at.y - b.at.y)
+        if (d < minDistance && (!best || d < best.d)) best = { a: i, b: j, d }
+      }
+    }
+    if (!best) return groups
+    const a = groups[best.a]!
+    const b = groups[best.b]!
+    const items = [...a.items, ...b.items]
+    /* Il centro è la media di quello che contiene, così il puntino unico sta in
+       mezzo ai suoi invece che sul primo arrivato. */
+    groups.splice(best.b, 1)
+    groups[best.a] = {
+      items,
+      at: {
+        x: items.reduce((sum, item) => sum + item.at.x, 0) / items.length,
+        y: items.reduce((sum, item) => sum + item.at.y, 0) / items.length,
+      },
+    }
+  }
+}
+
 /**
  * Il centro fra più posti, passando per i vettori sulla sfera: la media delle
  * longitudini sbaglierebbe di mezzo mondo a cavallo del meridiano 180.

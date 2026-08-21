@@ -8,11 +8,13 @@
 
 import {
   addMonths,
+  dayOf,
   daysInMonth,
   daysInclusive,
   elapsedDaysInMonth,
   monthKeyOf,
   monthRange,
+  parseMonthKey,
   yearOf,
   type MonthKey,
 } from './dates'
@@ -409,6 +411,61 @@ export function comparePeriods(
   }
 }
 
+export interface SameDaysComparison {
+  /** Quota della persona nel mese scelto, nei primi `days` giorni. */
+  current: number
+  /** Lo stesso nel mese precedente. */
+  previous: number
+  previousMonth: MonthKey
+  delta: number
+  deltaPct: number | null
+  /** Su quanti giorni è fatto il confronto. */
+  days: number
+  /**
+   * Vero quando `days` copre il mese precedente per intero: capita sempre a
+   * mese chiuso, e capita col 31 contro un mese da 30. Serve all'etichetta —
+   * «primi 31 giorni» di un mese che ne ha 30 è una frase falsa.
+   */
+  wholePrevious: boolean
+}
+
+/**
+ * Il mese scelto contro il precedente, **a pari giorni**.
+ *
+ * Il confronto col mese scorso è la statistica che si guarda per prima, e per il
+ * mese in corso non si può fare fra un parziale e un mese intero: il 5 del mese
+ * direbbe «−80%» a chiunque. Le due strade erano confrontare la proiezione col
+ * mese intero — che è quello che si fa con la media (→ ADR-0011) — o tagliare
+ * anche il mese scorso agli stessi giorni. Vince la seconda: non ha una stima
+ * dentro, e a mese chiuso diventa da sé il confronto fra due mesi interi.
+ * → ADR-0035
+ */
+export function compareSameDays(
+  visible: readonly Expense[],
+  person: PersonId,
+  month: MonthKey,
+  today: string,
+): SameDaysComparison {
+  const days = elapsedDaysInMonth(month, today)
+  const previousMonth = addMonths(month, -1)
+  const upTo = (key: MonthKey): number =>
+    sumBy(
+      visible.filter((e) => monthKeyOf(e.date) === key && dayOf(e.date) <= days),
+      (e) => shareOf(e, person),
+    )
+  const current = upTo(month)
+  const previous = upTo(previousMonth)
+  return {
+    current,
+    previous,
+    previousMonth,
+    delta: round2(current - previous),
+    deltaPct: toCents(previous) === 0 ? null : (current - previous) / previous,
+    days,
+    wholePrevious: days >= daysInMonth(previousMonth),
+  }
+}
+
 /** Stesso mese dell'anno scorso. */
 export function compareYearOverYear(
   series: readonly MonthTotal[],
@@ -423,6 +480,179 @@ export function compareYearOverYear(
     deltaPct: toCents(lastYear) === 0 ? null : (current - lastYear) / lastYear,
     lastYearMonth,
   }
+}
+
+// ──────────────────── statistiche di lungo periodo ────────────────────
+
+/*
+ * Queste guardano tutta la storia e non il mese scelto: è la ragione per cui
+ * stanno in una pagina loro invece che nel Riepilogo, dove un mese selezionato
+ * che non cambia metà della pagina è una promessa non mantenuta. → ADR-0034
+ *
+ * Convenzione comune a tutte: lavorano sulla serie **osservata**, senza i mesi
+ * vuoti di `fillMonthGaps`. Un mese senza spese non è «il mese più leggero» e
+ * non è un anno più corto: è un mese che non c'è. La media storica fa il
+ * contrario, e a ragione — là un mese a zero deve abbassarla. → ADR-0011
+ */
+
+export interface YearTotal {
+  year: number
+  total: number
+  /** Mesi osservati: il 2024 ne ha tre, e senza dirlo sembra un anno da [cifra rimossa]. */
+  months: number
+  /** Media al mese sui mesi osservati: è il numero con cui due anni si confrontano. */
+  perMonth: number
+}
+
+/** Anno per anno, dal più recente. */
+export function yearlyTotals(series: readonly MonthTotal[]): YearTotal[] {
+  const map = new Map<number, MonthTotal[]>()
+  for (const row of series) {
+    const year = parseMonthKey(row.month).year
+    const bucket = map.get(year)
+    if (bucket) bucket.push(row)
+    else map.set(year, [row])
+  }
+  return [...map.entries()]
+    .map(([year, rows]) => {
+      const total = sumBy(rows, (r) => r.total)
+      return {
+        year,
+        total,
+        months: rows.length,
+        perMonth: rows.length === 0 ? 0 : round2(total / rows.length),
+      }
+    })
+    .sort((a, b) => b.year - a.year)
+}
+
+/**
+ * Il mese più caro e il più leggero. Il mese in corso si esclude: è parziale, e
+ * vincerebbe come «più leggero» ogni primo del mese.
+ */
+export function extremeMonths(
+  series: readonly MonthTotal[],
+  opts: { excludeMonth?: MonthKey } = {},
+): { highest: MonthTotal | null; lowest: MonthTotal | null } {
+  const rows = series.filter((r) => r.month !== opts.excludeMonth && r.count > 0)
+  if (rows.length === 0) return { highest: null, lowest: null }
+  let highest = rows[0]!
+  let lowest = rows[0]!
+  for (const row of rows) {
+    if (toCents(row.total) > toCents(highest.total)) highest = row
+    if (toCents(row.total) < toCents(lowest.total)) lowest = row
+  }
+  return { highest, lowest }
+}
+
+export interface FixedSharePoint {
+  month: MonthKey
+  /** Quota incomprimibile sul totale del mese, 0–1. */
+  share: number
+}
+
+export interface FixedShare {
+  points: FixedSharePoint[]
+  /** Media delle quote osservate, non quota della somma: pesa i mesi allo stesso modo. */
+  average: number
+  highest: FixedSharePoint | null
+  lowest: FixedSharePoint | null
+}
+
+/**
+ * Quanto del mese è incomprimibile, mese per mese.
+ *
+ * Il mese in corso va escluso, e qui più che altrove: l'affitto arriva il 3 e le
+ * variabili si accumulano fino al 31, quindi il 5 del mese la quota di fisse è
+ * vicina al 100% e vincerebbe come «mese più vincolato» tutti i mesi.
+ */
+export function fixedShareSeries(
+  series: readonly MonthTotal[],
+  opts: { excludeMonth?: MonthKey } = {},
+): FixedShare {
+  /* Un mese a zero non ha una quota di fisse: la divisione non esiste, e
+     inventarle uno zero direbbe «quel mese era tutto discrezionale». */
+  const points = series
+    .filter((row) => toCents(row.total) > 0 && row.month !== opts.excludeMonth)
+    .map((row) => ({ month: row.month, share: toCents(row.fixed) / toCents(row.total) }))
+  if (points.length === 0) return { points: [], average: 0, highest: null, lowest: null }
+  let highest = points[0]!
+  let lowest = points[0]!
+  for (const point of points) {
+    if (point.share > highest.share) highest = point
+    if (point.share < lowest.share) lowest = point
+  }
+  return {
+    points,
+    average: points.reduce((acc, p) => acc + p.share, 0) / points.length,
+    highest,
+    lowest,
+  }
+}
+
+export interface RecurringRow {
+  /** Il titolo come è scritto l'ultima volta che è comparso. */
+  title: string
+  category: string
+  /** In quanti mesi diversi è comparsa. */
+  months: number
+  /** Quanto pesa in un mese: totale diviso i mesi in cui c'è stata. */
+  perMonth: number
+  total: number
+  last: string
+}
+
+/**
+ * Le spese fisse che tornano, raggruppate per titolo: è la risposta a «quanto mi
+ * costa il mese base».
+ *
+ * Il raggruppamento è sul titolo ripulito, non sull'id: due mesi di affitto sono
+ * due voci diverse nei dati e la stessa cosa nella vita. Il numero di mesi sta
+ * nella riga proprio perché è la spia di un raggruppamento sbagliato: una voce
+ * «fissa» comparsa una volta sola si vede subito.
+ */
+export function recurringProfile(
+  scope: readonly Expense[],
+  person: PersonId,
+): { rows: RecurringRow[]; monthlyBase: number } {
+  const map = new Map<
+    string,
+    { title: string; category: string; cents: number; months: Set<MonthKey>; last: string }
+  >()
+  for (const expense of scope) {
+    if (!expense.recurring) continue
+    const cents = toCents(shareOf(expense, person))
+    if (cents === 0) continue
+    const key = expense.title.trim().toLowerCase().replace(/\s+/g, ' ')
+    const row = map.get(key) ?? {
+      title: expense.title.trim(),
+      category: expense.category,
+      cents: 0,
+      months: new Set<MonthKey>(),
+      last: expense.date,
+    }
+    row.cents += cents
+    row.months.add(monthKeyOf(expense.date))
+    /* Titolo e categoria dell'occorrenza più recente: se una voce è stata
+       rinominata, il nome giusto è l'ultimo. */
+    if (expense.date >= row.last) {
+      row.last = expense.date
+      row.title = expense.title.trim()
+      row.category = expense.category
+    }
+    map.set(key, row)
+  }
+  const rows = [...map.values()]
+    .map((row) => ({
+      title: row.title,
+      category: row.category,
+      months: row.months.size,
+      perMonth: round2(row.cents / row.months.size / 100),
+      total: row.cents / 100,
+      last: row.last,
+    }))
+    .sort((a, b) => b.perMonth - a.perMonth)
+  return { rows, monthlyBase: sumBy(rows, (r) => r.perMonth) }
 }
 
 export function topExpenses(scope: readonly Expense[], person: PersonId, limit = 5): Expense[] {

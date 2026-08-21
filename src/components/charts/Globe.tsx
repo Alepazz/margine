@@ -12,6 +12,11 @@
  * Ogni puntino porta il suo nome accanto, così si vede che è roba da toccare e
  * quale si sta toccando. → ADR-0021
  *
+ * Ma con due continenti l'inquadratura non basta: tenere dentro New York
+ * riporta l'Europa a un grumo. Allora **i puntini troppo vicini diventano uno**,
+ * col numero di quanti sono, e toccarlo inquadra i suoi finché non si
+ * separano. → ADR-0036
+ *
  * La tela però è opaca a chi non vede: sotto il globo c'è la stessa lista come
  * pulsanti veri, quindi il mappamondo è un modo in più di arrivare a un viaggio,
  * mai l'unico.
@@ -23,10 +28,12 @@ import {
   clampZoom,
   drag,
   fitMarks,
+  groupNearby,
   MAX_ZOOM,
   MIN_ZOOM,
   project,
   type Framing,
+  type Group,
   type ScreenPoint,
 } from '../../domain/globe'
 import { LAND } from '../../domain/globe-land'
@@ -54,6 +61,17 @@ const LABEL_HEIGHT = 16
 interface Placed {
   mark: GlobeMark
   at: ScreenPoint
+}
+
+/**
+ * Come si chiama un gruppo: l'id del suo primo viaggio.
+ *
+ * Serve solo a sapere su quale puntino sta il mouse, e non può essere la
+ * posizione nell'elenco — girando il globo l'ordine cambia e l'evidenziazione
+ * salterebbe su un altro puntino.
+ */
+function keyOf(group: Group<Placed>): string {
+  return group.items[0]?.mark.trip.id ?? ''
 }
 
 interface LabelBox {
@@ -131,6 +149,13 @@ export function Globe({
     return out
   }, [marks, radius, sphere, frame.view])
 
+  /*
+   * Quello che si disegna non è un puntino per viaggio ma un puntino per
+   * **gruppo**: con due continenti nessuna inquadratura tiene tutti i puntini
+   * distinti, e due puntini a otto pixel non si mirano. → ADR-0036
+   */
+  const groups = useMemo(() => groupNearby(placed), [placed])
+
   useEffect(() => {
     const el = canvas.current
     if (!el || width === 0) return
@@ -191,12 +216,21 @@ export function Globe({
 
     // I viaggi.
     const accent = theme.series[0] ?? theme.ink
-    for (const { mark, at } of placed) {
-      const isSelected = mark.trip.id === selected
-      const isHover = mark.trip.id === hover
+    /* Il carattere arriva dai token, non da un valore scritto qui — ma si legge
+       una volta: `getComputedStyle` forza un ricalcolo dello stile, e a sessanta
+       fotogrammi di trascinamento al secondo sarebbero sessanta ricalcoli. */
+    if (!fontFamily.current) fontFamily.current = window.getComputedStyle(el).fontFamily
+    for (const group of groups) {
+      const { at } = group
+      const many = group.items.length > 1
+      const solo = group.items[0]?.mark
+      const isSelected = group.items.some((item) => item.mark.trip.id === selected)
+      const isHover = keyOf(group) === hover
+      const size = many ? DOT_RADIUS + 4 : DOT_RADIUS
       /* Posizione approssimata: un cerchio intorno, invece di far credere a una
-         precisione che «Germania» non ha. */
-      if (mark.approx) {
+         precisione che «Germania» non ha. In un gruppo non si mostra: lì la
+         posizione è già la media di più posti. */
+      if (!many && solo?.approx) {
         ctx.beginPath()
         ctx.arc(at.x, at.y, DOT_RADIUS + 5, 0, Math.PI * 2)
         ctx.strokeStyle = theme.muted
@@ -205,18 +239,28 @@ export function Globe({
       }
       if (isSelected || isHover) {
         ctx.beginPath()
-        ctx.arc(at.x, at.y, DOT_RADIUS + 9, 0, Math.PI * 2)
+        ctx.arc(at.x, at.y, size + 7, 0, Math.PI * 2)
         ctx.strokeStyle = accent
         ctx.lineWidth = isSelected ? 2 : 1
         ctx.stroke()
       }
       ctx.beginPath()
-      ctx.arc(at.x, at.y, isSelected ? DOT_RADIUS + 2 : DOT_RADIUS, 0, Math.PI * 2)
+      ctx.arc(at.x, at.y, isSelected && !many ? size + 2 : size, 0, Math.PI * 2)
       ctx.fillStyle = isSelected ? accent : theme.ink
       ctx.fill()
       ctx.strokeStyle = theme.surface
       ctx.lineWidth = 2
       ctx.stroke()
+      /* Quanti ce ne sono dentro: senza il numero un puntino più grosso è solo
+         un puntino più grosso. */
+      if (many) {
+        ctx.font = `600 ${LABEL_SIZE - 2}px ${fontFamily.current}`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillStyle = theme.surface
+        ctx.fillText(String(group.items.length), at.x, at.y + 0.5)
+        ctx.textAlign = 'left'
+      }
     }
 
     /*
@@ -228,45 +272,75 @@ export function Globe({
      * cede: due nomi sovrapposti sono peggio di un nome mancante. Il selezionato
      * chiede per primo, così il suo non manca mai.
      */
-    /* Il carattere arriva dai token, non da un valore scritto qui — ma si legge
-       una volta: `getComputedStyle` forza un ricalcolo dello stile, e a sessanta
-       fotogrammi di trascinamento al secondo sarebbero sessanta ricalcoli. */
-    if (!fontFamily.current) fontFamily.current = window.getComputedStyle(el).fontFamily
     ctx.font = `600 ${LABEL_SIZE}px ${fontFamily.current}`
     ctx.textBaseline = 'middle'
     const taken: LabelBox[] = []
-    const ordered = [...placed].sort((a, b) => {
-      const rank = (entry: Placed) => (entry.mark.trip.id === selected ? 0 : 1)
+    const ordered = [...groups].sort((a, b) => {
+      const rank = (group: Group<Placed>) =>
+        group.items.some((item) => item.mark.trip.id === selected) ? 0 : 1
       return rank(a) - rank(b)
     })
-    for (const { mark, at } of ordered) {
-      const isSelected = mark.trip.id === selected
-      const spot = placeLabel(ctx, mark.label, at, taken, radius)
+    for (const group of ordered) {
+      const isSelected = group.items.some((item) => item.mark.trip.id === selected)
+      /* Un gruppo porta il numero, non i nomi: due nomi accostati sono
+         illeggibili, e toccandolo si aprono. */
+      const text =
+        group.items.length > 1
+          ? `${group.items.length} viaggi`
+          : (group.items[0]?.mark.label ?? '')
+      const spot = placeLabel(ctx, text, group.at, taken, radius)
       if (!spot) continue
-      const textWidth = ctx.measureText(mark.label).width
+      const textWidth = ctx.measureText(text).width
       /* Un piatto pieno sotto il nome: sopra le terre, il testo nudo si perde. */
       ctx.fillStyle = theme.surface
       ctx.fillRect(spot.x - 3, spot.y - LABEL_HEIGHT / 2, textWidth + 6, LABEL_HEIGHT)
       ctx.fillStyle = isSelected ? accent : theme.ink
-      ctx.fillText(mark.label, spot.x, spot.y)
+      ctx.fillText(text, spot.x, spot.y)
     }
 
     ctx.restore()
-  }, [frame.view, frame.zoom, height, hover, placed, radius, selected, sphere, theme, width])
+  }, [frame.view, frame.zoom, groups, height, hover, radius, selected, sphere, theme, width])
 
   /** Il puntino sotto un punto dello schermo, o niente. */
-  const hit = (clientX: number, clientY: number): string | null => {
+  const hit = (clientX: number, clientY: number): Group<Placed> | null => {
     const el = canvas.current
     if (!el) return null
     const rect = el.getBoundingClientRect()
     const x = clientX - rect.left - width / 2
     const y = clientY - rect.top - height / 2
-    let best: { id: string; d: number } | null = null
-    for (const { mark, at } of placed) {
-      const d = Math.hypot(at.x - x, at.y - y)
-      if (d <= HIT_RADIUS && (!best || d < best.d)) best = { id: mark.trip.id, d }
+    let best: { group: Group<Placed>; d: number } | null = null
+    for (const group of groups) {
+      const d = Math.hypot(group.at.x - x, group.at.y - y)
+      if (d <= HIT_RADIUS && (!best || d < best.d)) best = { group, d }
     }
-    return best?.id ?? null
+    return best?.group ?? null
+  }
+
+  /**
+   * Il tocco: un viaggio si apre, un gruppo si scioglie.
+   *
+   * Sciogliere un gruppo è **inquadrare i suoi**, cioè `fitMarks` sul
+   * sottoinsieme: la stessa funzione dell'inquadratura di partenza, già
+   * presidiata da un test. Se nemmeno così si separano — due viaggi nello stesso
+   * posto, o l'avvicinamento già al massimo — si apre il primo, invece di
+   * lasciare un tocco che non fa niente.
+   */
+  const tap = (group: Group<Placed>): void => {
+    const first = group.items[0]?.mark.trip.id
+    if (group.items.length === 1) {
+      if (first) onSelect(first)
+      return
+    }
+    const wanted = fitMarks(group.items.map((item) => item.mark))
+    const after = group.items.flatMap((item) => {
+      const at = project(item.mark.lon, item.mark.lat, wanted.view, radius * wanted.zoom)
+      return at ? [{ mark: item.mark, at }] : []
+    })
+    if (groupNearby(after).length > 1) {
+      setFrame(wanted)
+      return
+    }
+    if (first) onSelect(first)
   }
 
   const zoomBy = (factor: number) =>
@@ -294,7 +368,8 @@ export function Globe({
           const previous = active.get(event.pointerId)
           if (!previous) {
             /* Nessun dito giù: è solo il mouse che passa sopra. */
-            setHover(hit(event.clientX, event.clientY))
+            const under = hit(event.clientX, event.clientY)
+            setHover(under ? keyOf(under) : null)
             return
           }
           const dx = event.clientX - previous.x
@@ -323,8 +398,8 @@ export function Globe({
              non è un tocco, altrimenti girare il globo aprirebbe un viaggio a
              caso ogni volta che si alza il dito. */
           if (active.size > 0 || state.pinched || state.moved > TAP_SLOP) return
-          const id = hit(event.clientX, event.clientY)
-          if (id) onSelect(id)
+          const under = hit(event.clientX, event.clientY)
+          if (under) tap(under)
         }}
         onPointerCancel={(event) => {
           pointers.current.delete(event.pointerId)

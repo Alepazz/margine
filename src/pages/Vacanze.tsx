@@ -14,7 +14,7 @@ import { ExpenseSheet } from '../components/ExpenseSheet'
 import { TripForm } from '../components/TripForm'
 import { Card, Notice, StatTile, useToast } from '../components/ui'
 import { formatDate } from '../domain/dates'
-import { formatEuro } from '../domain/money'
+import { formatEuro, toCents } from '../domain/money'
 import { tripPlaces, tripStats, tripsByYear } from '../domain/selectors'
 import { tripTitleOf, type Expense } from '../domain/types'
 import { usePageData } from './usePageData'
@@ -55,7 +55,18 @@ export function Vacanze(): ReactNode {
   const totalShare = shown.reduce((acc, t) => acc + Math.round(t.share * 100), 0) / 100
   const totalCouple = shown.reduce((acc, t) => acc + Math.round(t.couple * 100), 0) / 100
   const totalDays = shown.reduce((acc, t) => acc + t.days, 0)
-  const places = useMemo(() => tripPlaces(shown), [shown])
+  /*
+   * Un viaggio può esistere senza spese: i tricount partono da ottobre 2024, i
+   * viaggi da prima. I suoi giorni sono un fatto e restano contati, ma nel costo
+   * di un giorno di vacanza non entrano — dodici giorni a zero abbasserebbero la
+   * media di tutti gli altri, e la media direbbe una cosa falsa.
+   */
+  const withSpend = shown.filter((t) => t.count > 0)
+  const spentDays = withSpend.reduce((acc, t) => acc + t.days, 0)
+  const places = useMemo(
+    () => tripPlaces(shown).filter((place) => toCents(place.share) > 0),
+    [shown],
+  )
 
   const trip = shown.find((t) => t.trip.id === selectedTrip) ?? null
 
@@ -180,8 +191,12 @@ export function Vacanze(): ReactNode {
           <StatTile label="Giorni di viaggio" value={String(totalDays)} />
           <StatTile
             label="Media al giorno"
-            value={totalDays > 0 ? formatEuro(totalShare / totalDays) : '—'}
-            hint="quota tua per giorno"
+            value={spentDays > 0 ? formatEuro(totalShare / spentDays) : '—'}
+            hint={
+              withSpend.length === shown.length
+                ? 'quota tua per giorno'
+                : `quota tua per giorno, sui ${withSpend.length} viaggi con spese registrate`
+            }
           />
           <StatTile
             label="Viaggio più caro"
@@ -205,6 +220,12 @@ export function Vacanze(): ReactNode {
               onSelect={(id) => setSelectedTrip((current) => (current === id ? null : id))}
             />
             <div className="card-foot">
+              {/* Al condizionale di proposito: il raggruppamento dipende da come è
+                  girato il globo in questo momento, quindi «c'è un gruppo» non è
+                  una cosa che questa pagina possa sapere. */}
+              Dove due viaggi cadono troppo vicini per essere toccati uno per uno, il puntino porta
+              il numero di quanti sono: toccalo e il globo si stringe su di loro finché non si
+              separano.{' '}
               {/* I nomi si leggono dai dati: scriverli a mano qui vorrebbe dire
                   che il componente conosce i viaggi di qualcuno in particolare. */}
               {marks.some((m) => m.approx)
@@ -212,7 +233,7 @@ export function Vacanze(): ReactNode {
                     .filter((m) => m.approx)
                     .map((m) => m.label)
                     .join(', ')}. Si corregge nelle coordinate del viaggio.`
-                : 'Ogni puntino è un viaggio.'}
+                : ''}
               {senzaPosto.length > 0
                 ? ` ${senzaPosto.length} ${senzaPosto.length === 1 ? 'viaggio non ha' : 'viaggi non hanno'} coordinate e ${senzaPosto.length === 1 ? 'sta' : 'stanno'} solo nell'elenco qui sotto.`
                 : ''}
@@ -267,26 +288,35 @@ export function Vacanze(): ReactNode {
                     </span>
                     <span aria-hidden="true">·</span>
                     <span>
-                      {entry.days} giorni · {formatEuro(entry.perDayShare)} al giorno
+                      {entry.days} giorni
+                      {entry.count > 0 ? ` · ${formatEuro(entry.perDayShare)} al giorno` : ''}
                     </span>
                     <span aria-hidden="true">·</span>
-                    <span>{entry.count} voci</span>
+                    <span>{entry.count > 0 ? `${entry.count} voci` : 'nessuna spesa'}</span>
                     {entry.trip.closed ? <span className="chip">conclusa</span> : null}
                   </span>
                 </span>
                 <span className="list-amount">
-                  {formatEuro(entry.share, { decimals: 0 })}
-                  <span className="list-amount-sub">
-                    <br />
-                    su {formatEuro(entry.couple, { decimals: 0 })} in due
-                  </span>
+                  {/* Zero euro con «su 0 € in due» sotto è rumore: un viaggio
+                      senza spese non ha un importo, e il trattino lo dice. */}
+                  {entry.count === 0 ? (
+                    '—'
+                  ) : (
+                    <>
+                      {formatEuro(entry.share, { decimals: 0 })}
+                      <span className="list-amount-sub">
+                        <br />
+                        su {formatEuro(entry.couple, { decimals: 0 })} in due
+                      </span>
+                    </>
+                  )}
                 </span>
               </button>
             ))}
           </div>
           <div style={{ marginTop: 14 }}>
             <BarList
-              items={shown.map((entry) => ({
+              items={withSpend.map((entry) => ({
                 key: entry.trip.id,
                 label: entry.trip.place,
                 value: entry.share,
@@ -336,7 +366,9 @@ export function Vacanze(): ReactNode {
               </div>
             }
           >
-            {trip.trip.closed ? (
+            {/* Un solo avviso per volta: se il viaggio è anche senza spese, quello
+                qui sotto dice già che si riapre per aggiungerle. */}
+            {trip.trip.closed && trip.count > 0 ? (
               <div style={{ marginBottom: 12 }}>
                 <Notice icon="✓">
                   Vacanza conclusa: resta qui e nel saldo, ma non si possono più aggiungere spese
@@ -344,6 +376,20 @@ export function Vacanze(): ReactNode {
                 </Notice>
               </div>
             ) : null}
+            {/*
+              Un viaggio senza spese non ha una torta e non ha piastrelle: sono
+              quattro zeri e un cerchio vuoto. Ha un posto sul mappamondo e dei
+              giorni, e sono quelli che si dicono.
+            */}
+            {trip.count === 0 ? (
+              <Notice>
+                Nessuna spesa registrata: questo viaggio sta in archivio per il mappamondo e per il
+                conto dei giorni. I tricount partono da ottobre 2024, e prima di allora le spese non
+                sono state tracciate — se salta fuori una ricevuta,{' '}
+                {trip.trip.closed ? 'riapri la vacanza e aggiungila' : 'aggiungila'}.
+              </Notice>
+            ) : (
+              <>
             <div className="kpi-row" style={{ marginBottom: 14 }}>
               {/* Senza centesimi: su telefono «[cifra rimossa]» non ci sta nella piastrella
                   e viene troncato. I centesimi esatti stanno nelle righe qui sotto. */}
@@ -399,6 +445,8 @@ export function Vacanze(): ReactNode {
                 />
               </div>
             </div>
+              </>
+            )}
           </Card>
         ) : null}
 

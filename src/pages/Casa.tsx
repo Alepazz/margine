@@ -18,12 +18,11 @@ import { TrendChart } from '../components/charts/TrendChart'
 import { ExpenseList } from '../components/ExpenseList'
 import { ExpenseSheet } from '../components/ExpenseSheet'
 import { Card, Notice, StatTile } from '../components/ui'
-import { foldSlices, labelSlices } from '../domain/categories'
+import { donutSlices } from '../domain/categories'
 import { formatDate } from '../domain/dates'
 import { formatEuro } from '../domain/money'
 import {
   averageMonthly,
-  categoryBreakdown,
   fillMonthGaps,
   houseLedger,
   houseOutside,
@@ -56,7 +55,7 @@ export function Casa(): ReactNode {
   /* Il tricount mescola categorie, quindi la ciambella è per categoria: i colori
      sono quelli fissi di ogni categoria, e la telefonia si vede per quello che è. */
   const ledgerSlices = useMemo<DonutSlice[]>(
-    () => labelSlices(foldSlices(categoryBreakdown(ledger, person), lookup), lookup),
+    () => donutSlices(ledger, person, lookup),
     [ledger, lookup, person],
   )
 

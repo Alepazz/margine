@@ -4,9 +4,10 @@
  * Le destinazioni sono più dei posti disponibili in una barra, quindi hanno tre
  * case diverse. Nella **barra** stanno le quattro che si aprono ogni giorno.
  * Nel **menu `⋯`** della testata stanno le viste che si aprono di tanto in
- * tanto: l'elenco completo delle spese e il 730, che è una scena da una volta
- * l'anno. Le **impostazioni** restano sul loro ingranaggio, perché un menu che
- * mescola viste e configurazione diventa il cassetto dove finisce tutto.
+ * tanto: le statistiche di tutta la storia, l'elenco completo delle spese e il
+ * 730, che è una scena da una volta l'anno. Le **impostazioni** restano sul loro
+ * ingranaggio, perché un menu che mescola viste e configurazione diventa il
+ * cassetto dove finisce tutto.
  *
  * Sulla colonna laterale, dove lo spazio c'è, non si nasconde niente: il menu
  * `⋯` è una concessione al telefono, non un'architettura.
@@ -32,6 +33,7 @@ const NAV: NavItem[] = [
   { to: '/casa', label: 'Casa', glyph: '🏠', slot: 'tabbar' },
   { to: '/gatto', label: 'Gatto', glyph: '🐈', slot: 'tabbar' },
   { to: '/vacanze', label: 'Vacanze', glyph: '🌍', slot: 'tabbar' },
+  { to: '/statistiche', label: 'Statistiche', glyph: '📊', slot: 'more' },
   { to: '/spese', label: 'Tutte le spese', glyph: '≡', slot: 'more' },
   { to: '/730', label: 'Spese da 730', glyph: '🧾', slot: 'more' },
   { to: '/saldo', label: 'Saldo con chi vive con te', glyph: '⚖️', slot: 'more' },
