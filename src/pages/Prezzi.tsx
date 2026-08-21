@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import { Card, DeltaLabel, Notice, useToast } from '../components/ui'
-import { PriceForm } from '../components/PriceForm'
+import { PriceSheet } from '../components/PriceSheet'
 import { useReadyStore } from '../data/store'
 import { formatDate } from '../domain/dates'
 import { formatEuro } from '../domain/money'
@@ -146,7 +146,7 @@ function HistorySheet({
 }
 
 export function Prezzi(): ReactNode {
-  const { dataset, addPrice, deletePrice } = useReadyStore()
+  const { dataset, deletePrice } = useReadyStore()
   const toast = useToast()
   const [query, setQuery] = useState('')
   const [adding, setAdding] = useState(false)
@@ -189,35 +189,22 @@ export function Prezzi(): ReactNode {
       </div>
 
       <div className="stack">
-        {adding ? (
-          <Card title="Registra un prezzo" note="Il prezzo per unità, quello scritto in piccolo sull'etichetta">
-            <PriceForm
-              prices={dataset.prices}
-              onCancel={() => setAdding(false)}
-              onProblem={(message) => toast.show(message)}
-              onSave={(entry) => {
-                addPrice(entry)
-                setAdding(false)
-                toast.show(`${entry.product}: ${formatEuro(entry.price)} ${UNIT_LABEL[entry.unit]} da ${entry.store}.`)
-              }}
-            />
-          </Card>
-        ) : (
-          <div className="filters">
-            <input
-              className="input input-search"
-              type="search"
-              inputMode="search"
-              placeholder="Cerca un prodotto o un supermercato"
-              aria-label="Cerca fra i prezzi"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>
-              Registra un prezzo
-            </button>
-          </div>
-        )}
+        {/* La ricerca resta anche a modulo aperto: il foglio sta sopra, e
+            chiudendolo si torna all'elenco dov'era. */}
+        <div className="filters">
+          <input
+            className="input input-search"
+            type="search"
+            inputMode="search"
+            placeholder="Cerca un prodotto o un supermercato"
+            aria-label="Cerca fra i prezzi"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>
+            Registra un prezzo
+          </button>
+        </div>
 
         {board.length === 0 ? (
           <Card>
@@ -309,6 +296,8 @@ export function Prezzi(): ReactNode {
           </Card>
         ) : null}
       </div>
+
+      {adding ? <PriceSheet onClose={() => setAdding(false)} /> : null}
 
       {opened && openedGroup && openedRow ? (
         <HistorySheet
