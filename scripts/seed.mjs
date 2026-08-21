@@ -698,6 +698,27 @@ const config = {
   },
 }
 
+/**
+ * Rilevazioni di prezzo di esempio. → ADR-0041
+ *
+ * Poche e scelte: tre prodotti su due supermercati inventati, con dentro i tre
+ * casi che la pagina deve saper mostrare — un prodotto con **storico** nello
+ * stesso supermercato (la passata, scesa da 2,15 a 1,99), uno con una **nota**
+ * (il latte in offerta) e uno in **litri** invece che al chilo. Gli id sono
+ * scritti a mano: come tutto il resto del seed, due esecuzioni devono dare lo
+ * stesso file.
+ */
+const PRICES = [
+  { id: 'prezzo-2026-07-20-a1c3e5', product: 'Passata di pomodoro', store: 'Supermercato A', unit: 'kg', price: 2.15, date: '2026-07-20' },
+  { id: 'prezzo-2026-08-02-b2d4f6', product: 'Passata di pomodoro', store: 'Supermercato B', unit: 'kg', price: 1.79, date: '2026-08-02' },
+  { id: 'prezzo-2026-08-15-c3e5a7', product: 'Passata di pomodoro', store: 'Supermercato A', unit: 'kg', price: 1.99, date: '2026-08-15' },
+  { id: 'prezzo-2026-08-05-d4f6b8', product: 'Caffè macinato', store: 'Supermercato A', unit: 'kg', price: 14.9, date: '2026-08-05' },
+  { id: 'prezzo-2026-08-06-e5a7c9', product: 'Caffè macinato', store: 'Supermercato B', unit: 'kg', price: 16.5, date: '2026-08-06' },
+  { id: 'prezzo-2026-08-10-f6b8d1', product: 'Latte intero', store: 'Supermercato A', unit: 'l', price: 1.29, date: '2026-08-10' },
+  { id: 'prezzo-2026-08-12-a7c9e2', product: 'Latte intero', store: 'Supermercato B', unit: 'l', price: 1.19, date: '2026-08-12' },
+  { id: 'prezzo-2026-08-18-b8d1f3', product: 'Latte intero', store: 'Supermercato B', unit: 'l', price: 1.09, date: '2026-08-18', note: 'In offerta' },
+]
+
 const dataset = {
   version: 2,
   updatedAt: `${TODAY}T09:00:00.000Z`,
@@ -705,11 +726,15 @@ const dataset = {
   tricounts: TRICOUNTS,
   /* I rimborsi si registrano dall'app: nei dati di esempio si parte da zero. */
   settlements: [],
+  prices: PRICES,
 }
 
 writeJson(`${PATHS.dataExample}/expenses.json`, dataset)
 writeJson(`${PATHS.dataExample}/config.json`, config)
-log(`✓ Dati di esempio: ${expenses.length} spese, ${TRICOUNTS.length} tricount in data-example/`)
+log(
+  `✓ Dati di esempio: ${expenses.length} spese, ${TRICOUNTS.length} tricount, ` +
+    `${PRICES.length} prezzi rilevati in data-example/`,
+)
 
 if (!exists(PATHS.expenses)) {
   writeJson(PATHS.expenses, dataset)

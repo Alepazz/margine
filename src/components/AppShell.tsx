@@ -34,6 +34,9 @@ const NAV: NavItem[] = [
   { to: '/gatto', label: 'Gatto', glyph: '🐈', slot: 'tabbar' },
   { to: '/vacanze', label: 'Vacanze', glyph: '🌍', slot: 'tabbar' },
   { to: '/statistiche', label: 'Statistiche', glyph: '📊', slot: 'more' },
+  /* L'etichetta col selettore di variazione (U+FE0F): senza, `🏷` è un glifo di
+     testo e il browser lo disegna come un rettangolo pallido invece dell'emoji. */
+  { to: '/prezzi', label: 'Prezzi al supermercato', glyph: '🏷️', slot: 'more' },
   { to: '/spese', label: 'Tutte le spese', glyph: '≡', slot: 'more' },
   { to: '/730', label: 'Spese da 730', glyph: '🧾', slot: 'more' },
   { to: '/saldo', label: 'Saldo con chi vive con te', glyph: '⚖️', slot: 'more' },

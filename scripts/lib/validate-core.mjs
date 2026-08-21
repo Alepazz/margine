@@ -27,6 +27,29 @@ function isDate(value) {
 
 const cents = (value) => Math.round(value * 100)
 
+/** Le unità di misura di una rilevazione di prezzo. → ADR-0041 */
+const PRICE_UNITS = ['kg', 'l', 'pezzo']
+
+/**
+ * Due nomi sono lo stesso nome. È la gemella di `nameKey` in
+ * `src/domain/prices.ts`: qui serve solo per un avviso, quindi non c'è un test
+ * di parità come per le regole delle spese — se le due divergessero, il peggio
+ * che accade è un avviso in più o in meno.
+ */
+const nameKey = (text) => String(text ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
+
+/**
+ * Al più due decimali, letti dalla **rappresentazione** del numero e non da
+ * `Math.round(v * 100)`: in virgola mobile `2.15 * 100` fa 214.99999999999997,
+ * quindi il confronto aritmetico segnalerebbe come sbagliato un prezzo giusto.
+ */
+function atMostTwoDecimals(value) {
+  const text = String(value)
+  if (text.includes('e') || text.includes('E')) return false
+  const decimals = text.split('.')[1]
+  return decimals === undefined || decimals.length <= 2
+}
+
 export function validateDataset(dataset, config) {
   const errors = []
   const warnings = []
@@ -103,6 +126,61 @@ export function validateDataset(dataset, config) {
       errors.push(`${where}: importo non valido.`)
     } else if (settlement.amount <= 0) {
       errors.push(`${where}: importo non positivo (${settlement.amount}).`)
+    }
+  }
+
+  /*
+   * Le rilevazioni di prezzo. Non sono spese: non hanno quote né tricount, e non
+   * entrano in nessun totale — l'unica cosa che devono garantire è di essere
+   * confrontabili fra loro. Il campo manca nei file scritti prima di ADR-0041.
+   */
+  const prices = Array.isArray(dataset.prices) ? dataset.prices : []
+  if (dataset.prices !== undefined && !Array.isArray(dataset.prices)) {
+    errors.push('`prices` deve essere una lista.')
+  }
+  const seenPrices = new Set()
+  const unitByProduct = new Map()
+  for (const price of prices) {
+    const where = `prezzo ${price.id ?? '(senza id)'} «${price.product ?? ''}»`
+
+    if (!price.id) errors.push(`${where}: manca l'id.`)
+    else if (seenPrices.has(price.id)) errors.push(`id di rilevazione duplicato: ${price.id}.`)
+    else seenPrices.add(price.id)
+
+    if (typeof price.product !== 'string' || price.product.trim() === '') {
+      errors.push(`${where}: manca il prodotto.`)
+    }
+    if (typeof price.store !== 'string' || price.store.trim() === '') {
+      errors.push(`${where}: manca il supermercato.`)
+    }
+    if (!PRICE_UNITS.includes(price.unit)) {
+      errors.push(`${where}: unità sconosciuta (${price.unit}). Attese: ${PRICE_UNITS.join(', ')}.`)
+    }
+    if (typeof price.price !== 'number' || !Number.isFinite(price.price)) {
+      errors.push(`${where}: prezzo non valido.`)
+    } else if (price.price <= 0) {
+      errors.push(`${where}: prezzo non positivo (${price.price}).`)
+    } else if (!atMostTwoDecimals(price.price)) {
+      errors.push(`${where}: più di due decimali (${price.price}).`)
+    }
+    if (!isDate(price.date)) errors.push(`${where}: data non valida (${price.date}).`)
+    if (price.note !== undefined && typeof price.note !== 'string') {
+      errors.push(`${where}: «note» deve essere testo.`)
+    }
+
+    /* Lo stesso prodotto con due unità fa due gruppi che non si confrontano, e
+       di solito è un tocco sbagliato sul controllo dell'unità. Non è un errore:
+       «uova» al pezzo e al kg può volerlo dire davvero. → ADR-0041 */
+    const key = nameKey(price.product)
+    if (key !== '' && PRICE_UNITS.includes(price.unit)) {
+      const seen = unitByProduct.get(key)
+      if (seen === undefined) unitByProduct.set(key, price.unit)
+      else if (seen !== price.unit) {
+        warnings.push(
+          `${where}: «${price.product.trim()}» è rilevato sia in ${seen} sia in ${price.unit}, ` +
+            'quindi finisce in due gruppi che non si confrontano fra loro.',
+        )
+      }
     }
   }
 
@@ -352,13 +430,17 @@ export function buildReport(dataset) {
     trips: dataset.tricounts.filter((t) => t.trip).length,
     total: rows.reduce((acc, r) => acc + cents(r.total), 0) / 100,
     tagged730: dataset.expenses.filter((e) => e.tax730).length,
+    prices: Array.isArray(dataset.prices) ? dataset.prices.length : 0,
   }
 }
 
 export function printReport(report, log) {
   if (!report) return
   log('')
-  log(`Spese: ${report.expenses} · viaggi: ${report.trips} · segnate 730: ${report.tagged730}`)
+  log(
+    `Spese: ${report.expenses} · viaggi: ${report.trips} · segnate 730: ${report.tagged730}` +
+      (report.prices > 0 ? ` · prezzi rilevati: ${report.prices}` : ''),
+  )
   log(`Totale complessivo: ${report.total.toFixed(2)} €`)
   log('')
   const anyOthers = report.months.some((row) => row.others > 0)

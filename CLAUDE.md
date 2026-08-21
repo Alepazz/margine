@@ -2,7 +2,7 @@
 
 Cruscotto personale delle spese di Alessio, alimentato dai tricount (spese fisse condivise, personali, altre condivise, e uno per ogni vacanza). L'altra persona è **Federica**.
 
-**Prima di una scelta tecnica o architetturale, leggi [`docs/adr/`](docs/adr/).** Contiene le trentanove decisioni che tengono in piedi il progetto, con i vincoli che le hanno forzate. Una decisione nuova che ne cambia una vecchia è un ADR nuovo, scritto nello stesso commit del codice.
+**Prima di una scelta tecnica o architetturale, leggi [`docs/adr/`](docs/adr/).** Contiene le quarantuno decisioni che tengono in piedi il progetto, con i vincoli che le hanno forzate. Una decisione nuova che ne cambia una vecchia è un ADR nuovo, scritto nello stesso commit del codice.
 
 ## In tre righe
 
@@ -18,6 +18,8 @@ Sito **statico** su GitHub Pages, nessun backend. I dati vivono **cifrati** nel 
 - **Le quote appartengono ai membri; il pagante è un fatto a parte.** In un tricount con un membro solo la quota dell'altra persona è zero per costruzione, e lo controllano sia `validateExpense` sia `validate-core`. Ma una spesa personale **anticipata dall'altra persona** è legittima: è un debito. Confondere le due cose cancella un debito in silenzio. → ADR-0037, ADR-0028
 - **I menù di inserimento offrono solo i tricount di cui chi guarda è membro** (`tricountOptions`). È la separazione in scrittura: non un divieto, un'assenza. In lettura non serve niente, perché ogni statistica filtra già su `shareOf(spesa, persona) > 0`. → ADR-0037
 - **La separazione del personale è una convenzione dell'interfaccia, non una garanzia.** Una passphrase sola apre tutto il file: con gli strumenti del browser, o con `npm run decrypt`, si legge anche il compartimento dell'altro. Protegge dall'errore e dall'averlo davanti, non dalla volontà — ed è scritto anche a schermo, in Impostazioni, perché fra sei mesi il ricordo sarà «sono separati». → ADR-0039
+- **Una rilevazione di prezzo non è una spesa, e `import.mjs` la deve riportare a mano.** `dataset.prices` è una lista di fatti condivisi (nessuna quota, nessun tricount, fuori da margine, saldo e statistiche) e la pagina Prezzi è l'unica che **ignora `view.person`**. Il campo è additivo, quindi non ha richiesto migrazione — ma l'import ricostruisce il master da zero: **tutto ciò che nasce nell'app va ricopiato lì** (i rimborsi e i prezzi), altrimenti la sessione mensile lo cancella in silenzio. → ADR-0041, ADR-0019
+- **Il token di un collaboratore è classic con `public_repo`, e non è una svista da modernizzare.** Un token fine-grained non può scrivere su un repo di un altro account personale: nel suo elenco di repository non compare niente da spuntare, e il sintomo — «non trovo il tuo repo» — non somiglia a un permesso sbagliato. Le istruzioni si biforcano in tre posti (`Impostazioni.tsx`, README, il 403 in `github.ts`) e devono restare d'accordo. → ADR-0040, ADR-0005
 - **L'identità sta nel dispositivo, non nella testata.** Un telefono, una persona, scelta in Impostazioni e ricordata in `localStorage`. Rimetterla nella testata riaprirebbe la porta che ADR-0038 ha chiuso: un tocco accanto all'orologio aprirebbe il compartimento personale dell'altra persona. → ADR-0038, ADR-0007
 - **Le spunte della divisione non sono uno stato: sono la lettura del preset.** `half | mine | theirs` sono le tre combinazioni di due caselle, quindi «nessuno dei due partecipa» non è un errore da respingere, è uno stato irraggiungibile. Il modello sotto (`splitFor`, `presetOf`, il centesimo dispari) non è cambiato. → ADR-0032
 - **Nei campi importo si passa da `AmountInput`**, che filtra con `sanitizeAmount` e apre il tastierino: `type` resta testo perché il tipo numerico litiga con la virgola. Un campo importo scritto a mano con `type="number"` è un difetto, non una scorciatoia.
@@ -68,13 +70,13 @@ L'app si usa in piedi, con un pollice, e in secondo luogo dal Mac.
 
 ```
 src/domain/      logica pura, testata: types, money, dates, selectors, income, categories,
-                 expense-rules, ids, globe, export · globe-land.ts è generato
+                 expense-rules, prices, ids, globe, export · globe-land.ts è generato
 src/data/        envelope + crypto (WebCrypto), outbox (registro operazioni), github, store (contesto React)
 src/components/  AppShell, Gate, Controls, MonthStrip, MarginMeter, ExpenseList,
-                 ExpenseSheet, ExpenseForm, LedgerSelect, TricountForm, CategoryEditor,
-                 IncomeEditor, ui, charts/ (compreso Globe)
-src/pages/       Home · Spese · Casa · Gatto · Vacanze · Statistiche · Tax730 · Saldo ·
-                 Impostazioni (+ usePageData)
+                 ExpenseSheet, ExpenseForm, LedgerSelect, TricountForm, PriceForm,
+                 CategoryEditor, IncomeEditor, ui, charts/ (compreso Globe)
+src/pages/       Home · Spese · Casa · Gatto · Vacanze · Statistiche · Prezzi · Tax730 ·
+                 Saldo · Impostazioni (+ usePageData)
 scripts/         from-tricount, import, validate, encrypt, decrypt, seed, make-icon,
                  make-globe, add-trip (+ lib/)
                  migrazioni una volta sola: migrate-taxonomy, migrate-tricounts
@@ -97,12 +99,14 @@ Vale la regola globale: `/simplify`, poi una review strutturata del diff, poi si
 - **Il margine sui mesi vecchi.** Le entrate sono un valore unico e corrente, ma i dati partono da ottobre 2024: se lo stipendio è cambiato, il margine dei mesi passati è approssimato. Per farlo giusto servirebbe una serie di periodi di reddito, e un ADR.
 - **Le date dei viaggi** in `TRIPS` (in `scripts/from-tricount.mjs`) sono dedotte dal grappolo di spese sul posto, non dai primi pagamenti: da confermare con chi c'era.
 - **I punti di partenza dei tricount sono dichiarati tutti** (20/08/2026), quindi il totale non è più parziale: `fisse` 16,93 €, `condivise` mai saldato — parte da prima della prima voce e i dati fanno −66,04 € come Tricount — e le cinque vacanze tutte saldate. Il tricount personale non ne ha bisogno: non ha mai una quota dell'altra persona. Saldo netto: **−49,11 €**. → ADR-0022
-- **Federica sta per avere accesso**, deciso il 21/08/2026: il modello a tricount con membri è pronto (→ ADR-0037) e la separazione del personale è una convenzione dell'interfaccia (→ ADR-0039). Restano da fare due cose fuori dal codice: il suo account GitHub come collaboratrice del repo con un token suo, e l'**import del suo tricount personale** (`personali-federica` oggi è vuoto), che vuole la chiave di condivisione del suo tricount — da trattare come le altre: mai su un sito di terzi, mai nel repo. Il file di export si chiama `personale_2_expenses.json` di proposito: il nome che una persona dà al suo tricount non entra in un repo pubblico.
+- **Federica sta per avere accesso**, deciso il 21/08/2026: il modello a tricount con membri è pronto (→ ADR-0037) e la separazione del personale è una convenzione dell'interfaccia (→ ADR-0039). Restano da fare due cose fuori dal codice: il suo account GitHub come collaboratrice del repo con un token suo — **classic, con la sola spunta `public_repo`**, perché un fine-grained non vede i repo di un altro account (→ ADR-0040) — e l'**import del suo tricount personale** (`personali-federica` oggi è vuoto), che vuole la chiave di condivisione del suo tricount — da trattare come le altre: mai su un sito di terzi, mai nel repo. Il file di export si chiama `personale_2_expenses.json` di proposito: il nome che una persona dà al suo tricount non entra in un repo pubblico.
 - **Le sottocategorie si modificano solo nella sessione mensile.** Le categorie sì dall'app, i tipi dentro no: la richiesta era sulle categorie e un editor annidato è un'altra cosa.
 - **Cinque voci in «Altro» sono passaggi di soldi** e non consumi (*Saldo, Giroconto, Paolo, Debiti di Betto, Viaggio Betto*, 253,65 €). Alessio ha deciso il 20/08/2026 che restano spese: «se sono tracciate su Tricount sono spese». Nessuna azione, è registrato perché la domanda tornerà.
 - **I suggerimenti del 730 hanno perso «Tasse e burocrazia»**, cancellata nella revisione della tassonomia: commercialista, 730 e rinnovo patente sono in «Altro», che non è un suggerimento sensato. Se servono, vanno rimessi con una categoria propria.
 
 Fatto il 19/08/2026: primo import dei dati veri (1253 voci da otto tricount, ottobre 2024 → agosto 2026, riconciliate al centesimo).
+
+Fatto il 21/08/2026 (terzo giro): **l'osservatorio dei prezzi al supermercato** (ADR-0041), chiesto da Federica. `dataset.prices` è un campo additivo — nessuna migrazione — con `src/domain/prices.ts` che raggruppa per prodotto e unità, due operazioni nella coda (`price`, `price-delete`), e la pagina Prezzi. Nello stesso giro, la correzione del token per i collaboratori: un fine-grained non può scrivere su un repo di un altro account, serve un classic con `public_repo` (ADR-0040).
 
 Fatto il 21/08/2026 (secondo giro): **il tricount diventa un oggetto con dei membri** e «personale» smette di essere un caso speciale (ADR-0037), l'identità passa dalla testata al dispositivo (ADR-0038), e la separazione dei compartimenti personali è dichiarata per quello che è — una convenzione dell'interfaccia, non una cassaforte (ADR-0039). La migrazione è in `scripts/migrate-tricounts.mjs`, con quattro guardie: totale 60.298,29 €, conteggio per tricount, **saldo −49,11 €** e validazione, tutti identici prima e dopo.
 

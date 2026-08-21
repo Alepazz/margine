@@ -470,6 +470,40 @@ button.hero-value:focus-visible {
 }
 
 /*
+ * I nomi già usati, proposti sotto il campo mentre si scrive.
+ *
+ * Sono pulsanti e non un `<datalist>`: il menù nativo su iOS non compare in modo
+ * affidabile, e qui riusare il suggerimento non è una comodità — è ciò che tiene
+ * unita una serie di prezzi, perché «Passata» e «passata di pomodoro» sono due
+ * prodotti diversi. → ADR-0041
+ *
+ * Vanno a capo invece di scorrere in orizzontale: una fila che scorre nasconde
+ * quello che non entra, e i nomi dei supermercati sono corti.
+ */
+.suggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.suggest-chip {
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: var(--r-sm);
+  border: 1px dashed var(--line-strong);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.suggest-chip:hover {
+  border-style: solid;
+  color: var(--ink);
+}
+
+/*
  * Come si divide una spesa: una riga per persona, con la spunta a sinistra e
  * quanto le tocca a destra.
  *

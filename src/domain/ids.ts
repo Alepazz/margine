@@ -22,6 +22,11 @@ export function newSettlementId(date: string): string {
   return `rimborso-${date}-${randomHex(3)}`
 }
 
+/** Come i rimborsi: lista propria, prefisso per riconoscerle a occhio. */
+export function newPriceId(date: string): string {
+  return `prezzo-${date}-${randomHex(3)}`
+}
+
 /** Da un nome a uno slug leggibile: senza accenti, senza spazi, minuscolo. */
 function slugify(text: string, fallback: string, max: number): string {
   return (

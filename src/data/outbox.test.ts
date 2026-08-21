@@ -9,7 +9,7 @@ import {
   touchesConfig,
   type OutboxEntry,
 } from './outbox'
-import type { AppConfig, Dataset, Expense } from '../domain/types'
+import type { AppConfig, Dataset, Expense, PriceEntry } from '../domain/types'
 
 const DATASET: Dataset = {
   version: 1,
@@ -29,6 +29,7 @@ const DATASET: Dataset = {
   ],
   tricounts: [],
   settlements: [],
+  prices: [],
 }
 
 /** Un'annotazione, che è il caso storico e resta il più frequente. */
@@ -189,6 +190,103 @@ describe('messaggio di commit', () => {
         { kind: 'delete', expenseId: 'a', entryId: 'd', ts: 3 },
       ]),
     ).toBe('2 spese aggiunte, 1 spesa eliminata')
+  })
+
+  it('nomina anche le rilevazioni di prezzo', () => {
+    expect(
+      describeOps([
+        { kind: 'price', entry: RILEVAZIONE, entryId: 'p1', ts: 1 },
+        { kind: 'price', entry: { ...RILEVAZIONE, id: 'prezzo-2' }, entryId: 'p2', ts: 2 },
+        { kind: 'price-delete', priceId: 'prezzo-3', entryId: 'p3', ts: 3 },
+      ]),
+    ).toBe('2 prezzi rilevati, 1 rilevazione eliminata')
+  })
+})
+
+// ─────────────────────── le rilevazioni di prezzo ───────────────────────
+
+const RILEVAZIONE: PriceEntry = {
+  id: 'prezzo-2026-08-21-a1b2c3',
+  product: 'Passata di pomodoro',
+  store: 'Esselunga',
+  unit: 'kg',
+  price: 2.15,
+  date: '2026-08-21',
+}
+
+describe('rilevazioni di prezzo', () => {
+  const rileva = (entry: PriceEntry, ts = 1): OutboxEntry => ({
+    kind: 'price',
+    entry,
+    entryId: `p${ts}`,
+    ts,
+  })
+
+  it('aggiunge una rilevazione, una volta sola', () => {
+    const next = applyOps(DATASET, [rileva(RILEVAZIONE), rileva(RILEVAZIONE, 2)])
+    expect(next.prices).toHaveLength(1)
+    expect(next.prices[0]?.price).toBe(2.15)
+  })
+
+  it('non tocca le spese: una rilevazione non è un acquisto', () => {
+    const next = applyOps(DATASET, [rileva(RILEVAZIONE)])
+    expect(next.expenses).toBe(DATASET.expenses)
+    expect(next.settlements).toBe(DATASET.settlements)
+  })
+
+  it('ripulisce gli spazi e non salva una nota vuota', () => {
+    const next = applyOps(DATASET, [
+      rileva({ ...RILEVAZIONE, product: '  Passata  ', store: ' Lidl ', note: '   ' }),
+    ])
+    expect(next.prices[0]?.product).toBe('Passata')
+    expect(next.prices[0]?.store).toBe('Lidl')
+    expect(next.prices[0]).not.toHaveProperty('note')
+  })
+
+  it('elimina per id, e non inventa niente se quell’id non c’è', () => {
+    const con = applyOps(DATASET, [rileva(RILEVAZIONE)])
+    const senza = applyOps(con, [{ kind: 'price-delete', priceId: RILEVAZIONE.id, entryId: 'd', ts: 2 }])
+    expect(senza.prices).toEqual([])
+    expect(applyOps(DATASET, [{ kind: 'price-delete', priceId: 'ignoto', entryId: 'd', ts: 2 }])).toBe(
+      DATASET,
+    )
+  })
+
+  /* L'invariante di CLAUDE.md: un'operazione non riconosciuta resta in coda per
+     sempre, e il contatore delle modifiche in attesa non torna più a zero. */
+  it('una volta pubblicata non resta in coda per sempre', () => {
+    const aggiunta = rileva(RILEVAZIONE)
+    const cancellazione: OutboxEntry = {
+      kind: 'price-delete',
+      priceId: RILEVAZIONE.id,
+      entryId: 'd',
+      ts: 2,
+    }
+    const con = applyOps(DATASET, [aggiunta])
+
+    expect(isAlreadyApplied(DATASET, undefined, aggiunta)).toBe(false)
+    expect(isAlreadyApplied(con, undefined, aggiunta)).toBe(true)
+    expect(isAlreadyApplied(con, undefined, cancellazione)).toBe(false)
+    expect(isAlreadyApplied(DATASET, undefined, cancellazione)).toBe(true)
+  })
+
+  it('sopravvive al giro in localStorage', () => {
+    const round = JSON.parse(JSON.stringify(rileva(RILEVAZIONE))) as OutboxEntry
+    expect(round).toEqual(rileva(RILEVAZIONE))
+    expect(applyOps(DATASET, [round]).prices).toHaveLength(1)
+  })
+
+  it('non riscrive la configurazione', () => {
+    expect(touchesConfig({ kind: 'price', entry: RILEVAZIONE })).toBe(false)
+    expect(touchesConfig({ kind: 'price-delete', priceId: RILEVAZIONE.id })).toBe(false)
+  })
+
+  /* I file cifrati scritti prima di ADR-0041 non hanno il campo: la coda non
+     deve inciampare su un dataset che arriva senza. */
+  it('regge un dataset senza il campo, come quelli scritti prima', () => {
+    const { prices: _drop, ...senzaCampo } = DATASET
+    const next = applyOps(senzaCampo as Dataset, [rileva(RILEVAZIONE)])
+    expect(next.prices).toHaveLength(1)
   })
 })
 

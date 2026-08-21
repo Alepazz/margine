@@ -148,8 +148,15 @@ try {
       log('')
       log(`Aggiunte ${added} spese, ${tripsAdded} tricount. Già presenti (saltate): ${skipped}.`)
 
-      // conservato: preserva i rimborsi già registrati
+      /*
+       * Il master si ricostruisce da zero a ogni import, quindi **tutto ciò che
+       * non arriva dai tricount va riportato a mano**, o l'import lo cancella in
+       * silenzio: i rimborsi registrati dall'app e le rilevazioni di prezzo.
+       * Un campo nuovo del dataset che nasce nell'app va aggiunto anche qui.
+       * → ADR-0019, ADR-0041
+       */
       if (master.settlements) merged.settlements = master.settlements
+      if (master.prices) merged.prices = master.prices
 
       if (twins.length > 0) {
         const total = twins.reduce((sum, t) => sum + cents(t.incoming.amount), 0) / 100
