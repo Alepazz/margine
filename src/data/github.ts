@@ -205,17 +205,70 @@ export interface AccessCheck {
   message: string
 }
 
-/** Verifica dalle impostazioni che il token veda il file e possa scrivere. */
+/**
+ * Verifica dalle impostazioni che il token possa **scrivere**.
+ *
+ * Prima leggeva il file e diceva «accesso confermato», e non voleva dire niente:
+ * il repo è pubblico, quindi quella lettura riesce **senza alcun token** — provato,
+ * `GET /contents` risponde 200 anche senza header di autorizzazione. Un token in
+ * sola lettura, scaduto o inventato passava il controllo, e chi lo vedeva verde
+ * credeva di aver finito; poi ogni salvataggio restava in coda. È esattamente
+ * quello che è successo a Federica col primo token. → ADR-0040
+ *
+ * La prova vera è **creare un blob**: è il primo passo del commit vero
+ * (`commitFiles`), richiede lo stesso permesso, e produce un oggetto che nessun
+ * commit referenzia — niente file, niente voce nella storia, niente da annullare.
+ * Git lo raccoglie da sé.
+ *
+ * La lettura resta come secondo controllo, perché prende un caso che la scrittura
+ * non vede: `dataPath` o `branch` sbagliati nella configurazione.
+ */
 export async function testAccess(cfg: GithubConfig, token: string): Promise<AccessCheck> {
   try {
+    const probe = await fetch(`${repoUrl(cfg)}/git/blobs`, {
+      method: 'POST',
+      headers: { ...apiHeaders(token), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: 'margine: verifica accesso', encoding: 'utf-8' }),
+    })
+    if (!probe.ok) {
+      /*
+       * Un token senza permesso di scrittura riceve `404` e non `403`: GitHub
+       * risponde così per non rivelare cosa esiste. Ma `404` è anche la risposta
+       * a un repo che non c'è — `owner` o `repo` sbagliati nella configurazione —
+       * e le due cose portano a rimedi opposti. Si distinguono con una lettura:
+       * se il file si legge, il repo esiste e il problema è il permesso.
+       */
+      if (probe.status === 403 || probe.status === 404) {
+        const readable = await getFile(cfg, token).catch(() => null)
+        if (!readable) {
+          return {
+            ok: false,
+            message:
+              `Non trovo ${cfg.owner}/${cfg.repo} — o «${cfg.dataPath}» sul branch ${cfg.branch}. ` +
+              'Prima di guardare il token, controlla la sezione `github` della configurazione.',
+          }
+        }
+        /* Testo piano: finisce in un <p>, quindi asterischi e apici andrebbero
+           a schermo così come sono scritti. */
+        return {
+          ok: false,
+          message:
+            'Questo token legge ma non può scrivere, quindi le modifiche resterebbero in coda. ' +
+            'Se il repo non è tuo serve un token classic con la sola spunta «public_repo», da ' +
+            'github.com/settings/tokens/new; se è tuo, un fine-grained con «Contents: read and write».',
+        }
+      }
+      throw await failure(probe)
+    }
+
     const file = await getFile(cfg, token)
     if (!file) {
       return {
         ok: false,
-        message: `Il token funziona, ma «${cfg.dataPath}» non esiste sul branch ${cfg.branch}.`,
+        message: `Il token può scrivere, ma «${cfg.dataPath}» non esiste sul branch ${cfg.branch}.`,
       }
     }
-    return { ok: true, message: `Accesso in lettura confermato su ${cfg.owner}/${cfg.repo}.` }
+    return { ok: true, message: `Scrittura confermata su ${cfg.owner}/${cfg.repo}.` }
   } catch (error) {
     return { ok: false, message: error instanceof Error ? error.message : 'Errore sconosciuto.' }
   }
