@@ -76,8 +76,20 @@ function humanize(status: number, detail: string): string {
       return 'Token GitHub non valido o scaduto: rigeneralo dalle impostazioni.'
     case 403:
       return `Permesso negato dal token: serve «Contents: read and write» se è fine-grained, «public_repo» se è classic. ${detail}`
+    /*
+     * Su una scrittura il 404 vuol dire quasi sempre «il token non può
+     * scrivere»: GitHub risponde così, e non 403, per non rivelare cosa esiste.
+     * La lettura non passa da qui — `getFile` tratta il suo 404 da sé — quindi
+     * mettere la configurazione per prima mandava a cercare nel posto sbagliato,
+     * ed è la frase che Federica ha letto mentre il problema era il token.
+     * → ADR-0043, ADR-0040
+     */
     case 404:
-      return 'Repo, branch o percorso del file non trovato: controlla la configurazione.'
+      return (
+        'Il token non ha il permesso di scrivere (GitHub risponde «non trovato» invece di ' +
+        '«vietato»). Se il repo non è tuo serve un token classic con la spunta «public_repo». ' +
+        'Se il token è giusto, allora è il branch o il percorso del file nella configurazione.'
+      )
     case 409:
     case 422:
       return 'Il file è stato modificato da un altro dispositivo: riprovo unendo le modifiche.'
