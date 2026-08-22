@@ -51,8 +51,10 @@ const PRICE_ROUTE = '/prezzi'
 const HUB_ROUTE = '/esplora'
 
 const NAV: NavItem[] = [
-  { to: '/', label: 'Riepilogo', glyph: '◧', slot: 'tabbar' },
-  { to: '/spese', label: 'Spese', glyph: '≡', slot: 'tabbar' },
+  /* Emoji come tutte le altre voci: `◧` e `≡` erano glifi tipografici, e in una
+     barra dove tutto il resto è a colori sembravano due voci spente. */
+  { to: '/', label: 'Riepilogo', glyph: '💰', slot: 'tabbar' },
+  { to: '/spese', label: 'Spese', glyph: '📋', slot: 'tabbar' },
   /* L'etichetta col selettore di variazione (U+FE0F): senza, `🏷` è un glifo di
      testo e il browser lo disegna come un rettangolo pallido invece dell'emoji. */
   { to: '/prezzi', label: 'Prezzi', glyph: '🏷️', slot: 'tabbar' },
