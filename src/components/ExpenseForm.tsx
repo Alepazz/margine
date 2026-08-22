@@ -7,20 +7,11 @@
  * di che tipo, come si divide, e per ultima la data, che nove volte su dieci è
  * oggi e non si tocca.
  *
- * Il tricount si sceglie con **una fila di spunte**, non con una tendina: essendo
- * il campo da cui dipende tutto il resto, è anche quello il cui errore costa più
- * caro — una spesa finita nel tricount sbagliato va poi spostata — e una tendina
- * mostra solo il valore corrente, tenendo le alternative dietro un tocco. Con i
- * chip si vede dove sta andando la spesa **e dove non sta andando**. Le opzioni
- * restano quelle di `tricountOptions`: solo i propri, i conclusi fuori tranne
- * quello della spesa che si sta correggendo. → ADR-0044, ADR-0037
- *
- * Le vacanze però stanno **raccolte sotto un chip**, e non è un ripensamento: coi
- * viaggi aperti che oggi sono cinque, mostrarle tutte fa otto chip su cinque
- * righe, cioè duecentocinquanta pixel prima di «Cos'era» — i due campi che si
- * scrivono ogni volta finirebbero sotto la piega a ogni spesa, per mostrare
- * alternative che nella spesa di tutti i giorni non si scelgono mai. Si aprono
- * da sole quando la spesa **è** in una vacanza, cioè quando servono davvero.
+ * Il tricount si sceglie da una **tendina** (`LedgerSelect`), e la fila di chip
+ * provata il 22/08/2026 è stata rimossa: costava tre righe di altezza prima di
+ * «Cos'era» e «Quanto» — i due campi che si scrivono ogni volta — per mostrare
+ * alternative che in una spesa non si scelgono. Una riga alta una riga vince.
+ * → ADR-0045
  *
  * La divisione si dichiara dicendo **chi partecipa**: due caselle, una per
  * persona, con accanto quanto tocca a ciascuno. Le tre divisioni che esistono
@@ -50,13 +41,13 @@ import { formatEuro, toCents } from '../domain/money'
 import {
   soleMemberOf,
   titleOf,
-  tricountTitleOf,
   type Category,
   type Expense,
   type Payer,
   type PersonId,
   type Tricount,
 } from '../domain/types'
+import { LedgerSelect } from './LedgerSelect'
 import { TricountForm } from './TricountForm'
 import { AmountInput, NameFields, Segmented, useToast } from './ui'
 
@@ -114,9 +105,6 @@ export function ExpenseForm({
   const [paidBy, setPaidBy] = useState<Payer>(editing?.paidBy ?? person)
   const [recurring, setRecurring] = useState(editing?.recurring ?? false)
   const [newTrip, setNewTrip] = useState(false)
-  /* Solo «le ho aperte a mano»: che siano da mostrare **perché la spesa è in una
-     vacanza** non è uno stato, è una conseguenza — vedi `showTrips` più sotto. */
-  const [tripsOpened, setTripsOpened] = useState(false)
   const [newCategory, setNewCategory] = useState(false)
   const [catEmoji, setCatEmoji] = useState('')
   const [catLabel, setCatLabel] = useState('')
@@ -128,30 +116,8 @@ export function ExpenseForm({
   }, [])
 
   const tricounts = dataset?.tricounts ?? []
-  /* Le stesse opzioni che offriva la tendina, nello stesso ordine: i tricount
-     piani e poi le vacanze, che è l'ordine in cui stanno nei dati. */
-  const ledgerOptions = useMemo(
-    () => tricountOptions(tricounts, person, { current: ledger }),
-    [ledger, person, tricounts],
-  )
-  const plainOptions = ledgerOptions.filter((option) => option.tricount.trip === undefined)
-  const tripOptions = ledgerOptions.filter((option) => option.tricount.trip !== undefined)
   const chosenTricount = tricounts.find((t) => t.id === ledger)
   const isVacation = chosenTricount?.trip !== undefined
-  /*
-   * **Derivato, non uno stato a sé**, ed è la differenza fra funzionare e avere
-   * un buco: se il tricount scelto è una vacanza i chip delle vacanze si vedono,
-   * punto — altrimenti la fila non contiene il valore corrente e nessun chip è
-   * acceso. Una fila senza selezione fa toccare il primo chip visibile, cioè
-   * sposta la spesa fuori dal viaggio senza che nessuno l'abbia chiesto: è
-   * esattamente ciò che ADR-0027 vieta al selettore del tricount.
-   *
-   * Come stato indipendente aveva tre ingressi da ricordare a mano — la
-   * correzione di una spesa in vacanza, il primo tricount offerto che è un
-   * viaggio, e la vacanza appena creata da `createTrip` — e il terzo era già
-   * scoperto. Derivandolo non esiste un quarto.
-   */
-  const showTrips = tripsOpened || isVacation
   /*
    * In un tricount con un membro solo la spesa è al 100% di quel membro: le 370
    * in archivio sono tutte così, e offrire una divisione qui sarebbe offrire un
@@ -366,9 +332,9 @@ export function ExpenseForm({
         <div className="sheet-body">
           <div className="stack" style={{ gap: 12 }}>
             <div className="field">
-              <span className="label" id="ef-ledger-label">
+              <label className="label" htmlFor="ef-ledger">
                 In quale tricount
-              </span>
+              </label>
               {newTrip ? (
                 <TricountForm
                   takenIds={tricountIds}
@@ -378,49 +344,21 @@ export function ExpenseForm({
                   onProblem={(message) => toast.show(message)}
                 />
               ) : (
-                /*
-                 * `group` con `aria-pressed`, come il controllo segmentato del
-                 * progetto — e non `radiogroup`: un radiogroup ammette solo
-                 * `radio` fra i suoi elementi, mentre qui in fila ci sono anche
-                 * due azioni («apri le vacanze», «creane una»). Dichiararlo
-                 * radiogroup faceva sentire a chi legge con la voce un conteggio
-                 * sbagliato e due pulsanti spacciati per scelte, e prometteva le
-                 * frecce che spostano la selezione — che questi bottoni non
-                 * implementano.
-                 */
-                <div className="choice-row" role="group" aria-labelledby="ef-ledger-label">
-                  {(showTrips ? ledgerOptions : plainOptions).map((option) => (
-                    <button
-                      type="button"
-                      key={option.tricount.id}
-                      className={`choice-chip${option.tricount.id === ledger ? ' is-active' : ''}`}
-                      aria-pressed={option.tricount.id === ledger}
-                      onClick={() => changeLedger(option.tricount.id)}
-                    >
-                      {tricountTitleOf(option.tricount)}
-                      {option.tricount.trip ? ` ${option.tricount.trip.year}` : ''}
-                      {option.closed ? ' (concluso)' : ''}
-                    </button>
-                  ))}
-                  {/* Quante ne apre, scritto sul chip: così chi cerca una
-                      vacanza sa che stanno lì e non che non ci sono. */}
-                  {!showTrips && tripOptions.length > 0 ? (
-                    <button
-                      type="button"
-                      className="choice-chip is-action"
-                      aria-expanded={false}
-                      onClick={() => setTripsOpened(true)}
-                    >
-                      🌍 Vacanze ({tripOptions.length})
-                    </button>
-                  ) : null}
+                <div className="row row-inline" style={{ gap: 6 }}>
+                  <LedgerSelect
+                    id="ef-ledger"
+                    value={ledger}
+                    tricounts={tricounts}
+                    person={person}
+                    onChange={changeLedger}
+                  />
                   <button
                     type="button"
-                    className="choice-chip is-action"
+                    className="btn btn-sm"
                     onClick={() => setNewTrip(true)}
                     title="Apri un tricount per una vacanza nuova"
                   >
-                    + Vacanza
+                    Nuova vacanza
                   </button>
                 </div>
               )}

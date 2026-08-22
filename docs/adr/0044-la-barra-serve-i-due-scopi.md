@@ -1,6 +1,6 @@
 # ADR-0044: La barra serve i due scopi dell'app, e la quinta voce è una pagina
 
-**Status:** accepted · **Date:** 2026-08-21
+**Status:** accepted — la sola scelta del selettore del tricount (la fila di chip) è rovesciata da ADR-0045 · **Date:** 2026-08-21
 
 ## Context
 
