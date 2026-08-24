@@ -332,7 +332,8 @@ a:hover {
   overscroll-behavior: contain;
   width: 100%;
   max-width: 1120px;
-  padding: 20px 16px 24px 18px;
+  /* In fondo lo spazio dell'isola, che le scorre sopra. */
+  padding: 20px 16px var(--tabbar-reserve) 18px;
   /* Il margine del quaderno, sul bordo della pagina. */
   border-left: 2px solid var(--rule);
 }
@@ -449,19 +450,21 @@ html.is-locked .content {
 }
 
 /*
- * Barra di navigazione a isola, in vetro: staccata dai bordi, così il pollice la
- * raggiunge senza sfiorare la gesture bar di iOS.
+ * Barra di navigazione a **isola fluttuante** in vetro: staccata dai bordi e dal
+ * fondo, col contenuto che le scorre sotto e si intravede attraverso il vetro.
  *
- * **Non è `position: fixed`, ed è il punto.** È l'ultima riga del guscio, cioè
- * sta in fondo perché in fondo è il suo posto nel flusso, non perché qualcuno
- * gliel'ha detto: così non la possono spostare né il rimbalzo, né la tastiera,
- * né lo scorrimento automatico verso il campo a fuoco. Con `fixed` volava in
- * mezzo allo schermo, e nessuno dei tre si governa dal CSS. → ADR-0048
+ * `position: fixed`, e sta ferma per una ragione che non è nel suo `bottom`: la
+ * pagina non scorre (→ ADR-0048), quindi non esiste nessuno scorrimento del
+ * documento che il rimbalzo, la tastiera o lo scorrimento verso il campo a fuoco
+ * possano trascinare. È la stessa ricetta di Epilog, dove la nota accanto a
+ * `body { height: 100dvh; overflow: hidden }` dice esattamente questo: «così la
+ * tabbar fissa resta ancorata in basso e non balla con la toolbar di Safari». Le
+ * misure combaciano fin nel dettaglio, 14px di distacco compresi. → ADR-0049
  *
- * Il prezzo, dichiarato: il contenuto non scivola più sotto il vetro. L'isola
- * ha sotto di sé la carta e non la pagina, quindi il vetro sfuma la carta. In
- * cambio non c'è più niente da riservare in fondo alla pagina — `--tabbar-h`
- * misurato e `--tabbar-reserve` sono spariti con la loro classe di difetti.
+ * Prima di ADR-0048 l'isola era `fixed` **sopra un documento scorrevole**, ed è
+ * quella coppia a farla volare: né `fixed` da sola né il guscio da solo. Un
+ * giorno che si volesse rimettere lo scorrimento al documento, l'isola tornerà a
+ * ballare — sono una cosa sola.
  *
  * L'isola esiste solo sotto i 900px — sopra c'è la colonna laterale — quindi le
  * misure da telefono stanno già qui: un secondo giro di valori nel blocco
@@ -470,17 +473,35 @@ html.is-locked .content {
 :root {
   /* Quanto l'isola sta staccata dal fondo, oltre alla safe-area. */
   --tabbar-lift: 14px;
+  /*
+   * Lo spazio che la pagina si riserva in fondo, perché l'ultima riga non
+   * finisca sotto il vetro. **Costante, non misurata**: l'isola è cornice, e la
+   * cornice sta in px e non scala con la manopola — è la regola già scritta per
+   * questo progetto, che l'isola violava tenendo glifo ed etichetta in rem.
+   * Adesso la rispetta, quindi l'altezza è ferma a **79px** (misurata in
+   * WebKit), e i 96 qui sotto sono 79 di isola più 17 d'aria. Il distacco non è
+   * ripetuto ma preso da `--tabbar-lift`: scritto a mano, cambiare il distacco
+   * avrebbe sfalsato la riserva in silenzio. Se un giorno la tipografia
+   * dell'isola tornasse in rem, questo numero ricomincerebbe a sbagliare e
+   * servirebbe di nuovo misurarla a runtime.
+   */
+  --tabbar-reserve: calc(env(safe-area-inset-bottom) + var(--tabbar-lift) + 96px);
 }
 
 .tabbar {
-  flex: 0 0 auto;
-  width: calc(min(560px, 100%) - 24px);
-  /* La safe-area va qui, non in un `bottom`: sotto l'isola non c'è più il fondo
-     della finestra ma il fondo del guscio, e la gesture bar sta lì sotto. */
-  margin: 0 auto calc(env(safe-area-inset-bottom) + var(--tabbar-lift));
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom) + var(--tabbar-lift));
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(min(560px, 100vw) - 24px);
   z-index: 30;
   display: flex;
   gap: 2px;
+  /*
+   * Nessun padding-bottom con la safe-area: quello serve a una barra incollata
+   * al bordo dello schermo. Qui l'isola è già sollevata dal `bottom`, e
+   * sommarla due volte le appendeva sotto uno zoccolo vuoto di 34px.
+   */
   padding: 8px 4px;
   border-radius: 999px;
   background: var(--glass-bg);
@@ -509,7 +530,11 @@ html.is-locked .content {
   border-radius: 999px;
   color: var(--ink-3);
   text-decoration: none;
-  font-size: 0.72rem;
+  /* px e non rem: l'isola è cornice, e la cornice non scala con la manopola.
+     Tenerla in rem legava la sua altezza alla scala del carattere, che è
+     esattamente ciò che rendeva impossibile riservarne lo spazio con una
+     costante. → ADR-0049 */
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.005em;
   transition:
@@ -523,7 +548,8 @@ html.is-locked .content {
 }
 
 .tabbar-glyph {
-  font-size: 1.4rem;
+  /* Anche questo in px, per la stessa ragione dell'etichetta. */
+  font-size: 23px;
   line-height: 1;
 }
 
