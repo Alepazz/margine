@@ -17,12 +17,14 @@ import { useReadyStore } from '../data/store'
 import { formatEuro } from '../domain/money'
 import { UNIT_LABEL } from '../domain/prices'
 import { PriceForm } from './PriceForm'
-import { useToast } from './ui'
+import { useScrollLock, useToast } from './ui'
 
 export function PriceSheet({ onClose }: { onClose: () => void }): ReactNode {
   const { dataset, addPrice } = useReadyStore()
   const toast = useToast()
   const sheetRef = useRef<HTMLDivElement | null>(null)
+
+  useScrollLock()
 
   useEffect(() => {
     /* Il fuoco entra nel foglio, come negli altri fogli del progetto: senza,

@@ -11,15 +11,21 @@ body {
   margin: 0;
   padding: 0;
   /*
-   * La pagina non rimbalza, e serve alla barra.
+   * **La pagina non scorre: scorre `.content`.**
    *
-   * Su iOS il rimbalzo di fine corsa trascina con sé gli elementi `fixed`:
-   * l'isola della barra sale quando la pagina rimbalza in fondo e scende quando
-   * rimbalza in cima, quindi la si vede «a volte più in alto a volte più in
-   * basso» pur avendo una posizione costante. Non è un difetto di `--tabbar-h`
-   * né della safe-area: è il rimbalzo. Togliere questa riga lo rimette.
+   * È il guscio di un'app, non un documento, ed è la sola forma in cui la barra
+   * in fondo non può muoversi — finché era `position: fixed` la muovevano il
+   * rimbalzo di fine corsa, la tastiera e lo scorrimento automatico verso il
+   * campo a fuoco, e nessuno di quei tre si governa dal CSS. Qui non c'è niente
+   * da ancorare: l'isola è l'ultima riga di un guscio alto quanto lo schermo.
+   * Whiff ce l'ha ferma perché la sua barra è una vista nativa, fuori dalla
+   * pagina; questo è l'equivalente sul web. → ADR-0048
+   *
+   * Conseguenza: `height` e non `min-height`, e `overflow: hidden` qui, senza i
+   * quali il documento resta scorrevole e il rimbalzo torna con lui.
    */
-  overscroll-behavior-y: none;
+  height: 100%;
+  overflow: hidden;
 }
 
 html {
@@ -40,7 +46,6 @@ html {
 }
 
 body {
-  min-height: 100vh;
   background-color: var(--paper);
   /* La griglia del quaderno: presente, quasi invisibile. */
   background-image:
@@ -137,20 +142,28 @@ a:hover {
 
 /* ─────────────────────────── guscio ─────────────────────────── */
 
+/*
+ * Il guscio: alto quanto lo schermo e **non scorrevole**. Su telefono è una
+ * colonna — testata e contenuto, poi l'isola in fondo — e su schermo grande
+ * torna una riga, con la colonna laterale accanto. `100dvh` e non `100vh`
+ * perché su iOS `vh` è il viewport grande: con quello il guscio sarebbe più
+ * alto dello schermo e l'ultima riga finirebbe sotto il bordo. → ADR-0048
+ */
 .app {
   display: flex;
-  min-height: 100vh;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
 }
 
+/* Niente `sticky` né `height: 100vh`: la colonna è alta quanto il guscio, che
+   non scorre — ci pensa `align-items: stretch` del contenitore. */
 .sidebar {
   display: none;
   flex: 0 0 232px;
   flex-direction: column;
   gap: 24px;
   padding: 24px 16px;
-  position: sticky;
-  top: 0;
-  height: 100vh;
 }
 
 .brand {
@@ -248,13 +261,18 @@ a:hover {
 .main {
   flex: 1 1 auto;
   min-width: 0;
+  /* Senza, un figlio flex non scende sotto la propria altezza naturale e a
+     scorrere finirebbe il guscio invece del contenuto. */
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
+/* Ferma per costruzione: è una riga del guscio, sopra il contenuto che scorre.
+   Prima era `sticky`, che qui non farebbe niente — il suo contenitore non
+   scorre più. */
 .topbar {
-  position: sticky;
-  top: 0;
+  flex: 0 0 auto;
   z-index: 20;
   display: flex;
   align-items: center;
@@ -286,23 +304,44 @@ a:hover {
 }
 
 /*
- * Bersaglio di uno `scrollIntoView`. La testata è appiccicata in cima, quindi
- * chi arriva qui scorrendo finirebbe sotto il vetro: la distanza la dichiara il
- * CSS, che è l'unico posto che sa quanto è alta la testata.
+ * Bersaglio di uno `scrollIntoView`. Bastano pochi pixel d'aria: la testata non
+ * è più dentro ciò che scorre (→ ADR-0048), quindi non c'è più nessun vetro
+ * sotto cui finire — erano 76px, l'altezza della testata, e adesso lascerebbero
+ * un buco davanti al bersaglio.
  */
 .scroll-target {
-  scroll-margin-top: 76px;
+  scroll-margin-top: 8px;
 }
 
+/*
+ * **L'unica cosa che scorre.** Il guscio è fermo, quindi lo scorrimento vive
+ * qui: è ciò che tiene ferma l'isola in fondo (→ ADR-0048) e ciò che permette di
+ * bloccare la pagina dietro un foglio aperto senza il trucco del `body` fisso —
+ * basta togliere lo scorrimento a un elemento, e la sua posizione si conserva
+ * da sé. `overscroll-behavior: contain` toglie il rimbalzo di fine corsa del
+ * riquadro e non lo passa a nessuno.
+ *
+ * In fondo non si riserva più l'ingombro dell'isola: l'isola non copre niente,
+ * sta sotto il contenuto invece che sopra.
+ */
 .content {
   flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   width: 100%;
   max-width: 1120px;
-  /* In fondo si riserva l'ingombro vero dell'isola, non un numero a occhio. */
-  padding: 20px 16px var(--tabbar-reserve) 18px;
+  padding: 20px 16px 24px 18px;
   /* Il margine del quaderno, sul bordo della pagina. */
   border-left: 2px solid var(--rule);
+}
+
+/* Con un foglio aperto la pagina dietro non scorre: si scorre solo il foglio.
+   La classe la mette `useScrollLock`, con un contatore per i fogli che si
+   aprono uno dentro l'altro. */
+html.is-locked .content {
+  overflow: hidden;
 }
 
 /*
@@ -410,49 +449,38 @@ a:hover {
 }
 
 /*
- * Barra di navigazione a isola fluttuante, in vetro: staccata dai bordi e dal
- * fondo, così il pollice la raggiunge senza sfiorare la gesture bar di iOS e la
- * pagina continua a intravedersi sotto.
+ * Barra di navigazione a isola, in vetro: staccata dai bordi, così il pollice la
+ * raggiunge senza sfiorare la gesture bar di iOS.
+ *
+ * **Non è `position: fixed`, ed è il punto.** È l'ultima riga del guscio, cioè
+ * sta in fondo perché in fondo è il suo posto nel flusso, non perché qualcuno
+ * gliel'ha detto: così non la possono spostare né il rimbalzo, né la tastiera,
+ * né lo scorrimento automatico verso il campo a fuoco. Con `fixed` volava in
+ * mezzo allo schermo, e nessuno dei tre si governa dal CSS. → ADR-0048
+ *
+ * Il prezzo, dichiarato: il contenuto non scivola più sotto il vetro. L'isola
+ * ha sotto di sé la carta e non la pagina, quindi il vetro sfuma la carta. In
+ * cambio non c'è più niente da riservare in fondo alla pagina — `--tabbar-h`
+ * misurato e `--tabbar-reserve` sono spariti con la loro classe di difetti.
  *
  * L'isola esiste solo sotto i 900px — sopra c'è la colonna laterale — quindi le
  * misure da telefono stanno già qui: un secondo giro di valori nel blocco
  * mobile sarebbe una copia da tenere allineata a mano.
- *
- * Lo spazio che la pagina riserva in fondo (`--tabbar-reserve`) deve valere
- * quanto l'isola ingombra davvero. Erano due costanti indipendenti battute a
- * occhio, e sono divergite: la pagina riservava 116px per un'isola che ne
- * occupava 154, e le ultime righe di ogni pagina finivano sotto il vetro.
- *
- * `--tabbar-h` non si calcola qui, si **misura**: l'altezza dell'isola è
- * emergente — la decidono glifo, etichetta e scala del carattere (108% su
- * telefono), non il `min-height` del link. Prevederla in CSS la sbagliava di
- * 6px. La pubblica `AppShell` con un ResizeObserver, e il valore qui sotto
- * serve solo al primo disegno, prima che il misuratore parta.
  */
 :root {
   /* Quanto l'isola sta staccata dal fondo, oltre alla safe-area. */
   --tabbar-lift: 14px;
-  --tabbar-h: 80px;
-  --tabbar-reserve: calc(
-    env(safe-area-inset-bottom) + var(--tabbar-lift) + var(--tabbar-h) + 16px
-  );
 }
 
 .tabbar {
-  position: fixed;
-  bottom: calc(env(safe-area-inset-bottom) + var(--tabbar-lift));
-  left: 50%;
-  transform: translateX(-50%);
-  width: calc(min(560px, 100vw) - 24px);
+  flex: 0 0 auto;
+  width: calc(min(560px, 100%) - 24px);
+  /* La safe-area va qui, non in un `bottom`: sotto l'isola non c'è più il fondo
+     della finestra ma il fondo del guscio, e la gesture bar sta lì sotto. */
+  margin: 0 auto calc(env(safe-area-inset-bottom) + var(--tabbar-lift));
   z-index: 30;
   display: flex;
   gap: 2px;
-  /*
-   * Nessun padding-bottom con la safe-area: quello serve a una barra incollata
-   * al bordo dello schermo, che deve tenere le icone sopra la gesture bar. Qui
-   * l'isola è già sollevata dal `bottom`, e sommarla due volte le appendeva
-   * sotto uno zoccolo vuoto di 34px.
-   */
   padding: 8px 4px;
   border-radius: 999px;
   background: var(--glass-bg);
@@ -500,6 +528,13 @@ a:hover {
 }
 
 @media (min-width: 900px) {
+  /* Su schermo grande il guscio torna una riga: colonna laterale e contenuto
+     affiancati. Resta alto quanto la finestra e non scorrevole — a scorrere è
+     `.content`, come su telefono. */
+  .app {
+    flex-direction: row;
+  }
+
   .sidebar {
     display: flex;
   }

@@ -49,7 +49,7 @@ import {
 } from '../domain/types'
 import { LedgerSelect } from './LedgerSelect'
 import { TricountForm } from './TricountForm'
-import { AmountInput, NameFields, Segmented, useToast } from './ui'
+import { AmountInput, NameFields, Segmented, useScrollLock, useToast } from './ui'
 
 /** Accetta la virgola: sulla tastiera del telefono è quello che esce. */
 function parseAmount(text: string): number {
@@ -112,6 +112,8 @@ export function ExpenseForm({
   const [catLabel, setCatLabel] = useState('')
   const [touched, setTouched] = useState(false)
   const sheetRef = useRef<HTMLDivElement | null>(null)
+
+  useScrollLock()
 
   useEffect(() => {
     sheetRef.current?.focus()

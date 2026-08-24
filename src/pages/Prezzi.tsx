@@ -13,7 +13,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
-import { Card, DeltaLabel, Notice, useToast } from '../components/ui'
+import { Card, DeltaLabel, Notice, useScrollLock, useToast } from '../components/ui'
 import { PriceSheet } from '../components/PriceSheet'
 import { useReadyStore } from '../data/store'
 import { formatDate } from '../domain/dates'
@@ -50,6 +50,8 @@ function HistorySheet({
 }): ReactNode {
   const sheetRef = useRef<HTMLDivElement | null>(null)
   const [confirming, setConfirming] = useState<string | null>(null)
+
+  useScrollLock()
 
   useEffect(() => {
     sheetRef.current?.focus()
