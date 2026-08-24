@@ -10,6 +10,16 @@ html,
 body {
   margin: 0;
   padding: 0;
+  /*
+   * La pagina non rimbalza, e serve alla barra.
+   *
+   * Su iOS il rimbalzo di fine corsa trascina con sé gli elementi `fixed`:
+   * l'isola della barra sale quando la pagina rimbalza in fondo e scende quando
+   * rimbalza in cima, quindi la si vede «a volte più in alto a volte più in
+   * basso» pur avendo una posizione costante. Non è un difetto di `--tabbar-h`
+   * né della safe-area: è il rimbalzo. Togliere questa riga lo rimette.
+   */
+  overscroll-behavior-y: none;
 }
 
 html {

@@ -1,7 +1,12 @@
 /**
- * Dettaglio di una spesa e unico punto dove l'app scrive: tag «da scaricare nel
- * 730», nota e link allo scontrino su Drive. Il salvataggio è ottimistico —
+ * Dettaglio di una spesa: tag «da scaricare nel 730» e «pagata col welfare»,
+ * nota e link allo scontrino su Drive. Il salvataggio è ottimistico —
  * l'annotazione compare subito e viene committata nel repo in sottofondo.
+ *
+ * I due tag si mettono **anche dall'inserimento** (`ExpenseForm`): si sanno
+ * mentre si scrive la spesa, non il mese dopo. Qui restano perché è da qui che
+ * si correggono su una spesa già in archivio — e nota e scontrino stanno solo
+ * qui, che sono le due cose che arrivano davvero dopo.
  */
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'

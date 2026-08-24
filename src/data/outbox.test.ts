@@ -106,6 +106,42 @@ describe('creare, correggere, eliminare', () => {
     expect(next.expenses[0]?.shares).toEqual({ me: 50, partner: 50 })
   })
 
+  it('una correzione spegne i flag portando false, non omettendoli', () => {
+    /* È il contratto su cui poggia il modulo di inserimento: le due spunte
+       (730 e welfare) viaggiano **sempre** come booleani, perché un campo
+       assente in un `update` vuol dire «lascia com'era» e togliere la spunta
+       non farebbe niente. A spegnerli è `normalize`, che cancella la chiave
+       quando il valore è falso: il file non si riempie di `false`. */
+    const acceso = applyOps(DATASET, [patch({ tax730: true, welfare: true })])
+    expect(acceso.expenses[0]?.tax730).toBe(true)
+    expect(acceso.expenses[0]?.welfare).toBe(true)
+
+    const spento = applyOps(acceso, [
+      {
+        kind: 'update',
+        expenseId: 'a',
+        fields: { ...(acceso.expenses[0] as Expense), tax730: false, welfare: false },
+        entryId: 'u',
+        ts: 2,
+      },
+    ])
+    expect(spento.expenses[0]).not.toHaveProperty('tax730')
+    expect(spento.expenses[0]).not.toHaveProperty('welfare')
+
+    /* E l'operazione si riconosce come applicata, altrimenti resterebbe in coda
+       per sempre: il confronto è con l'intenzione normalizzata, quindi «flag a
+       false» è soddisfatto da una spesa che non ha più quella chiave. */
+    const spegni: OutboxEntry = {
+      kind: 'update',
+      expenseId: 'a',
+      fields: { tax730: false, welfare: false },
+      entryId: 'u2',
+      ts: 3,
+    }
+    expect(isAlreadyApplied(spento, undefined, spegni)).toBe(true)
+    expect(isAlreadyApplied(acceso, undefined, spegni)).toBe(false)
+  })
+
   it('elimina una spesa', () => {
     const next = applyOps(DATASET, [{ kind: 'delete', expenseId: 'a', entryId: 'd', ts: 1 }])
     expect(next.expenses).toHaveLength(0)
