@@ -104,6 +104,8 @@ export function ExpenseForm({
   )
   const [paidBy, setPaidBy] = useState<Payer>(editing?.paidBy ?? person)
   const [recurring, setRecurring] = useState(editing?.recurring ?? false)
+  const [tax730, setTax730] = useState(editing?.tax730 ?? false)
+  const [welfare, setWelfare] = useState(editing?.welfare ?? false)
   const [newTrip, setNewTrip] = useState(false)
   const [newCategory, setNewCategory] = useState(false)
   const [catEmoji, setCatEmoji] = useState('')
@@ -159,6 +161,17 @@ export function ExpenseForm({
    */
   const payer = personalOnly ? (editing?.paidBy ?? person) : paidBy
 
+  /*
+   * Il welfare appartiene a **chi ha anticipato**: toglie l'uscita dal budget di
+   * quella persona e non dell'altra, quindi la spunta si offre solo se hai
+   * anticipato tu — è la stessa condizione del foglio di dettaglio. Sulla spesa
+   * anticipata da qualcun altro il flag già presente **si conserva**: correggere
+   * un importo non è il gesto con cui si smentisce il welfare di chi l'ha
+   * pagata. → ADR-0014
+   */
+  const welfareMine = payer === person
+  const welfareFlag = welfareMine ? welfare : (editing?.welfare ?? false)
+
   const shares = useMemo(() => {
     /* Tutta del membro unico, chiunque stia guardando. */
     if (soleMember) {
@@ -203,11 +216,18 @@ export function ExpenseForm({
     /* Sempre presente, anche vuota: un `update` applica solo i campi che porta,
        quindi ometterla vorrebbe dire «lascia com'era». */
     built.subcategory = subcategory
-    /* Le annotazioni già presenti non si perdono correggendo l'importo. */
-    if (editing?.tax730 !== undefined) built.tax730 = editing.tax730
+    /*
+     * I due flag li scrive il modulo, e sempre come booleani: `normalize()`
+     * nella coda cancella la chiave quando il valore è falso, quindi lo stesso
+     * campo serve ad accendere il flag e a spegnerlo. Ometterlo invece vorrebbe
+     * dire «lascia com'era», e togliere una spunta non farebbe niente.
+     */
+    built.tax730 = tax730
+    built.welfare = welfareFlag
+    /* Le altre annotazioni non si mettono da qui e non si perdono correggendo
+       l'importo: si scrivono nel foglio di dettaglio. */
     if (editing?.notes !== undefined) built.notes = editing.notes
     if (editing?.receiptLinks !== undefined) built.receiptLinks = editing.receiptLinks
-    if (editing?.welfare !== undefined) built.welfare = editing.welfare
     return built
   }, [
     category,
@@ -220,7 +240,9 @@ export function ExpenseForm({
     recurring,
     shares,
     subcategory,
+    tax730,
     title,
+    welfareFlag,
   ])
 
   const takenIds = useMemo(
@@ -637,6 +659,30 @@ export function ExpenseForm({
               />
               Spesa fissa, torna ogni mese
             </label>
+
+            {/* Le due annotazioni che prima si mettevano solo dopo, aprendo la
+                spesa dall'elenco: la commercialista e il welfare si sanno
+                mentre si inserisce, non il mese dopo. Restano modificabili dal
+                foglio di dettaglio, che è dove si aggiungono nota e scontrino. */}
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={tax730}
+                onChange={(event) => setTax730(event.target.checked)}
+              />
+              Da scaricare nel 730
+            </label>
+
+            {welfareMine ? (
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={welfare}
+                  onChange={(event) => setWelfare(event.target.checked)}
+                />
+                Pagata col welfare aziendale
+              </label>
+            ) : null}
 
             {showErrors ? (
               <div className="stack" style={{ gap: 2 }}>

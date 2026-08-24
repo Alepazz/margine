@@ -1439,8 +1439,33 @@ button.hero-value:focus-visible {
      scorrere finisce la pagina invece del corpo. */
   min-height: 0;
   overflow-y: auto;
-  /* Spazio per il piede: l'ultimo campo non deve finire sotto il bordo. */
-  padding-bottom: 4px;
+  /*
+   * **Di lato non si scorre, e non è un dettaglio di stile.**
+   *
+   * Un contenitore con `overflow-y: auto` e l'altra direzione lasciata a
+   * `visible` diventa scorrevole **anche in orizzontale**: la regola CSS è che
+   * `visible` accanto a un valore di scorrimento si calcola come `auto`. Basta
+   * che qualcosa sporga di 2px — o che iOS voglia portare in vista l'anello del
+   * fuoco — perché il modulo si trascini di lato sotto il pollice.
+   *
+   * `hidden` e non `clip`: accanto a un `auto` sull'altro asse la stessa regola
+   * trasforma `clip` in `hidden`, quindi scriverlo non aggiunge niente —
+   * verificato leggendo il valore calcolato in WebKit, che risponde `hidden`.
+   * Il dito così non trascina più; resta possibile a un `scrollLeft`, ed è per
+   * questo che i 6px qui sotto contano.
+   *
+   * I 6px sono lo spazio per **l'anello del fuoco**, non un margine estetico.
+   * Un campo sta a `width: 100%`, e l'anello (`:focus-visible`, 2px a 2px di
+   * distanza) gli cresce 4px intorno: fuori dal riquadro di clip, cioè tagliato
+   * di netto a destra e a sinistra — si vedeva la riga sopra e quella sotto e
+   * niente ai lati. Il margine negativo rende i 6px, così il bordo del campo
+   * resta allineato a testa e piede del foglio.
+   */
+  overflow-x: hidden;
+  margin-inline: -6px;
+  /* In fondo lo spazio per il piede: l'ultimo campo non deve finire sotto il
+     bordo. */
+  padding: 0 6px 4px;
 }
 
 .sheet-foot {
