@@ -1,6 +1,6 @@
 # ADR-0047: La pagina non rimbalza
 
-**Status:** accepted · **Date:** 2026-08-24
+**Status:** superseded by ADR-0048 · **Date:** 2026-08-24
 
 ## Context
 

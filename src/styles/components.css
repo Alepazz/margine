@@ -446,6 +446,16 @@ button.hero-value:focus-visible {
 .select,
 .textarea {
   width: 100%;
+  /*
+   * **`width: 100%` non basta su un campo dentro un flex.** `.field` è una
+   * colonna flex, quindi il campo è un elemento flex e non scende sotto la
+   * propria larghezza minima automatica — che per un controllo nativo è quella
+   * che gli dà il sistema, e su iOS è più larga che a schermo: il campo della
+   * data sbordava a destra e gli altri finivano **sopra il bordo** del foglio.
+   * È lo stesso difetto di ADR-0033 e ADR-0046, e la cura è sempre questa riga.
+   * Non si vede da scrivania, dove i controlli nativi sono più stretti.
+   */
+  min-width: 0;
   padding: 9px 11px;
   border-radius: var(--r-sm);
   border: 1px solid var(--line-strong);
@@ -1656,15 +1666,28 @@ button.hero-value:focus-visible {
 
 /* ─────────────────────────── schermata di sblocco ─────────────────────────── */
 
+/*
+ * Le due schermate che stanno **fuori** dal guscio — sblocco e scelta
+ * dell'identità — e quindi devono scorrere da sé: da ADR-0048 `body` ha
+ * `overflow: hidden`, e senza queste due righe una schermata più alta dello
+ * schermo sarebbe tagliata **senza modo di raggiungerne il fondo**, cioè col
+ * pulsante che sblocca fuori portata. È il difetto peggiore che il guscio nuovo
+ * poteva introdurre, e non si vede su uno schermo grande.
+ *
+ * Il centraggio lo fa `margin: auto` sulla scheda e non `align-items: center`:
+ * in un contenitore che scorre il centraggio taglia in cima quando il contenuto
+ * è più alto del riquadro, mentre i margini automatici si distribuiscono solo
+ * se c'è spazio avanzato.
+ */
 .gate {
-  min-height: 100vh;
+  height: 100%;
+  overflow-y: auto;
   display: flex;
-  align-items: center;
-  justify-content: center;
   padding: 24px;
 }
 
 .gate-card {
+  margin: auto;
   width: 100%;
   max-width: 400px;
   background: var(--surface);

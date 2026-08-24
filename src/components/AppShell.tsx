@@ -14,7 +14,7 @@
  * un'architettura.
  */
 
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 
 import { SyncBadge, ThemeButton } from './Controls'
@@ -80,37 +80,15 @@ const GROUPS: [NavGroup, string][] = [
   ['analisi', 'Analisi'],
 ]
 
-/**
- * Pubblica l'altezza vera dell'isola in `--tabbar-h`, che `--tabbar-reserve` usa
- * per lo spazio in fondo alla pagina.
- *
- * Si misura invece di calcolarla perché è emergente: la decidono glifo,
- * etichetta e scala del carattere, non il `min-height` del link — un `calc` in
- * CSS la sbagliava di 6px, e le ultime righe della pagina finivano sotto il
- * vetro. Con la misura resta esatta anche quando l'isola cambia composizione,
- * come è appena successo.
+/*
+ * Qui viveva `useTabbarHeight`, che misurava l'isola con un ResizeObserver e
+ * pubblicava `--tabbar-h` perché la pagina si riservasse in fondo il suo
+ * ingombro esatto. Non serve più a niente: da ADR-0048 l'isola è l'ultima riga
+ * del guscio invece di un elemento fisso sopra il contenuto, quindi non copre
+ * nulla e non c'è nessuno spazio da riservare. Se un giorno l'isola tornasse
+ * `fixed`, tornerebbe anche il bisogno di misurarla — e con esso il difetto che
+ * ADR-0048 ha tolto.
  */
-function useTabbarHeight(): RefObject<HTMLElement | null> {
-  const ref = useRef<HTMLElement | null>(null)
-
-  useEffect(() => {
-    const island = ref.current
-    if (!island) return
-    const root = document.documentElement
-    const publish = () => root.style.setProperty('--tabbar-h', `${island.offsetHeight}px`)
-    publish()
-    const observer = new ResizeObserver(publish)
-    observer.observe(island)
-    return () => {
-      observer.disconnect()
-      // Torna al valore di partenza del foglio di stile invece di lasciare
-      // appiccicato quello dell'ultima misura.
-      root.style.removeProperty('--tabbar-h')
-    }
-  }, [])
-
-  return ref
-}
 
 function Brand(): ReactNode {
   return (
@@ -126,7 +104,6 @@ function Brand(): ReactNode {
 }
 
 export function AppShell(): ReactNode {
-  const tabbar = useTabbarHeight()
   /** Cosa si sta aggiungendo. Il `+` è uno, i verbi sono due. */
   const [adding, setAdding] = useState<'expense' | 'price' | null>(null)
   const { pathname } = useLocation()
@@ -263,7 +240,7 @@ export function AppShell(): ReactNode {
         sei**: un foglio di scelta costerebbe un tocco su ogni spesa per
         risparmiarne uno sui prezzi, e il rapporto d'uso va al contrario.
       */}
-      <nav className="tabbar" aria-label="Sezioni" ref={tabbar}>
+      <nav className="tabbar" aria-label="Sezioni">
         {TABBAR.slice(0, 2).map(tab)}
         <button
           type="button"

@@ -20,7 +20,7 @@ import { tricountLabel } from '../domain/expense-rules'
 import { soleMemberOf, type Expense } from '../domain/types'
 import { ExpenseForm } from './ExpenseForm'
 import { LedgerSelect } from './LedgerSelect'
-import { useToast } from './ui'
+import { useScrollLock, useToast } from './ui'
 
 /**
  * Un'etichetta che si accende e si spegne: titolo, cosa comporta adesso, e il
@@ -211,6 +211,8 @@ export function ExpenseSheet({
   const [linkDraft, setLinkDraft] = useState('')
   const [linkError, setLinkError] = useState<string | null>(null)
   const sheetRef = useRef<HTMLDivElement | null>(null)
+
+  useScrollLock()
 
   // Solo all'apertura di un'altra spesa: non azzerare la nota che stai scrivendo.
   useEffect(() => {

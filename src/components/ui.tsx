@@ -22,6 +22,37 @@ import type { MarginStatus } from '../domain/income'
  */
 export const VEIL = '••••'
 
+// ─────────────────────── blocco dello scorrimento ───────────────────────
+
+/**
+ * Quanti fogli sono aperti adesso. Un booleano non basterebbe: un foglio può
+ * sostituirne un altro (dal dettaglio di una spesa si passa a correggerla), e
+ * React smonta il vecchio **dopo** aver montato il nuovo o prima, a seconda del
+ * caso — con un booleano lo sblocco dell'uno cancellerebbe il blocco dell'altro.
+ */
+let openSheets = 0
+
+/**
+ * Con un foglio aperto la pagina dietro non si scorre: si scorre solo il foglio.
+ *
+ * Costa una classe su `<html>` e niente altro, perché da ADR-0048 quello che
+ * scorre è `.content` e non il documento: togliere lo scorrimento a un elemento
+ * **conserva la sua posizione**, quindi non serve il trucco del `body` fisso con
+ * il ripristino dello `scrollY` — che è il modo in cui di solito si finisce a
+ * perdere il segno riaprendo l'elenco. È ciò che serve al supermercato, dove si
+ * alterna «quanto costava?» e «lo registro».
+ */
+export function useScrollLock(): void {
+  useEffect(() => {
+    openSheets += 1
+    document.documentElement.classList.add('is-locked')
+    return () => {
+      openSheets -= 1
+      if (openSheets === 0) document.documentElement.classList.remove('is-locked')
+    }
+  }, [])
+}
+
 // ─────────────────────────── scheda ───────────────────────────
 
 export function Card({
