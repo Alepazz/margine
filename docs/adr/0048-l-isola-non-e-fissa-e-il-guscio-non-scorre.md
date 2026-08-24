@@ -1,6 +1,6 @@
 # ADR-0048: L'isola non è fissa, e il guscio non scorre
 
-**Status:** accepted · **Date:** 2026-08-24
+**Status:** accepted — la sola scelta della barra nel flusso è rovesciata da ADR-0049 · **Date:** 2026-08-24
 
 ## Context
 

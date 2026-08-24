@@ -469,6 +469,44 @@ button.hero-value:focus-visible {
   resize: vertical;
 }
 
+/*
+ * **Il campo della data rinuncia all'aspetto nativo, e non è un vezzo estetico.**
+ *
+ * Su iOS `input[type="date"]` è un controllo di sistema con un impianto suo, e
+ * quell'impianto ha una larghezza minima che **non rispetta né `width: 100%` né
+ * `min-width: 0`**: il campo «Quando» sbordava a destra oltre il bordo del
+ * foglio mentre tutti gli altri stavano dentro al pixel. Con `appearance: none`
+ * la scatola torna una scatola normale e la larghezza la decide il CSS; il
+ * selettore a rotella resta, perché lo apre il tipo del campo e non il suo
+ * aspetto.
+ *
+ * L'allineamento serve perché senza l'impianto nativo il valore resterebbe dove
+ * lo metteva iOS — centrato, come si vede nella schermata del difetto — mentre
+ * ogni altro campo del progetto scrive da sinistra.
+ *
+ * Non si riproduce sul banco, nemmeno in WebKit con l'emulazione iPhone: da
+ * scrivania quel controllo è un'altra cosa e sta comodamente dentro. Verificato
+ * qui solo che non rompa niente — valore al suo posto, larghezza dentro il
+ * foglio, selettore che si apre. La prova vera è sul telefono. → ADR-0049
+ *
+ * L'altezza **non** si tocca di proposito: sul banco la scatola della data viene
+ * 4px più alta di un campo di testo, ma è un artefatto del WebKit da scrivania,
+ * e accordare un `line-height` su quella misura vorrebbe dire tarare il vestito
+ * sulla piattaforma sbagliata. Provati 1.4 (52px) e `normal` (50px) contro i 51
+ * di riferimento: nessuno combacia, e nessuno dei tre dice niente su iOS.
+ *
+ * Solo da telefono, ed è deliberato: il difetto è del controllo di iOS, e sul
+ * Mac quel campo funziona — togliergli l'aspetto nativo là significherebbe
+ * perdere l'icona del calendario per riparare un guasto che non c'è.
+ */
+@media (max-width: 899px) {
+  .input[type='date'] {
+    -webkit-appearance: none;
+    appearance: none;
+    text-align: left;
+  }
+}
+
 .input::placeholder,
 .textarea::placeholder {
   color: var(--ink-3);
@@ -1606,7 +1644,9 @@ button.hero-value:focus-visible {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  /* Sopra l'isola della barra, che arriva a ~76px dal fondo */
+  /* Appoggiato sull'isola, il cui bordo alto sta a 93px dal fondo (14 di
+     distacco + 79 di altezza): un pelo sotto, così i due si toccano invece di
+     lasciare una fessura. Il commento diceva 76px e non era più vero. */
   bottom: calc(env(safe-area-inset-bottom) + 92px);
   z-index: 50;
   padding: 9px 16px;
