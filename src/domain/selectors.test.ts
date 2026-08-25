@@ -312,6 +312,64 @@ describe('filtri', () => {
     const filtered = applyFilter(DATA, { ...EMPTY_FILTER, month: '2026-08', tax730Only: true })
     expect(filtered.map((e) => e.id)).toEqual(['e'])
   })
+
+  describe('intervallo di date', () => {
+    const SPAN = [
+      expense({ id: 'prima', date: '2026-02-28', amount: 10 }),
+      expense({ id: 'inizio', date: '2026-03-01', amount: 10 }),
+      expense({ id: 'mezzo', date: '2026-03-15', amount: 10 }),
+      expense({ id: 'fine', date: '2026-04-30', amount: 10 }),
+      expense({ id: 'dopo', date: '2026-05-01', amount: 10 }),
+    ]
+
+    it('prende gli estremi, che sono inclusivi', () => {
+      const filtered = applyFilter(SPAN, { ...EMPTY_FILTER, from: '2026-03-01', to: '2026-04-30' })
+      expect(filtered.map((e) => e.id)).toEqual(['inizio', 'mezzo', 'fine'])
+    })
+
+    it('i due estremi sono indipendenti', () => {
+      expect(applyFilter(SPAN, { ...EMPTY_FILTER, from: '2026-04-30' }).map((e) => e.id)).toEqual([
+        'fine',
+        'dopo',
+      ])
+      expect(applyFilter(SPAN, { ...EMPTY_FILTER, to: '2026-03-01' }).map((e) => e.id)).toEqual([
+        'prima',
+        'inizio',
+      ])
+    })
+
+    it('un intervallo rovesciato non trova niente, non esplode', () => {
+      expect(applyFilter(SPAN, { ...EMPTY_FILTER, from: '2026-04-30', to: '2026-03-01' })).toEqual([])
+    })
+
+    it("l'intervallo si somma agli altri filtri", () => {
+      const data = [
+        expense({ id: 'dentro', date: '2026-03-10', amount: 10, category: 'gatto' }),
+        expense({ id: 'categoria', date: '2026-03-11', amount: 10, category: 'casa' }),
+        expense({ id: 'data', date: '2026-06-10', amount: 10, category: 'gatto' }),
+      ]
+      const filtered = applyFilter(data, {
+        ...EMPTY_FILTER,
+        from: '2026-03-01',
+        to: '2026-03-31',
+        category: 'gatto',
+      })
+      expect(filtered.map((e) => e.id)).toEqual(['dentro'])
+    })
+
+    /*
+     * Il valore di partenza è una proprietà di `EMPTY_FILTER`, non di
+     * `applyFilter`: che gli estremi vuoti non filtrino lo dicono già tutti i
+     * test qui sopra, che di `EMPTY_FILTER` fanno lo spread. Quello che nessun
+     * altro test coglierebbe è un estremo **preimpostato** — «dall'inizio dei
+     * tempi» è la richiesta, e una data di comodo lì dentro la tradirebbe in
+     * silenzio, mostrando meno spese di quante ce ne sono.
+     */
+    it('si parte senza estremi, cioè dall\'inizio dei tempi', () => {
+      expect(EMPTY_FILTER.from).toBe('')
+      expect(EMPTY_FILTER.to).toBe('')
+    })
+  })
 })
 
 describe('la casa: due insiemi che non coincidono', () => {

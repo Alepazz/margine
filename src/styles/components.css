@@ -662,6 +662,38 @@ button.hero-value:focus-visible {
   min-width: 160px;
 }
 
+/*
+ * L'intervallo di date: due campi che viaggiano in coppia.
+ *
+ * Il contenitore non e' decorazione — serve a mandarli a capo insieme. Sciolti
+ * fra i menu' il flex li impagina uno per volta, e su telefono il «Dal»
+ * finiva in fondo a una riga con l'«Al» in cima alla successiva: due meta' di
+ * una condizione sola, separate.
+ */
+.filter-range {
+  display: flex;
+  gap: 8px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.filter-date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/*
+ * Piu' specifico di `.filters .input` di proposito: li' il campo ha una
+ * larghezza minima di 120px che a un campo data dentro meta' schermo non
+ * serve, e su telefono lo farebbe sbordare.
+ */
+.filters .filter-date .input {
+  width: auto;
+  min-width: 0;
+}
+
 /* Su schermo grande i filtri stanno tutti in vista e il pulsante non serve */
 .filters-toggle {
   display: none;
@@ -1947,6 +1979,26 @@ button.hero-value:focus-visible {
   .filters .select {
     flex: 1 1 calc(50% - 5px);
     min-width: 0;
+  }
+
+  /*
+   * L'intervallo si prende una riga sua e i due estremi la dividono a meta'.
+   * L'etichetta va **sopra** il campo, non accanto: con il campo a 16px (la
+   * misura sotto la quale iOS ingrandisce la pagina) «gg/mm/aaaa» piu' il
+   * riquadro non stanno in meta' schermo insieme a un «Dal» di fianco, e a
+   * sbordare sarebbe il campo — in silenzio, perche' il testo si taglia e
+   * basta.
+   */
+  .filter-range {
+    flex: 1 1 100%;
+    gap: 10px;
+  }
+
+  .filter-date {
+    flex: 1 1 calc(50% - 5px);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
   }
 
   .filters-toggle {
