@@ -44,8 +44,14 @@ export function Spese(): ReactNode {
   const [selected, setSelected] = useState<Expense | null>(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
 
+  /*
+   * Mese e intervallo sono **un** filtro, quello sul tempo: contarli separati
+   * direbbe «(2)» per una condizione sola. Non sono mai attivi insieme — ci
+   * pensano `pickMonth` e `pickRange` — ma il conteggio non ci fa affidamento.
+   */
+  const timeFiltered = filter.month !== 'all' || filter.from !== '' || filter.to !== ''
   const activeFilters =
-    (filter.month === 'all' ? 0 : 1) +
+    (timeFiltered ? 1 : 0) +
     (filter.category === 'all' ? 0 : 1) +
     (filter.tricount === 'all' ? 0 : 1) +
     (filter.paidBy === 'all' ? 0 : 1) +
@@ -58,6 +64,16 @@ export function Spese(): ReactNode {
   const update = (patch: Partial<ExpenseFilter>) => {
     setFilter((current) => ({ ...current, ...patch }))
   }
+
+  /*
+   * Il tempo si filtra in due modi che si escludono: la tendina per un mese
+   * intero — un tocco, ed è il caso di gran lunga più frequente — e i due
+   * estremi per tutto il resto. Tenerli combinabili in AND darebbe insiemi
+   * vuoti inspiegabili («Agosto» + «dal 3 al 12 marzo»), e non c'è domanda che
+   * quella coppia risponda. → ADR-0050
+   */
+  const pickMonth = (month: ExpenseFilter['month']) => update({ month, from: '', to: '' })
+  const pickRange = (key: 'from' | 'to', value: string) => update({ [key]: value, month: 'all' })
 
   return (
     <>
@@ -97,7 +113,7 @@ export function Spese(): ReactNode {
           <select
             className="select"
             value={filter.month}
-            onChange={(event) => update({ month: event.target.value === 'all' ? 'all' : event.target.value })}
+            onChange={(event) => pickMonth(event.target.value)}
             aria-label="Mese"
           >
             <option value="all">Tutti i mesi</option>
@@ -107,6 +123,41 @@ export function Spese(): ReactNode {
               </option>
             ))}
           </select>
+          {/*
+            `min`/`max` incrociati spengono i giorni impossibili **nel
+            selettore**, che sul telefono è l'unico modo in cui una data si
+            mette. Non sono un vincolo sul valore: digitata a mano, una data
+            fuori intervallo entra lo stesso (il campo resta `:invalid` e
+            `validity.rangeOverflow` è vero) e l'elenco esce vuoto — verificato,
+            non dedotto. Va bene così: con i due estremi rovesciati uno accanto
+            all'altro, «nessuna spesa» si spiega da sé.
+
+            Il perché del contenitore sta in `.filter-range`, che è dove agisce.
+          */}
+          <div className="filter-range">
+            <label className="filter-date">
+              <span className="label">Dal</span>
+              <input
+                className="input"
+                type="date"
+                value={filter.from}
+                max={filter.to === '' ? undefined : filter.to}
+                onChange={(event) => pickRange('from', event.target.value)}
+                aria-label="Dal giorno"
+              />
+            </label>
+            <label className="filter-date">
+              <span className="label">Al</span>
+              <input
+                className="input"
+                type="date"
+                value={filter.to}
+                min={filter.from === '' ? undefined : filter.from}
+                onChange={(event) => pickRange('to', event.target.value)}
+                aria-label="Al giorno"
+              />
+            </label>
+          </div>
           <select
             className="select"
             value={filter.category}

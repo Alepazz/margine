@@ -1193,6 +1193,20 @@ export function tax730Suggestions(
 export interface ExpenseFilter {
   query: string
   month: MonthKey | 'all'
+  /**
+   * Estremi dell'intervallo, ISO `YYYY-MM-DD`, stringa vuota = estremo assente.
+   *
+   * Le date delle spese sono ISO, quindi il confronto fra stringhe **è** il
+   * confronto fra date: nessun `Date` da costruire, nessun fuso da sbagliare.
+   * I due estremi sono inclusivi e indipendenti — «dal 3 marzo in poi» è un
+   * intervallo legittimo tanto quanto «fino al 12 aprile».
+   *
+   * Vive sullo stesso asse di `month`, e i due si spengono a vicenda in
+   * `Spese.tsx`: qui non c'è una regola che li combini, perché non ci sono mai
+   * tutti e due insieme. → ADR-0050
+   */
+  from: string
+  to: string
   category: string | 'all'
   tricount: string | 'all'
   paidBy: PersonId | 'all'
@@ -1202,6 +1216,8 @@ export interface ExpenseFilter {
 export const EMPTY_FILTER: ExpenseFilter = {
   query: '',
   month: 'all',
+  from: '',
+  to: '',
   category: 'all',
   tricount: 'all',
   paidBy: 'all',
@@ -1214,6 +1230,9 @@ export function applyFilter(scope: readonly Expense[], filter: ExpenseFilter): E
   const q = filter.query.trim().toLowerCase()
   return scope.filter((e) => {
     if (filter.month !== 'all' && monthKeyOf(e.date) !== filter.month) return false
+    /* Estremi inclusivi, confronto lessicografico su ISO. */
+    if (filter.from !== '' && e.date < filter.from) return false
+    if (filter.to !== '' && e.date > filter.to) return false
     if (filter.category !== 'all' && e.category !== filter.category) return false
     if (filter.tricount !== 'all' && e.tricount !== filter.tricount) return false
     if (filter.paidBy !== 'all' && e.paidBy !== filter.paidBy) return false
