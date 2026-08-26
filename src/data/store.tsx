@@ -16,6 +16,15 @@ import {
 } from 'react'
 
 import { currentMonthKey, monthKeyOf, todayIso, type MonthKey } from '../domain/dates'
+import {
+  CHANGE_GROUPS,
+  parseChanges,
+  unseenSince,
+  type Change,
+  type ChangeGroup,
+  type RawCommit,
+} from '../domain/changes'
+import { diffExpenses, type ExpenseDelta } from '../domain/diff'
 import { DEFAULT_VIEW, monthsOf, type ViewOptions } from '../domain/selectors'
 import type {
   Annotation,
@@ -31,7 +40,16 @@ import type {
 } from '../domain/types'
 import { WrongPassphraseError, decryptEnvelope, deriveKeyCached, encryptEnvelope } from './crypto'
 import { isEnvelope, type Envelope } from './envelope'
-import { GithubError, commitFiles, getFile, loadToken } from './github'
+import {
+  GithubError,
+  commitFiles,
+  getFile,
+  listCommits,
+  loadLogin,
+  loadToken,
+  saveLogin,
+  viewerLogin,
+} from './github'
 import {
   EMPTY_OUTBOX,
   applyConfigOps,
@@ -63,6 +81,23 @@ const IDENTITY_SINCE_KEY = 'margine.person.since.v1'
  * l'opposto. Resta qui anche adesso che l'app saprebbe scriverlo nei dati.
  */
 const HIDE_INCOME_KEY = 'margine.hideIncome.v1'
+/* Fin dove ho letto le novità: lo muove **solo** l'apertura della campanella. */
+const NEWS_SEEN_KEY = 'margine.news.seenAt.v1'
+/* Quali gruppi di eventi contano. Preferenza del dispositivo, non dei dati. */
+const NEWS_GROUPS_KEY = 'margine.news.groups.v1'
+/* Non più di una rilettura al minuto: passare fra le app non è un evento. */
+const REFRESH_EVERY_MS = 60_000
+/**
+ * Quante versioni decifrate tenere in memoria.
+ *
+ * **Due bastano**, e non è una stima: le letture sono in fila e ogni versione
+ * serve al massimo due volte di seguito — `read(sha)` e `read(genitore)`, e al
+ * giro dopo quel genitore è il `sha` della novità successiva. Non si torna mai
+ * indietro su una versione superata. Tenerne cinque vorrebbe dire tre dataset
+ * decifrati da circa un megabyte l'uno fermi nella memoria di un telefono senza
+ * che nessuno li richieda mai. Tre, per un margine che non costa quasi niente.
+ */
+const MAX_CACHED_VERSIONS = 3
 const SYNC_DEBOUNCE_MS = 1200
 
 export type Status = 'boot' | 'locked' | 'unlocking' | 'ready' | 'error'
@@ -102,6 +137,8 @@ export interface StoreApi {
   hideIncome: boolean
   /** Come parte l'app su questo dispositivo: questo è ciò che resta. */
   hideIncomeByDefault: boolean
+  /** Le novità dell'altra persona: la campanella. → ADR-0051 */
+  news: NewsState
   unlock: (passphrase: string, remember: boolean) => Promise<void>
   lock: () => void
   setMonth: (month: MonthKey) => void
@@ -133,6 +170,39 @@ export interface StoreApi {
   deletePrice: (priceId: string) => void
   syncNow: () => Promise<void>
   reload: () => void
+  /** Segna letto fino all'ultima novità conosciuta. Lo chiama solo la campanella. */
+  markNewsSeen: () => void
+  setNewsGroups: (groups: readonly ChangeGroup[]) => void
+  /** Chiede il dettaglio di una novità: cosa ha toccato quel commit. */
+  loadNewsDetail: (change: Change) => Promise<void>
+  /** Com'è andata la richiesta del dettaglio. `undefined` = non ancora chiesto. */
+  newsDetail: (sha: string) => NewsDetail | undefined
+}
+
+export type NewsDetail =
+  | { state: 'loading' }
+  | { state: 'failed'; reason: string }
+  | { state: 'done'; deltas: ExpenseDelta[] }
+
+export interface NewsState {
+  /** Tutte le novità visibili, dalla più recente. */
+  changes: Change[]
+  /** Quante non ho ancora visto: è il numero sul pallino. */
+  unseen: number
+  /** I gruppi accesi in Impostazioni. */
+  groups: ChangeGroup[]
+  /** Vero mentre si sta leggendo l'elenco: la campanella non si blocca comunque. */
+  loading: boolean
+  /**
+   * So qual è il mio login GitHub, e quindi so che le righe rimaste sono
+   * dell'altra persona.
+   *
+   * Quando è falso — nessun token, login mai imparato — l'elenco comprende
+   * anche i miei commit, e **chi ha fatto cosa non si può affermare**: il
+   * foglio deve mostrare l'autore invece dell'emoji dell'altra persona.
+   * Attribuire per assunzione è peggio che non attribuire.
+   */
+  knowsMe: boolean
 }
 
 const StoreContext = createContext<StoreApi | null>(null)
@@ -183,6 +253,30 @@ function describeError(error: unknown): string {
 
 function commitMessage(entries: readonly OutboxEntry[]): string {
   return `${describeOps(entries)} (da Margine)`
+}
+
+function readNewsSeenAt(): string | undefined {
+  try {
+    return localStorage.getItem(NEWS_SEEN_KEY) ?? undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * I gruppi accesi. Senza niente in memoria sono **tutti**: una campanella che
+ * parte muta si direbbe rotta, e chi non vuole un gruppo lo spegne.
+ */
+function readNewsGroups(): ChangeGroup[] {
+  try {
+    const raw = localStorage.getItem(NEWS_GROUPS_KEY)
+    if (raw === null) return [...CHANGE_GROUPS]
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return [...CHANGE_GROUPS]
+    return CHANGE_GROUPS.filter((group) => parsed.includes(group))
+  } catch {
+    return [...CHANGE_GROUPS]
+  }
 }
 
 function readHideIncomeDefault(): boolean {
@@ -240,6 +334,55 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
   const [view, setView] = useState<ViewOptions>({ ...DEFAULT_VIEW, person: readIdentity() ?? 'me' })
   const [outbox, setOutbox] = useState<OutboxState>(EMPTY_OUTBOX)
   const [sync, setSync] = useState<SyncState>({ phase: 'idle', pending: 0 })
+  const [changes, setChanges] = useState<Change[]>([])
+  const [newsSeenAt, setNewsSeenAt] = useState<string | undefined>(readNewsSeenAt)
+  const [newsGroups, setNewsGroupsState] = useState<ChangeGroup[]>(readNewsGroups)
+  const [newsLoading, setNewsLoading] = useState(false)
+  const [myLogin, setMyLogin] = useState<string | undefined>(() => loadLogin() ?? undefined)
+  const lastRefresh = useRef(0)
+  /**
+   * Dettaglio per commit: `sha` → com'è andata.
+   *
+   * Tiene anche i tentativi **falliti**, e non è pignoleria: un pulsante che
+   * scarica mezzo megabyte, non ci riesce e non dice niente è il difetto di
+   * ADR-0043 rifatto. Chi guarda deve poter distinguere «sto leggendo» da «non
+   * si può leggere», e la seconda deve dire perché.
+   */
+  const detailCache = useRef(new Map<string, NewsDetail>())
+  /**
+   * La stessa mappa, in stato, perché un `ref` che muta non fa ridisegnare
+   * niente. Il ref resta perché `loadDetail` deve **leggere** cosa c'è già
+   * prima di scrivere, e con il solo stato leggerebbe il valore del render in
+   * cui è stato creato. Si aggiornano insieme, in `putDetail`.
+   */
+  const [details, setDetails] = useState<Map<string, NewsDetail>>(new Map())
+  /** L'ultima versione **remota** vista, senza l'overlay della coda locale. */
+  const lastRemote = useRef<Dataset | undefined>(undefined)
+  /**
+   * Il confronto che la rilettura ha già in mano.
+   *
+   * Se dall'ultima volta è arrivato **un commit solo**, questo confronto È il
+   * dettaglio di quel commit: si mette in cache senza scaricare niente. Se ne
+   * sono arrivati più d'uno l'attribuzione sarebbe indovinata, e allora si
+   * butta — il dettaglio si scaricherà a richiesta, per il commit giusto.
+   */
+  const freeDiff = useRef<{ before: Dataset; after: Dataset } | undefined>(undefined)
+  /** Gli sha già conosciuti: servono a capire se ne è arrivato uno solo. */
+  const knownShas = useRef<Set<string> | undefined>(undefined)
+  /** I commit come sono arrivati, per poter rifiltrare senza riscaricare. */
+  const rawCommits = useRef<RawCommit[]>([])
+  /** Quando si è letta la lista l'ultima volta: vedi `loadNews`. */
+  const lastNews = useRef(0)
+  /**
+   * I dati decifrati a un certo commit, tenuti da parte.
+   *
+   * Serve perché **commit consecutivi condividono i file**: il genitore di uno
+   * è l'altro. Tre novità di fila vogliono quattro versioni, non sei, e con la
+   * cache si scaricano quattro volte invece di sei. Il tetto c'è perché un
+   * dataset decifrato pesa in memoria molto più del file che lo porta.
+   */
+  const fileCache = useRef(new Map<string, Dataset>())
+
   const [hasStoredPassphrase, setHasStoredPassphrase] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
   const [hideIncomeByDefault, setDefaultHidden] = useState(readHideIncomeDefault)
@@ -446,6 +589,289 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
     },
     [applyUnlocked],
   )
+
+  // ── Rilettura silenziosa e novità ───────────────────────────────────────
+
+  /**
+   * Rilegge i dati dal repo **senza far scattare niente di visibile**.
+   *
+   * Il pericolo qui è uno solo, e vale la pena scriverlo: sostituire il dataset
+   * con quello remoto farebbe **sparire da sotto gli occhi** le spese ancora in
+   * coda, che nel repo non ci sono ancora. La cura è la stessa che `flush` usa
+   * per il commit — riapplicare la coda sopra ciò che si è appena letto — ed è
+   * per questo che qui si passa da `applyOps` con `settled` e `pending` esatti
+   * come fa `applyUnlocked`, invece di un `setDataset(remoto)`.
+   *
+   * Quello che **non** fa, di proposito: non tocca `status`, così non compare il
+   * cancello; non tocca il mese scelto, perché stavi guardando marzo e devi
+   * continuare a guardare marzo; e se fallisce non dice niente e non cambia
+   * niente — una rilettura andata male lascia i dati di prima, che sono validi.
+   */
+  const refreshData = useCallback(async () => {
+    const passphrase = passphraseRef.current
+    if (passphrase === undefined) return
+
+    /*
+     * Nessun blocco mentre un commit è in volo, ed è deliberato: la rilettura
+     * riapplica comunque la coda, quindi leggere il file un istante prima che
+     * il commit atterri dà lo stesso contenuto — quello remoto più ciò che è in
+     * attesa, cioè quello che si sta scrivendo. Un guard qui non aggiungerebbe
+     * correttezza, aggiungerebbe uno stato da tenere allineato.
+     */
+    const now = Date.now()
+    if (now - lastRefresh.current < REFRESH_EVERY_MS) return
+    lastRefresh.current = now
+
+    try {
+      const [data, cfg] = await Promise.all([fetchEnvelope(DATA_URL), fetchEnvelope(CONFIG_URL)])
+      setEnvelopes({ data, config: cfg })
+
+      const key = await deriveKeyCached(passphrase, data.kdf)
+      const rawDataset = normaliseDataset(await decryptEnvelope<Dataset>(data, key))
+      const configKey =
+        cfg.kdf.salt === data.kdf.salt ? key : await deriveKeyCached(passphrase, cfg.kdf)
+      const nextConfig = await decryptEnvelope<AppConfig>(cfg, configKey)
+
+      /*
+       * La versione remota **pura**, prima dell'overlay locale: è il termine di
+       * paragone per sapere cosa ha fatto l'altra persona. Confrontare i dataset
+       * con l'overlay dentro conterebbe anche le proprie spese in coda.
+       */
+      const previousRemote = lastRemote.current
+      lastRemote.current = rawDataset
+
+      const box = loadOutbox()
+      const queued = [...box.settled, ...box.pending]
+      const merged = applyOps(rawDataset, queued)
+      const mergedConfig = applyConfigOps(nextConfig, queued)
+      freeDiff.current = previousRemote ? { before: previousRemote, after: rawDataset } : undefined
+
+      configRef.current = mergedConfig
+      setConfig(mergedConfig)
+      setDataset(merged)
+    } catch {
+      /* Rilettura fallita: si tiene ciò che c'è. Non è un guasto da mostrare. */
+    }
+  }, [])
+
+  /** L'unico posto che scrive un dettaglio: ref per la lettura, stato per il render. */
+  const putDetail = useCallback((sha: string, detail: NewsDetail) => {
+    detailCache.current.set(sha, detail)
+    setDetails(new Map(detailCache.current))
+  }, [])
+
+  /**
+   * Scarica lo storico dei commit e lo traduce in novità.
+   *
+   * Il token è facoltativo — il repo è pubblico — ma se c'è si impara anche il
+   * proprio login, una volta sola, per non contarsi da soli fra le novità.
+   */
+  const loadNews = useCallback(async (groups: readonly ChangeGroup[]) => {
+    const github = configRef.current?.github
+    if (!github) return
+
+    /*
+     * Non più di una lettura al minuto, come la rilettura dei dati.
+     *
+     * Senza, ogni ritorno in primo piano ne faceva **due**: `visibilitychange`
+     * e `focus` scattano tutti e due, e questa non aveva la guardia che
+     * `refreshData` ha. La lista pesa 173 KB e senza token il limite di GitHub
+     * è 60 richieste all'ora per indirizzo IP: trenta passaggi fra le app e la
+     * campanella si zittiva, senza poterlo spiegare.
+     */
+    const now = Date.now()
+    if (now - lastNews.current < REFRESH_EVERY_MS) return
+    lastNews.current = now
+
+    const token = loadToken()
+    setNewsLoading(true)
+    try {
+      let login = loadLogin() ?? undefined
+      if (login === undefined && token) {
+        const found = await viewerLogin(token)
+        if (found) {
+          saveLogin(found)
+          login = found
+        }
+      }
+      setMyLogin(login)
+      const raw = await listCommits(github, token)
+      rawCommits.current = raw
+      const next = parseChanges(raw, { myLogin: login, groups })
+
+      /*
+       * Il caso gratuito. Confrontando **tutti** gli sha, non solo quelli
+       * visibili: se fossero arrivati un commit mio e uno suo, il confronto che
+       * ho in mano coprirebbe tutti e due e attribuirlo al suo direbbe il falso.
+       * Uno solo, e allora quel confronto è esattamente il suo dettaglio.
+       */
+      const before = knownShas.current
+      const allShas = new Set(raw.map((commit) => commit.sha))
+      if (before !== undefined && freeDiff.current !== undefined) {
+        const fresh = [...allShas].filter((sha) => !before.has(sha))
+        const only = fresh.length === 1 ? next.find((change) => change.sha === fresh[0]) : undefined
+        if (only) {
+          putDetail(only.sha, {
+            state: 'done',
+            deltas: diffExpenses(freeDiff.current.before, freeDiff.current.after),
+          })
+        }
+      }
+      knownShas.current = allShas
+      freeDiff.current = undefined
+      setChanges(next)
+    } catch {
+      /* Senza rete la campanella resta con ciò che aveva: non è un errore da dire. */
+    } finally {
+      setNewsLoading(false)
+    }
+  }, [putDetail])
+
+  /**
+   * Il dettaglio di un commit: quali spese ha toccato, con titolo e importo.
+   *
+   * Scarica il file cifrato **a quel commit** e a quello prima, li decifra e li
+   * confronta. È l'unico modo di saperlo: nel messaggio di commit non ci può
+   * stare, perché il repo è pubblico e ciò che finisce lì è in chiaro per
+   * chiunque, per sempre. → ADR-0051
+   *
+   * Due file da 359 KB per commit, quindi si fa **a richiesta** e si tiene: la
+   * cache non scade perché un commit passato non cambia mai.
+   */
+  const loadDetail = useCallback(async (change: Change): Promise<void> => {
+    const already = detailCache.current.get(change.sha)
+    if (already && already.state !== 'failed') return
+
+    const github = configRef.current?.github
+    const passphrase = passphraseRef.current
+    const fail = (reason: string) => {
+      putDetail(change.sha, { state: 'failed', reason })
+    }
+    if (!github) return fail('Manca la configurazione del repo.')
+    if (passphrase === undefined) return fail('I dati sono bloccati: serve la passphrase.')
+    if (change.parent === null) return fail('È il primo commit: non c’è niente con cui confrontarlo.')
+
+    putDetail(change.sha, { state: 'loading' })
+
+    const token = loadToken()
+    const read = async (ref: string): Promise<Dataset | undefined> => {
+      const cached = fileCache.current.get(ref)
+      if (cached) return cached
+      const file = await getFile(github, token, github.dataPath, ref)
+      if (!file) return undefined
+      const parsed: unknown = JSON.parse(file.text)
+      if (!isEnvelope(parsed)) return undefined
+      const key = await deriveKeyCached(passphrase, parsed.kdf)
+      const decrypted = normaliseDataset(await decryptEnvelope<Dataset>(parsed, key))
+      /* Il più vecchio esce quando la cache è piena: `Map` conserva l'ordine
+         d'inserimento, quindi la prima chiave è la meno recente. */
+      if (fileCache.current.size >= MAX_CACHED_VERSIONS) {
+        const oldest = fileCache.current.keys().next().value
+        if (oldest !== undefined) fileCache.current.delete(oldest)
+      }
+      fileCache.current.set(ref, decrypted)
+      return decrypted
+    }
+
+    try {
+      /* In fila e non in parallelo: due novità consecutive vogliono lo stesso
+         file, e in parallelo lo scaricherebbero tutte e due prima che la cache
+         se ne accorga. */
+      const after = await read(change.sha)
+      const before = await read(change.parent)
+      if (!after || !before) return fail('In quel commit il file dei dati non c’era.')
+      putDetail(change.sha, { state: 'done', deltas: diffExpenses(before, after) })
+    } catch (detailError) {
+      fail(
+        detailError instanceof WrongPassphraseError
+          ? 'Quel commit è cifrato con un’altra passphrase.'
+          : describeError(detailError),
+      )
+    }
+  }, [putDetail])
+
+  /**
+   * Segna letto fino **all'ultima novità conosciuta**, non a «adesso».
+   *
+   * Con «adesso» un commit arrivato un istante prima con l'orologio di GitHub
+   * appena indietro verrebbe inghiottito senza essere mai stato mostrato.
+   * Ancorandosi al commit più recente che ho davvero in mano, ciò che è visto è
+   * visto e ciò che arriva dopo resta nuovo, qualunque cosa facciano gli
+   * orologi.
+   */
+  const markNewsSeen = useCallback(() => {
+    setChanges((current) => {
+      /*
+       * **Senza novità in mano non si dichiara visto niente.**
+       *
+       * Il ripiego su «adesso» che c'era prima perdeva le novità in silenzio:
+       * la campanella è tappabile appena l'app è pronta, e se la si apriva nei
+       * ~350 ms in cui l'elenco dei commit stava ancora arrivando, il
+       * segnalibro si piantava sull'ora corrente. Quando la lista atterrava, un
+       * istante dopo, ogni commit risultava più vecchio del segnalibro e quindi
+       * già visto — senza che il pallino fosse mai comparso. Un momento di
+       * distrazione dell'utente cancellava novità che non aveva visto.
+       */
+      const newest = current[0]?.at
+      if (newest === undefined) return current
+      setNewsSeenAt((previous) => {
+        const next = previous !== undefined && previous > newest ? previous : newest
+        try {
+          localStorage.setItem(NEWS_SEEN_KEY, next)
+        } catch {
+          /* senza storage il pallino torna alla prossima apertura */
+        }
+        return next
+      })
+      return current
+    })
+  }, [])
+
+  const setNewsGroups = useCallback(
+    (groups: readonly ChangeGroup[]) => {
+      const next = CHANGE_GROUPS.filter((group) => groups.includes(group))
+      setNewsGroupsState(next)
+      try {
+        localStorage.setItem(NEWS_GROUPS_KEY, JSON.stringify(next))
+      } catch {
+        /* la preferenza vale per questa sessione */
+      }
+      /*
+       * Rifiltra ciò che è già in mano invece di riscaricare: cambiare una
+       * spunta non cambia i commit, cambia quali si guardano. E riscaricare
+       * consumerebbe il limite di richieste per un'informazione che non è
+       * cambiata.
+       */
+      setChanges(parseChanges(rawCommits.current, { myLogin, groups: next }))
+    },
+    [myLogin],
+  )
+
+  /*
+   * Quando l'app torna in primo piano: rilegge i dati e le novità. È il momento
+   * in cui il telefono è stato in tasca mentre l'altra persona registrava la
+   * spesa, ed è l'unico modo che un sito statico ha di accorgersene.
+   */
+  useEffect(() => {
+    if (status !== 'ready') return
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return
+      void refreshData()
+      void loadNews(newsGroups)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onVisible)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onVisible)
+    }
+  }, [loadNews, newsGroups, refreshData, status])
+
+  /* Il primo caricamento delle novità, appena i dati sono aperti. */
+  useEffect(() => {
+    if (status !== 'ready') return
+    void loadNews(newsGroups)
+  }, [loadNews, newsGroups, status])
 
   // ── Boot: scarica i due file cifrati ────────────────────────────────────
   useEffect(() => {
@@ -663,6 +1089,13 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       view,
       sync: { ...sync, pending: outbox.pending.length },
       hasStoredPassphrase,
+      news: {
+        changes,
+        unseen: unseenSince(changes, newsSeenAt).length,
+        groups: newsGroups,
+        loading: newsLoading,
+        knowsMe: myLogin !== undefined,
+      },
       identity,
       identitySince,
       hideIncome,
@@ -689,8 +1122,21 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       deletePrice,
       syncNow: flush,
       reload,
+      markNewsSeen,
+      setNewsGroups,
+      loadNewsDetail: loadDetail,
+      newsDetail: (sha: string) => details.get(sha),
     }),
     [
+      changes,
+      newsSeenAt,
+      newsGroups,
+      newsLoading,
+      myLogin,
+      loadDetail,
+      details,
+      markNewsSeen,
+      setNewsGroups,
       addExpense,
       addPrice,
       addSettlement,

@@ -352,6 +352,170 @@ button.hero-value:focus-visible {
   min-width: 34px;
 }
 
+/*
+ * La campanella e il suo pallino.
+ *
+ * Il pallino esce dall'angolo del pulsante, quindi il pulsante è il riferimento
+ * (`position: relative`) e il pallino non deve poter essere tagliato: nessun
+ * `overflow` sulla testata, e il pulsante mantiene la sua area tappabile
+ * intera — il pallino è decorazione sopra, non un secondo bersaglio.
+ *
+ * Il colore è `--rule`, il rosso della cornice: è il token dichiarato per la
+ * cornice e mai per i dati, ed è esattamente cosa è questo pallino. Non usa i
+ * token di stato, che vogliono icona ed etichetta accanto perché il colore da
+ * solo non basta: qui il colore non porta significato, il numero sì.
+ */
+.news-btn {
+  position: relative;
+}
+
+.news-badge {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--rule);
+  color: #fff;
+  font-family: var(--font-mono);
+  /* In px, non in rem: è cornice, e la sua misura non deve muoversi con la
+     manopola della scala del contenuto. */
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* ── il foglio delle novità ── */
+
+.news-day {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--ink-3);
+  margin-bottom: 6px;
+}
+
+.news-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.news-row:last-child {
+  border-bottom: none;
+}
+
+/* Il ripiego quando non so chi sono: il login dell'autore, per esteso. */
+.news-who {
+  flex: none;
+  max-width: 8.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--ink-3);
+}
+
+.news-emoji {
+  flex: none;
+  font-size: 1.05rem;
+}
+
+/* Il testo è l'unica parte comprimibile: senza questo, un riassunto lungo
+   spinge l'ora fuori dal foglio invece di andare a capo. */
+.news-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.news-new {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--line-strong);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--ink-2);
+  vertical-align: 1px;
+}
+
+/* ── il dettaglio di una novità ── */
+
+.news-more {
+  margin: 2px 0 6px 30px;
+  min-height: 0;
+  padding: 4px 8px;
+  font-size: 0.78rem;
+}
+
+.news-detail {
+  margin: 2px 0 8px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/*
+ * Tre colonne: verbo, titolo, importo — e la riga di contesto sotto, a tutta
+ * larghezza. `minmax(0, 1fr)` sul titolo e non `1fr`: il minimo implicito di
+ * `1fr` è il min-content, quindi una descrizione lunga allargherebbe la traccia
+ * e con lei tutte le altre righe della griglia.
+ */
+.news-detail-row {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  align-items: baseline;
+  font-size: 0.85rem;
+}
+
+.news-detail-verb {
+  font-family: var(--font-mono);
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.news-detail-title {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.news-detail-amount {
+  white-space: nowrap;
+}
+
+.news-detail-where {
+  grid-column: 2 / -1;
+  font-size: 0.76rem;
+  color: var(--ink-3);
+}
+
+.news-detail-none {
+  margin: 2px 0 8px 30px;
+  font-size: 0.78rem;
+  color: var(--ink-3);
+}
+
+.news-time {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--ink-3);
+}
+
 /* Controllo segmentato: persona, vacanze sì/no, ordinamento. */
 .segmented {
   display: inline-flex;

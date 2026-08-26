@@ -9,11 +9,14 @@
  * fine-grained non può scrivere su un repo di un altro account. → ADR-0040
  */
 
+import type { RawCommit } from '../domain/changes'
 import type { GithubConfig } from '../domain/types'
 import { fromBase64 } from './envelope'
 
 const API = 'https://api.github.com'
 const TOKEN_KEY = 'margine.gh.token.v1'
+/* Il login dell'account del token: serve solo a riconoscere i propri commit. */
+const LOGIN_KEY = 'margine.gh.login.v1'
 
 export class GithubError extends Error {
   readonly status: number
@@ -37,8 +40,29 @@ export function saveToken(token: string): void {
   localStorage.setItem(TOKEN_KEY, token.trim())
 }
 
+export function loadLogin(): string | null {
+  try {
+    return localStorage.getItem(LOGIN_KEY)
+  } catch {
+    return null
+  }
+}
+
+export function saveLogin(login: string): void {
+  try {
+    localStorage.setItem(LOGIN_KEY, login)
+  } catch {
+    /* senza storage si riconoscono meno bene i propri commit, non è grave */
+  }
+}
+
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY)
+  try {
+    localStorage.removeItem(LOGIN_KEY)
+  } catch {
+    /* ignora */
+  }
 }
 
 function apiHeaders(token: string, accept = 'application/vnd.github+json'): HeadersInit {
@@ -47,6 +71,18 @@ function apiHeaders(token: string, accept = 'application/vnd.github+json'): Head
     Authorization: `Bearer ${token}`,
     'X-GitHub-Api-Version': '2022-11-28',
   }
+}
+
+/**
+ * Intestazioni per una **lettura**: il token è facoltativo perché il repo è
+ * pubblico. Senza, il limite scende da 5000 richieste all'ora a 60 per
+ * indirizzo IP — abbondante per una campanella, e vuol dire che lo storico si
+ * vede anche su un dispositivo dove il token non è ancora stato messo.
+ */
+function readHeaders(token: string | null, accept = 'application/vnd.github+json'): HeadersInit {
+  return token
+    ? apiHeaders(token, accept)
+    : { Accept: accept, 'X-GitHub-Api-Version': '2022-11-28' }
 }
 
 function repoUrl(cfg: GithubConfig): string {
@@ -106,11 +142,18 @@ export interface RemoteFile {
 /** Legge un file dal repo. `null` se non esiste ancora. */
 export async function getFile(
   cfg: GithubConfig,
-  token: string,
+  token: string | null,
   path: string = cfg.dataPath,
+  /*
+   * Il commit da cui leggere. Di norma la punta del branch — ma la campanella
+   * chiede il file **a un commit preciso** e a quello prima, per sapere quale
+   * spesa è comparsa: è l'unico modo di avere titolo e importo senza scriverli
+   * in un messaggio di commit, che su un repo pubblico vuol dire pubblicarli.
+   */
+  ref: string = cfg.branch,
 ): Promise<RemoteFile | null> {
-  const url = `${contentsUrl(cfg, path)}?ref=${encodeURIComponent(cfg.branch)}`
-  const response = await fetch(url, { headers: apiHeaders(token), cache: 'no-store' })
+  const url = `${contentsUrl(cfg, path)}?ref=${encodeURIComponent(ref)}`
+  const response = await fetch(url, { headers: readHeaders(token), cache: 'no-store' })
   if (response.status === 404) return null
   if (!response.ok) throw await failure(response)
 
@@ -123,11 +166,94 @@ export async function getFile(
   }
 
   const raw = await fetch(url, {
-    headers: apiHeaders(token, 'application/vnd.github.raw'),
+    headers: readHeaders(token, 'application/vnd.github.raw'),
     cache: 'no-store',
   })
   if (!raw.ok) throw await failure(raw)
   return { sha: body.sha, text: await raw.text() }
+}
+
+// ─────────────────────── lo storico dei cambiamenti ───────────────────────
+
+/**
+ * L'elenco dei commit, per la campanella delle novità.
+ *
+ * **Il token è facoltativo, e non è una svista.** Il repo è pubblico, quindi
+ * questa lettura riesce anche senza — è la stessa cosa che rendeva inutile la
+ * vecchia verifica dell'accesso (→ ADR-0043), e qui invece torna comoda: chi
+ * non ha ancora messo il token vede lo storico lo stesso. Il prezzo è il limite
+ * di richieste, che senza token è 60 all'ora per indirizzo IP e con token 5000:
+ * a tre commit al giorno e una lettura per apertura non lo sfiora nessuno dei
+ * due.
+ *
+ * Una pagina sola: cento commit coprono mesi al ritmo di questo repo, e la
+ * campanella non è un archivio storico. Chi vuole tutto ha `git log`.
+ */
+export async function listCommits(
+  cfg: GithubConfig,
+  token: string | null,
+  perPage = 100,
+): Promise<RawCommit[]> {
+  const url =
+    `${repoUrl(cfg)}/commits` +
+    `?sha=${encodeURIComponent(cfg.branch)}&per_page=${String(perPage)}`
+  const response = await fetch(url, { headers: readHeaders(token), cache: 'no-store' })
+  if (!response.ok) throw await failure(response)
+
+  const body: unknown = await response.json()
+  if (!Array.isArray(body)) throw new GithubError(500, 'Risposta GitHub inattesa per i commit.')
+
+  const out: RawCommit[] = []
+  for (const item of body) {
+    if (typeof item !== 'object' || item === null) continue
+    const row = item as {
+      sha?: unknown
+      commit?: { message?: unknown; author?: { name?: unknown; date?: unknown } }
+      author?: { login?: unknown } | null
+      parents?: { sha?: unknown }[]
+    }
+    const sha = typeof row.sha === 'string' ? row.sha : undefined
+    const message = typeof row.commit?.message === 'string' ? row.commit.message : undefined
+    const date = typeof row.commit?.author?.date === 'string' ? row.commit.author.date : undefined
+    if (sha === undefined || message === undefined || date === undefined) continue
+    out.push({
+      sha,
+      message,
+      /*
+       * `author.login` è l'account GitHub collegato, e va preferito al nome
+       * dell'autore git: i commit di Alessio portano due nomi diversi — quello
+       * del suo git locale e quello del suo account quando scrive l'app — ma un
+       * login solo. Confrontare i nomi farebbe passare per «l'altra persona»
+       * metà dei propri commit.
+       */
+      login: typeof row.author?.login === 'string' ? row.author.login : null,
+      name: typeof row.commit?.author?.name === 'string' ? row.commit.author.name : 'qualcuno',
+      date,
+      /* Il primo genitore: è la versione con cui confrontare per sapere cosa
+         quel commit ha cambiato. Arriva già nella stessa risposta, quindi non
+         costa una richiesta in più. Manca solo sul primo commit del repo. */
+      parent: typeof row.parents?.[0]?.sha === 'string' ? row.parents[0].sha : null,
+    })
+  }
+  return out
+}
+
+/**
+ * Il login dell'account a cui appartiene il token.
+ *
+ * Serve a sapere quali commit sono miei — le mie azioni non sono novità. Si
+ * chiede una volta quando il token si salva o si verifica, e si tiene da parte:
+ * non cambia mai, e una richiesta a ogni apertura sarebbe sprecata.
+ */
+export async function viewerLogin(token: string): Promise<string | null> {
+  const response = await fetch(`${API}/user`, { headers: apiHeaders(token), cache: 'no-store' })
+  if (!response.ok) return null
+  const body: unknown = await response.json()
+  if (typeof body === 'object' && body !== null && 'login' in body) {
+    const login = (body as { login: unknown }).login
+    return typeof login === 'string' ? login : null
+  }
+  return null
 }
 
 // ─────────────────────── più file, un commit solo ───────────────────────

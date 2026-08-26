@@ -15,6 +15,7 @@ import { IncomeEditor } from '../components/IncomeEditor'
 import { TricountForm } from '../components/TricountForm'
 import { Card, Notice, Segmented, StatTile, VEIL, useToast } from '../components/ui'
 import { clearToken, loadToken, saveToken, testAccess } from '../data/github'
+import { CHANGE_GROUPS, GROUP_LABELS } from '../domain/changes'
 import { formatDate } from '../domain/dates'
 import { incomeBreakdown } from '../domain/income'
 import { formatEuro } from '../domain/money'
@@ -36,6 +37,8 @@ export function Impostazioni(): ReactNode {
     hideIncomeByDefault,
     toggleHideIncome,
     setHideIncomeByDefault,
+    news,
+    setNewsGroups,
     addTricount,
   } = usePageData()
   const toast = useToast()
@@ -142,6 +145,41 @@ export function Impostazioni(): ReactNode {
               </div>
             </>
           )}
+        </Card>
+
+        <Card title="Novità" note="Cosa fa comparire il pallino sulla campanella">
+          <div className="stack" style={{ gap: 4 }}>
+            {CHANGE_GROUPS.map((group) => {
+              const on = news.groups.includes(group)
+              return (
+                <label className="checkbox" key={group}>
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    onChange={(event) =>
+                      setNewsGroups(
+                        event.target.checked
+                          ? [...news.groups, group]
+                          : news.groups.filter((g) => g !== group),
+                      )
+                    }
+                  />
+                  {GROUP_LABELS[group]}
+                </label>
+              )
+            })}
+          </div>
+          <div className="card-foot">
+            Spegnere un gruppo lo toglie <strong>sia</strong> dall'elenco <strong>sia</strong> dal
+            conteggio: un pallino che promettesse righe non mostrate sarebbe peggio di nessun
+            pallino. La campanella conta solo le modifiche fatte dall'altra persona
+            dall'interfaccia dell'app — le tue le hai appena fatte, e che siano arrivate te lo dice
+            «salvato» qui sopra.
+          </div>
+          <div className="card-foot">
+            Vive in questo browser come la persona scelta e il token: è una preferenza tua, non un
+            fatto dei tricount, quindi non finisce nei dati e non segue gli altri dispositivi.
+          </div>
         </Card>
 
         <Card title="Privacy" note="Come parte l'app su questo dispositivo">

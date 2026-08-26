@@ -463,25 +463,41 @@ export function pendingCount(state: OutboxState): number {
   return state.pending.length
 }
 
+/**
+ * Il vocabolario con cui un'operazione diventa parole nel messaggio di commit.
+ *
+ * È **esportato** perché lo legge anche `domain/changes.ts`, che dai messaggi
+ * ricostruisce cosa è successo per la campanella delle novità. Le due direzioni
+ * devono restare d'accordo: scriverle due volte vorrebbe dire che il giorno in
+ * cui si aggiunge un'operazione la campanella smette di riconoscerla — in
+ * silenzio, mostrando una riga senza gruppo invece di un errore. C'è un test di
+ * parità che percorre il giro completo per tutti e tredici i tipi.
+ *
+ * Prima e seconda voce: singolare e plurale. Coincidono dove la lingua non
+ * distingue («categorie aggiornate»), ed è lecito: la mappa inversa cerca in
+ * entrambe.
+ */
+export const OP_WORDS: Record<Op['kind'], [string, string]> = {
+  create: ['spesa aggiunta', 'spese aggiunte'],
+  update: ['spesa corretta', 'spese corrette'],
+  delete: ['spesa eliminata', 'spese eliminate'],
+  patch: ['annotazione', 'annotazioni'],
+  tricount: ['tricount nuovo', 'tricount nuovi'],
+  'tricount-edit': ['tricount modificato', 'tricount modificati'],
+  settle: ['rimborso registrato', 'rimborsi registrati'],
+  unsettle: ['rimborso annullato', 'rimborsi annullati'],
+  price: ['prezzo rilevato', 'prezzi rilevati'],
+  'price-delete': ['rilevazione eliminata', 'rilevazioni eliminate'],
+  categories: ['categorie aggiornate', 'categorie aggiornate'],
+  recategorize: ['categoria svuotata', 'categorie svuotate'],
+  income: ['entrate aggiornate', 'entrate aggiornate'],
+}
+
 /** Riassunto per il messaggio di commit. */
 export function describeOps(entries: readonly OutboxEntry[]): string {
   const counts = new Map<Op['kind'], number>()
   for (const entry of entries) counts.set(entry.kind, (counts.get(entry.kind) ?? 0) + 1)
-  const words: Record<Op['kind'], [string, string]> = {
-    create: ['spesa aggiunta', 'spese aggiunte'],
-    update: ['spesa corretta', 'spese corrette'],
-    delete: ['spesa eliminata', 'spese eliminate'],
-    patch: ['annotazione', 'annotazioni'],
-    tricount: ['tricount nuovo', 'tricount nuovi'],
-    'tricount-edit': ['tricount modificato', 'tricount modificati'],
-    settle: ['rimborso registrato', 'rimborsi registrati'],
-    unsettle: ['rimborso annullato', 'rimborsi annullati'],
-    price: ['prezzo rilevato', 'prezzi rilevati'],
-    'price-delete': ['rilevazione eliminata', 'rilevazioni eliminate'],
-    categories: ['categorie aggiornate', 'categorie aggiornate'],
-    recategorize: ['categoria svuotata', 'categorie svuotate'],
-    income: ['entrate aggiornate', 'entrate aggiornate'],
-  }
+  const words = OP_WORDS
   const parts: string[] = []
   for (const [kind, count] of counts) {
     const [one, many] = words[kind]
