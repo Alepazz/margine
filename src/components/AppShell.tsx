@@ -17,8 +17,11 @@
 import { useState, type ReactNode } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 
+import { useReadyStore } from '../data/store'
+import { badgeLabel } from '../domain/changes'
 import { SyncBadge, ThemeButton } from './Controls'
 import { ExpenseForm } from './ExpenseForm'
+import { NewsSheet } from './NewsSheet'
 import { PriceSheet } from './PriceSheet'
 
 /** I due gruppi dell'hub e della colonna. Le voci di barra non ne hanno. */
@@ -103,9 +106,42 @@ function Brand(): ReactNode {
   )
 }
 
+/**
+ * La campanella, col numero di novità non viste.
+ *
+ * Il pallino lo azzera **solo** l'apertura del foglio, non l'apertura dell'app:
+ * `markNewsSeen` sta dentro `NewsSheet`. E il numero si ferma a `9+` — oltre,
+ * la cifra esatta non cambia quello che fai.
+ *
+ * Sta nella testata e non nella barra in fondo perché la barra serve i due
+ * scopi dell'app (→ ADR-0044) e questa non è né consultare né registrare: è la
+ * cornice, dove stanno già stato di sincronizzazione, tema e impostazioni.
+ */
+function NewsButton({ onOpen }: { onOpen: () => void }): ReactNode {
+  const { news } = useReadyStore()
+  const label = badgeLabel(news.unseen)
+  return (
+    <button
+      type="button"
+      className="btn btn-icon btn-ghost news-btn"
+      onClick={onOpen}
+      aria-label={news.unseen > 0 ? `Novità: ${String(news.unseen)} da vedere` : 'Novità'}
+      title="Novità"
+    >
+      <span aria-hidden="true">🔔</span>
+      {label ? (
+        <span className="news-badge" aria-hidden="true">
+          {label}
+        </span>
+      ) : null}
+    </button>
+  )
+}
+
 export function AppShell(): ReactNode {
   /** Cosa si sta aggiungendo. Il `+` è uno, i verbi sono due. */
   const [adding, setAdding] = useState<'expense' | 'price' | null>(null)
+  const [newsOpen, setNewsOpen] = useState(false)
   const { pathname } = useLocation()
 
   const addsPrice = pathname === PRICE_ROUTE
@@ -204,6 +240,7 @@ export function AppShell(): ReactNode {
           </div>
           <div className="topbar-spacer" />
           <SyncBadge />
+          <NewsButton onOpen={() => setNewsOpen(true)} />
           <ThemeButton />
           <NavLink
             to="/impostazioni"
@@ -256,6 +293,7 @@ export function AppShell(): ReactNode {
 
       {adding === 'expense' ? <ExpenseForm onClose={() => setAdding(null)} /> : null}
       {adding === 'price' ? <PriceSheet onClose={() => setAdding(null)} /> : null}
+      {newsOpen ? <NewsSheet onClose={() => setNewsOpen(false)} /> : null}
     </div>
   )
 }
