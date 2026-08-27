@@ -23,7 +23,7 @@ import { formatDate, todayIso } from '../domain/dates'
 import { changedFields, type ExpenseDelta } from '../domain/diff'
 import { formatEuro } from '../domain/money'
 import { tricountTitleOf, type Category, type Tricount } from '../domain/types'
-import { useScrollLock } from './ui'
+import { Notice, useScrollLock } from './ui'
 
 
 
@@ -137,64 +137,81 @@ export function NewsSheet({ onClose }: { onClose: () => void }): ReactNode {
         </div>
 
         <div className="sheet-body">
-          {vuota ? (
-            <p className="hint">
-              {news.loading
-                ? 'Sto leggendo…'
-                : news.knowsMe
-                  ? `Niente di nuovo. Quando ${other.name} aggiunge o corregge qualcosa, lo trovi qui.`
-                  : 'Niente di nuovo. Quando qualcosa cambia nei dati, lo trovi qui.'}
-            </p>
-          ) : (
-            <div className="stack" style={{ gap: 14 }}>
-              {days.map(([day, list]) => (
-                <div key={day}>
-                  <div className="news-day">{dayLabel(day, today)}</div>
-                  {list.map((notice) => {
-                    const sotto =
-                      notice.kind === 'delta'
-                        ? detailOf(notice.delta, config.categories, dataset.tricounts)
-                        : notice.failed
-                          ? 'non sono riuscito a leggerne il contenuto · tocca per riprovare'
-                          : undefined
-                    /* Una riga fallita si riprova toccandola: il ciclo
-                       automatico salta ciò che ha già uno stato, quindi senza
-                       questo una rete caduta per un istante lascerebbe la riga
-                       vaga per tutta la sessione. */
-                    const riprova = notice.kind === 'summary' && notice.failed === true
-                    const change = news.changes.find((c) => c.sha === notice.sha)
-                    return (
-                      <div
-                        className={`news-row${riprova ? ' is-retry' : ''}`}
-                        key={notice.key}
-                        onClick={riprova && change ? () => void loadNewsDetail(change) : undefined}
-                        role={riprova ? 'button' : undefined}
-                        tabIndex={riprova ? 0 : undefined}
-                        onKeyDown={
-                          riprova && change
-                            ? (event) => {
-                                if (event.key === 'Enter' || event.key === ' ') {
-                                  event.preventDefault()
-                                  void loadNewsDetail(change)
-                                }
-                              }
+          {/* La colonna sta **dentro** il corpo, non è il corpo: `.sheet-body`
+              è il contenitore che scorre, e farlo diventare flex esporrebbe i
+              figli alla compressione invece dello scorrimento. → ADR-0030 */}
+          <div className="stack" style={{ gap: 12 }}>
+            {/*
+              Il guasto sta **sopra** l'elenco, non al posto suo. Sostituirlo
+              costava le novità già arrivate — una lettura fallita non tocca
+              `changes`, quindi restano in memoria e il pallino continua a
+              contarle: misurato, pallino a 4 e foglio a zero righe. → ADR-0053
+            */}
+            {news.error !== undefined ? <Notice tone="bad">{news.error}</Notice> : null}
+
+            {vuota ? (
+              /* Con un guasto a schermo «Niente di nuovo» direbbe il falso: là
+                 fuori non si sa cosa ci sia, ed è esattamente il punto. */
+              news.error !== undefined ? null : (
+                <p className="hint">
+                  {news.loading
+                    ? 'Sto leggendo…'
+                    : news.knowsMe
+                      ? `Niente di nuovo. Quando ${other.name} aggiunge o corregge qualcosa, lo trovi qui.`
+                      : 'Niente di nuovo. Quando qualcosa cambia nei dati, lo trovi qui.'}
+                </p>
+              )
+            ) : (
+              <div className="stack" style={{ gap: 14 }}>
+                {days.map(([day, list]) => (
+                  <div key={day}>
+                    <div className="news-day">{dayLabel(day, today)}</div>
+                    {list.map((notice) => {
+                      const sotto =
+                        notice.kind === 'delta'
+                          ? detailOf(notice.delta, config.categories, dataset.tricounts)
+                          : notice.failed
+                            ? 'non sono riuscito a leggerne il contenuto · tocca per riprovare'
                             : undefined
-                        }
-                      >
-                        <div className="news-text">
-                          <span className={notice.kind === 'summary' && notice.pending ? 'news-pending' : undefined}>
-                            {testoDi(notice)}
-                          </span>
-                          {sotto ? <span className="news-sub">{sotto}</span> : null}
+                      /* Una riga fallita si riprova toccandola: il ciclo
+                         automatico salta ciò che ha già uno stato, quindi senza
+                         questo una rete caduta per un istante lascerebbe la riga
+                         vaga per tutta la sessione. */
+                      const riprova = notice.kind === 'summary' && notice.failed === true
+                      const change = news.changes.find((c) => c.sha === notice.sha)
+                      return (
+                        <div
+                          className={`news-row${riprova ? ' is-retry' : ''}`}
+                          key={notice.key}
+                          onClick={riprova && change ? () => void loadNewsDetail(change) : undefined}
+                          role={riprova ? 'button' : undefined}
+                          tabIndex={riprova ? 0 : undefined}
+                          onKeyDown={
+                            riprova && change
+                              ? (event) => {
+                                  if (event.key === 'Enter' || event.key === ' ') {
+                                    event.preventDefault()
+                                    void loadNewsDetail(change)
+                                  }
+                                }
+                              : undefined
+                          }
+                        >
+                          <div className="news-text">
+                            <span className={notice.kind === 'summary' && notice.pending ? 'news-pending' : undefined}>
+                              {testoDi(notice)}
+                            </span>
+                            {sotto ? <span className="news-sub">{sotto}</span> : null}
+                          </div>
+                          <span className="news-time">{timeLabel(notice.at)}</span>
                         </div>
-                        <span className="news-time">{timeLabel(notice.at)}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              ))}
-            </div>
-          )}
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Nel piede e non in fondo all'elenco: il piede non scorre, quindi il
