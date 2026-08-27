@@ -1,6 +1,6 @@
 # ADR-0060: La testata è una coppia, e il conto si chiude da lì
 
-**Status:** accepted · **Date:** 2026-08-27 · Supera la sola scelta di presentazione di ADR-0059
+**Status:** accepted — due scelte (il segno come unico verso; il pulsante nei due versi) sono superate da ADR-0062 · **Date:** 2026-08-27 · Supera la sola scelta di presentazione di ADR-0059
 
 ## Context
 

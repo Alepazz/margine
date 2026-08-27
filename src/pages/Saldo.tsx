@@ -8,31 +8,27 @@
  * contarlo due volte. → ADR-0019
  */
 
-import { useMemo, useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 
 import { Card, Notice, ShowMore, StatTile, useToast } from '../components/ui'
-import { formatDate, todayIso } from '../domain/dates'
+import { formatDate, monthKeyOf, monthLabel } from '../domain/dates'
 import { formatEuro, toCents } from '../domain/money'
 import { newSettlement, settlementDirection } from '../domain/settlement'
 import { aTo } from '../domain/text'
 import { tricountLabel } from '../domain/expense-rules'
-import { coupleBalance } from '../domain/selectors'
-import { usePageData } from './usePageData'
+import { useCoupleBalance, usePageData } from './usePageData'
 
 const MOVEMENTS_SHOWN = 25
 
 export function Saldo(): ReactNode {
-  const { config, dataset, view, addSettlement, removeSettlement } = usePageData()
+  const { config, dataset, view, today, addSettlement, removeSettlement } = usePageData()
   const toast = useToast()
   const person = view.person
   const other = person === 'me' ? 'partner' : 'me'
   const [customAmount, setCustomAmount] = useState('')
   const [limit, setLimit] = useState(MOVEMENTS_SHOWN)
 
-  const balance = useMemo(
-    () => coupleBalance(dataset.expenses, dataset.settlements, config.balance),
-    [config.balance, dataset.expenses, dataset.settlements],
-  )
+  const balance = useCoupleBalance()
 
   /* Il nome leggibile di un tricount, dalla stessa funzione che usa il pannello
      che sposta una spesa: le vacanze ne hanno uno per viaggio, e quel nome sta
@@ -48,15 +44,23 @@ export function Saldo(): ReactNode {
   const settledUp = cents === 0
   /* Dalla stessa funzione che costruisce il rimborso: la frase che annuncia il
      verso e il rimborso che lo esegue non possono dire cose diverse. */
-  const { debtor, creditor } = settlementDirection(owedToMe, person, other)
+  const verso = settlementDirection(owedToMe, person, other)
 
   const record = (amount: number) => {
+    /*
+     * La data è `today` — quello del render — e **non** `todayIso()` al clic,
+     * che pure sarebbe più fresco. Con l'app aperta a cavallo di fine mese le
+     * due divergono, e un rimborso datato al 1º settembre mentre il saldo
+     * considera ancora agosto verrebbe messo da parte come futuro
+     * (→ ADR-0064): premeresti «Saldato tutto» e non cambierebbe niente. Meglio
+     * una data vecchia di qualche ora che un rimborso che non salda.
+     */
     const settlement = newSettlement({
       owedToViewer: owedToMe,
       viewer: person,
       other,
       amount,
-      date: todayIso(),
+      date: today,
     })
     if (settlement === null) {
       toast.show('L’importo del rimborso deve essere maggiore di zero.')
@@ -66,6 +70,25 @@ export function Saldo(): ReactNode {
     setCustomAmount('')
     toast.show(`Rimborso di ${formatEuro(settlement.amount)} registrato.`)
   }
+
+  /*
+   * Sei `deferred === 1` in mezzo al JSX erano illeggibili: la frase si sceglie
+   * intera, una volta, e il resto è comune. Il saldo che tace su una parte dei
+   * dati è indistinguibile da un saldo completo, e questa è l'unica pagina che
+   * può accorgersene. → ADR-0064
+   */
+  const rinviate =
+    balance.deferred === 1
+      ? `Una voce è datata dopo ${monthLabel(monthKeyOf(today))}, quindi non è ancora contata qui: il saldo la conterà dal primo giorno del suo mese. Finché resta lì`
+      : `${balance.deferred} voci sono datate dopo ${monthLabel(monthKeyOf(today))}, quindi non sono ancora contate qui: il saldo le conterà dal primo giorno del loro mese. Finché restano lì`
+
+  /*
+   * Contati dagli stessi movimenti da cui viene l'importo accanto:
+   * `dataset.settlements` comprende anche quelli che nel saldo non entrano —
+   * prima del punto di partenza, o datati avanti (→ ADR-0064) — e un numero con
+   * una didascalia che descrive un altro insieme è peggio di nessuna didascalia.
+   */
+  const rimborsiContati = balance.movements.filter((m) => m.kind === 'settlement').length
 
   const shown = balance.movements.slice(0, limit)
   const rest = balance.movements.length - shown.length
@@ -139,8 +162,11 @@ export function Saldo(): ReactNode {
                 </button>
               </div>
               <p className="hint">
-                Il rimborso va da {config.people[debtor].name} {aTo(config.people[creditor].name)}{' '}
-                {config.people[creditor].name}, con la data di oggi.
+                {verso === null
+                  ? null
+                  : `Il rimborso va da ${config.people[verso.debtor].name} ${aTo(
+                      config.people[verso.creditor].name,
+                    )} ${config.people[verso.creditor].name}, con la data di oggi.`}
               </p>
             </div>
           ) : null}
@@ -160,7 +186,7 @@ export function Saldo(): ReactNode {
           <StatTile
             label="Rimborsi registrati"
             value={formatEuro(balance.settled, { decimals: 0 })}
-            hint={`${dataset.settlements.length} movimenti`}
+            hint={`${rimborsiContati} ${rimborsiContati === 1 ? 'movimento' : 'movimenti'}`}
           />
           {/* Non è «il saldo di partenza»: quello ora sta in ogni tricount. Qui
               resta il residuo che non appartiene a nessuno di essi. → ADR-0022 */}
@@ -186,6 +212,13 @@ export function Saldo(): ReactNode {
             , leggi il saldo di oggi e mettilo in <code>data/config.json</code> sotto{' '}
             <code>balance.groups</code> (positivo se {config.people.partner.name} deve{' '}
             {aTo(config.people.me.name)} {config.people.me.name}), poi ricifra.
+          </Notice>
+        ) : null}
+
+        {balance.deferred > 0 ? (
+          <Notice tone="warn">
+            {rinviate} questo totale non coincide con quello di Tricount: se è un errore di data, si
+            corregge dal foglio della spesa.
           </Notice>
         ) : null}
 

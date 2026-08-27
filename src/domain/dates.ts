@@ -104,8 +104,19 @@ export function daysInclusive(startIso: string, endIso: string): number {
   return Math.max(1, Math.round((end - start) / 86_400_000) + 1)
 }
 
-/** `2026-07-14` → `2026-07-14T…`: quanti giorni del mese sono già passati (1-based). */
+/**
+ * Quanti giorni di quel mese sono passati (1-based: il primo del mese fa 1).
+ *
+ * Un mese **futuro** non ne ha nessuno, e prima diceva il contrario: la
+ * condizione era «se non è il mese corrente, è tutto trascorso», che è vera per
+ * il passato e falsa per il futuro. Bastava una spesa datata avanti — un refuso
+ * sulla data, o l'affitto del mese prossimo inserito presto — perché la scheda
+ * di quel mese dicesse «mese chiuso, il numero è definitivo» di un mese non
+ * ancora cominciato. È la stessa famiglia di ADR-0055. → ADR-0063
+ */
 export function elapsedDaysInMonth(month: MonthKey, today: string): number {
-  if (monthKeyOf(today) !== month) return daysInMonth(month)
+  const corrente = monthKeyOf(today)
+  if (month > corrente) return 0
+  if (month < corrente) return daysInMonth(month)
   return Math.min(dayOf(today), daysInMonth(month))
 }
