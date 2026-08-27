@@ -14,6 +14,7 @@ import {
   parseChanges,
   partsOfSummary,
   phraseOf,
+  unseenCount,
   unseenSince,
   type RawCommit,
 } from './changes'
@@ -307,5 +308,39 @@ describe('le righe della campanella', () => {
     const righe = noticesOf(change('2 prezzi rilevati'), () => ({ deltas: [] }))
     expect(righe).toHaveLength(1)
     expect(righe[0]).toMatchObject({ kind: 'summary', pending: undefined })
+  })
+})
+
+/*
+ * Il pallino e l'elenco sono due segni diversi: chiudere il foglio dice «viste»
+ * e spegne il pallino, il pulsante dice «archiviate» e svuota l'elenco. Con un
+ * segno solo i due gesti erano lo stesso gesto. → ADR-0061
+ */
+describe('quante righe non sono ancora state guardate', () => {
+  const righe = [{ at: '2026-08-27T12:00:00Z' }, { at: '2026-08-27T10:00:00Z' }, { at: '2026-08-26T09:00:00Z' }]
+
+  it('senza segno di lettura le conta tutte', () => {
+    expect(unseenCount(righe, undefined)).toBe(3)
+  })
+
+  it('conta solo quelle più recenti del segno', () => {
+    expect(unseenCount(righe, '2026-08-27T09:00:00Z')).toBe(2)
+    expect(unseenCount(righe, '2026-08-27T11:00:00Z')).toBe(1)
+  })
+
+  /* Il segno è preso dalla più recente, quindi «uguale» vuol dire vista. */
+  it('la riga esattamente al segno è già vista', () => {
+    expect(unseenCount(righe, '2026-08-27T12:00:00Z')).toBe(0)
+  })
+
+  /* L'elenco resta pieno anche a pallino spento: è l'invariante del diff. */
+  it('non tocca l’elenco, che resta lungo com’era', () => {
+    expect(unseenCount(righe, '2026-08-27T12:00:00Z')).toBe(0)
+    expect(righe).toHaveLength(3)
+  })
+
+  it('su un elenco vuoto fa zero comunque', () => {
+    expect(unseenCount([], undefined)).toBe(0)
+    expect(unseenCount([], '2026-08-27T12:00:00Z')).toBe(0)
   })
 })

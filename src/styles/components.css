@@ -175,55 +175,88 @@ button.hero-value:focus-visible {
 }
 
 /*
- * La testata della scheda: due colonne parallele, «come sto col mese» a
- * sinistra e «come sto con lei» a destra.
+ * La testata della scheda: **due metà**, «come sto col mese» e «come stiamo io
+ * e lei», divise da un filo.
  *
- * **Griglia e non flex.** In flex la prima colonna prende come larghezza di
- * partenza il proprio contenuto, e il suggerimento sotto il numero grande —
- * «88 € al giorno da qui a fine mese (4 giorni)» — è lungo abbastanza da
- * occupare la riga e spingere il saldo a capo: misurato, 304px di min-content
- * contro 324 disponibili. `minmax(0, 1fr)` toglie quel minimo implicito, e la
- * seconda colonna prende solo ciò che le serve. È lo stesso difetto di
- * ADR-0044, dove una traccia dichiarata `1fr` si allargava al suo contenuto.
+ * Uguali e adiacenti, non una grande e una piccola appoggiata a destra: quella
+ * forma le metteva ai due estremi di una scheda con il vuoto in mezzo, e si
+ * leggevano come due cose scollegate invece che come due facce della stessa
+ * domanda. → ADR-0060
+ *
+ * **Griglia e non flex**, e tutte e due le tracce dichiarate `minmax(0, 1fr)`.
+ * In flex una colonna prende come larghezza di partenza il proprio contenuto, e
+ * il suggerimento sotto il numero grande basta a occupare la riga e spingere
+ * l'altra a capo: misurato, 304px di min-content contro 324 disponibili. E il
+ * minimo implicito di un `1fr` secco è `auto`, cioè di nuovo il contenuto: è lo
+ * stesso difetto di ADR-0044 in un vestito nuovo.
  */
 .hero-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  /* Tre righe — titolo, cifra, contorno — condivise dalle due metà. */
+  grid-template-rows: auto auto auto;
+  gap: 16px;
   align-items: start;
 }
 
 /*
- * **Solo dentro la riga a due colonne** il numero grande può rimpicciolirsi.
+ * **Le righe si allineano fra le due metà**, con `subgrid`.
  *
- * La sua colonna a 320px vale 135px, e «−1.384 €» a 2,1rem ne misura 136: un
- * pixel, e il simbolo dell'euro finiva da solo sulla seconda riga. Il minimo
- * del `clamp` scende quindi a 1,8rem, e morde solo sotto i ~372px di viewport
- * — sopra vince `9vw` e non cambia niente.
+ * Senza, ogni colonna impagina per conto suo e basta che un titolo vada a capo
+ * e l'altro no — «Puoi ancora spendere» sta su due righe a 390px, «Il vostro
+ * saldo» su una — perché le due cifre finiscano a quote diverse. Due numeri che
+ * non sono alla stessa altezza non sono una coppia: si legge prima uno e poi
+ * l'altro, che è il difetto da cui questa impaginazione nasce.
  *
- * La regola sta qui e non su `.hero-value`, che è condivisa con la pagina
- * Saldo: là il numero ha tutta la larghezza della scheda e non ha nessun motivo
- * di rimpicciolirsi. Una modifica fatta per una pagina non deve cambiarne
- * un'altra in silenzio. → ADR-0059
+ * Le due metà hanno lo stesso numero di righe di proposito (titolo, cifra,
+ * contorno); quando il saldo è pari la terza resta vuota. → ADR-0060
  */
-.hero-row .hero-value {
-  font-size: clamp(1.8rem, 9vw, 3rem);
+.hero-row > .hero {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 3;
+  gap: 2px;
+  align-content: start;
 }
 
 /*
- * La colonna del saldo: stessa impaginazione del numero grande (riusa `.hero`),
- * allineata a destra. È un collegamento al Saldo, quindi ha l'altezza minima di
- * un bersaglio per il pollice.
+ * Il numero grande vive in **metà scheda**, quindi rimpicciolisce prima.
+ *
+ * Le misure che governano questa riga, a 390px: la colonna vale 154px, e
+ * «−1.384 €» — quattro cifre col segno, il caso peggiore che i dati possano
+ * dare — a 9vw ne misurerebbe 160 e andrebbe a capo lasciando il simbolo
+ * dell'euro da solo sulla seconda riga.
+ *
+ * La regola sta qui e non su `.hero-value`, che la pagina Saldo usa a sua
+ * volta: là il numero ha tutta la larghezza della scheda e non ha nessun motivo
+ * di stringersi. Una modifica fatta per una pagina non deve cambiarne un'altra
+ * in silenzio. → ADR-0060, ADR-0059
  */
+.hero-row .hero-value {
+  font-size: clamp(1.5rem, 7.5vw, 3rem);
+}
+
+/* La metà del saldo. Allineata a sinistra come l'altra: sono due blocchi
+   gemelli, e specchiarne uno li farebbe sembrare di nuovo diversi. */
 .hero-balance {
-  text-align: right;
+  border-inline-start: 1px solid var(--line);
+  padding-inline-start: 16px;
+}
+
+/* Il numero porta al Saldo, e il collegamento è largo quanto lui: un'area
+   invisibile grande mezza scheda porterebbe altrove al primo tocco distratto. */
+.hero-balance-link {
+  /* `justify-self` e non `align-self`: da quando la colonna è una griglia
+     (subgrid) il primo governa l'asse orizzontale e il secondo quello
+     verticale. Con `align-self` il collegamento restava largo quanto la
+     colonna — mezza scheda di area invisibile che porta altrove. */
+  justify-self: start;
   text-decoration: none;
   color: inherit;
-  min-height: 44px;
   border-radius: var(--r-sm);
 }
 
-.hero-balance:focus-visible {
+.hero-balance-link:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 3px;
 }
@@ -235,7 +268,7 @@ button.hero-value:focus-visible {
 .hero-balance-value {
   font-family: var(--font-num);
   font-variant-numeric: tabular-nums;
-  font-size: clamp(1.45rem, 6vw, 1.9rem);
+  font-size: clamp(1.35rem, 5.5vw, 1.9rem);
   font-weight: 500;
   letter-spacing: -0.02em;
   line-height: 1.05;
@@ -253,6 +286,20 @@ button.hero-value:focus-visible {
 
 .hero-balance-value.is-even {
   color: var(--ink-2);
+}
+
+/*
+ * Il pulsante che chiude il conto. Largo quanto il suo testo e non quanto la
+ * colonna: a tutta metà scheda peserebbe più del numero che lo giustifica.
+ * L'etichetta può andare a capo — su schermo stretto «Saldato tutto (393 €)»
+ * non ci sta su una riga sola, e un bottone alto due righe è meglio di uno che
+ * sborda dalla sua colonna.
+ */
+.hero-balance-btn {
+  justify-self: start;
+  margin-top: 8px;
+  text-align: center;
+  white-space: normal;
 }
 
 /* ─────────────────────────── misuratore ─────────────────────────── */

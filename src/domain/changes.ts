@@ -243,6 +243,23 @@ export function unseenSince(changes: readonly Change[], seenAt: string | undefin
   return changes.filter((change) => change.at > seenAt)
 }
 
+/**
+ * Quante di queste righe non sono ancora state **guardate**.
+ *
+ * Non è la lunghezza dell'elenco, ed è la differenza che tiene in piedi i due
+ * gesti: chiudere il foglio dice «viste» e spegne il pallino, il pulsante dice
+ * «archiviate» e svuota l'elenco. Con un segno solo i due gesti erano lo stesso
+ * gesto, e o si perdevano le novità aprendo per sbaglio, o il pallino restava
+ * acceso su cose già lette. → ADR-0061, ADR-0052
+ */
+export function unseenCount(
+  notices: readonly { at: string }[],
+  readAt: string | undefined,
+): number {
+  if (readAt === undefined) return notices.length
+  return notices.filter((notice) => notice.at > readAt).length
+}
+
 /** Il numero sul pallino: oltre nove diventa `9+`, che è tutto ciò che serve sapere. */
 export function badgeLabel(count: number): string {
   if (count <= 0) return ''
