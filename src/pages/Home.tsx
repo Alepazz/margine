@@ -19,10 +19,11 @@ import { ExpenseList } from '../components/ExpenseList'
 import { ExpenseSheet } from '../components/ExpenseSheet'
 import { MarginMeter } from '../components/MarginMeter'
 import { MonthStrip } from '../components/MonthStrip'
-import { Card, DeltaLabel, Notice, StatTile } from '../components/ui'
+import { Card, DeltaLabel, Notice, StatTile, useToast } from '../components/ui'
 import { donutSlices } from '../domain/categories'
 import { currentMonthKey, monthLabel, monthLabelShort } from '../domain/dates'
 import { EMPTY_INCOME, computeMargin, marginView } from '../domain/income'
+import { newSettlement } from '../domain/settlement'
 import { formatEuro, relativeChange, toCents } from '../domain/money'
 import {
   averageByCategory,
@@ -39,7 +40,7 @@ import {
   projectMonth,
   topExpenses,
 } from '../domain/selectors'
-import type { Expense } from '../domain/types'
+import type { Expense, PersonId } from '../domain/types'
 import { usePageData } from './usePageData'
 
 export function Home(): ReactNode {
@@ -56,8 +57,10 @@ export function Home(): ReactNode {
     today,
     hideIncome,
     toggleHideIncome,
+    addSettlement,
   } = usePageData()
   const [selected, setSelected] = useState<Expense | null>(null)
+  const toast = useToast()
   const person = view.person
 
   /* Il mese in corso è parziale: escluderlo dalla media evita di confrontarlo con se stesso. */
@@ -108,13 +111,38 @@ export function Home(): ReactNode {
    * uscite. Qui serve solo da mostrare, girato dal punto di vista di chi
    * guarda — il calcolo ha un segno fisso. → ADR-0058, ADR-0019
    */
-  const balance = useMemo(() => {
+  const owedToMe = useMemo(() => {
     const totale = coupleBalance(dataset.expenses, dataset.settlements, config.balance)
-    return {
-      owedToMe: person === 'me' ? totale.balance : -totale.balance,
-      otherName: config.people[person === 'me' ? 'partner' : 'me'].name,
-    }
-  }, [config.balance, config.people, dataset.expenses, dataset.settlements, person])
+    return person === 'me' ? totale.balance : -totale.balance
+  }, [config.balance, dataset.expenses, dataset.settlements, person])
+
+  /*
+   * Chiudere il conto dal Riepilogo, con lo stesso costruttore della pagina
+   * Saldo: il verso lo decide il segno del saldo, e sbagliarlo sposterebbe un
+   * debito dalla parte opposta senza che se ne accorga nessuno. → ADR-0060
+   */
+  const other: PersonId = person === 'me' ? 'partner' : 'me'
+
+  /* Niente `useMemo` attorno: `MarginMeter` non è memorizzato, quindi un
+     oggetto nuovo a ogni render non costa un render in più — e memorizzarlo
+     vorrebbe dire ragionare su quale versione di `settleAll` resta congelata
+     dentro. */
+  const balance = {
+    owedToMe,
+    otherName: config.people[other].name,
+    onSettle: () => {
+      const settlement = newSettlement({
+        owedToViewer: owedToMe,
+        viewer: person,
+        other,
+        amount: owedToMe,
+        date: today,
+      })
+      if (settlement === null) return
+      addSettlement(settlement)
+      toast.show(`Rimborso di ${formatEuro(settlement.amount)} registrato.`)
+    },
+  }
 
   const slices = useMemo<DonutSlice[]>(
     () => donutSlices(monthExpenses, person, lookup),

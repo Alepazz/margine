@@ -70,43 +70,61 @@ function Row({
 }
 
 /**
- * Il saldo con l'altra persona: **la seconda colonna della testata**.
+ * Il saldo con l'altra persona: **la seconda metà della testata**.
  *
- * Stessa impaginazione del numero grande — etichetta piccola sopra, cifra sotto
- * — perché sono due risposte allo stesso genere di domanda: «come sto col
- * mese?» e «come sto con lei?». La cifra è più piccola di proposito: due numeri
- * della stessa taglia competerebbero, e il Riepilogo perderebbe il singolo
+ * Non è un'appendice del numero grande, è l'altra faccia della stessa domanda —
+ * «quanto posso spendere» e «come stiamo io e lei». Per questo le due colonne
+ * sono uguali, divise da un filo, e non una grande e una piccola appoggiata a
+ * destra: quella forma le faceva sembrare due cose scollegate ai due estremi di
+ * una scheda vuota in mezzo. → ADR-0060
+ *
+ * Il titolo è **fisso** e dice cosa è il numero. «Con Federica» era un contesto,
+ * non un titolo: non diceva che quello fosse un saldo.
+ *
+ * Il **segno è il verso**: `+` verde vuol dire che rientrano soldi, `−` rosso
+ * che ne escono. La cifra è più piccola di quella del margine, che resta il
  * numero per cui l'app esiste. → ADR-0015
- *
- * Il **segno è il messaggio**: `+` verde vuol dire che rientrano soldi, `−`
- * rosso che ne escono. Prima c'era una frase sotto («te li deve»), dentro un
- * riquadro: si leggeva come un fumetto appiccicato al numero grande, e a dirlo
- * è stato Alessio vedendola. Il segno lo dice già, e a chi non vede il colore lo
- * dice comunque — il colore non porta nulla che il `+` non porti.
- * → ADR-0059, ADR-0058
  */
-function BalanceTag({ owedToMe, otherName }: { owedToMe: number; otherName: string }): ReactNode {
+function BalanceTag({
+  owedToMe,
+  otherName,
+  onSettle,
+}: {
+  owedToMe: number
+  otherName: string
+  onSettle: () => void
+}): ReactNode {
   const cents = toCents(owedToMe)
   const tono = cents > 0 ? 'is-good' : cents < 0 ? 'is-bad' : 'is-even'
   const cifra = formatEuro(Math.abs(owedToMe), { decimals: 0 })
+  /* Il segno non si legge ad alta voce: la frase la porta il nome accessibile. */
+  const frase =
+    cents > 0
+      ? `${otherName} ti deve ${cifra}`
+      : cents < 0
+        ? `Devi ${cifra} ${aTo(otherName)} ${otherName}`
+        : `In pari con ${otherName}`
+
   return (
-    <Link
-      to="/saldo"
-      className="hero hero-balance"
-      /* Il segno non si legge ad alta voce: il nome accessibile dice la frase. */
-      aria-label={
-        cents > 0
-          ? `${otherName} ti deve ${cifra}. Vai al saldo`
-          : cents < 0
-            ? `Devi ${cifra} ${aTo(otherName)} ${otherName}. Vai al saldo`
-            : `In pari con ${otherName}. Vai al saldo`
-      }
-    >
-      <span className="hero-label">Con {otherName}</span>
-      <span className={`hero-balance-value ${tono}`} aria-hidden="true">
-        {cents === 0 ? 'Pari' : `${cents > 0 ? '+' : '−'}${cifra}`}
-      </span>
-    </Link>
+    <div className="hero hero-balance">
+      <span className="hero-label">Il vostro saldo</span>
+      <Link to="/saldo" className="hero-balance-link" aria-label={`${frase}. Vai al saldo`}>
+        <span className={`hero-balance-value ${tono}`} aria-hidden="true">
+          {cents === 0 ? 'Pari' : `${cents > 0 ? '+' : '−'}${cifra}`}
+        </span>
+      </Link>
+      {/*
+        Chiudere il conto da qui, con le stesse parole della pagina Saldo: è il
+        gesto che si fa **guardando** il saldo, e mandarlo in un'altra pagina
+        costava due tocchi ogni volta. Compare nei due versi, come là: se lei ti
+        ha pagato, il rimborso va da lei a te. → ADR-0060, ADR-0019
+      */}
+      {cents === 0 ? null : (
+        <button type="button" className="btn btn-sm hero-balance-btn" onClick={onSettle}>
+          Saldato tutto ({cifra})
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -122,7 +140,7 @@ export function MarginMeter({
   /** Lo stesso mese dell'anno prima: unico riferimento stagionale che i dati permettono. */
   lastYear: { month: MonthKey; total: number } | null
   /** Il saldo con l'altra persona, già girato dal punto di vista di chi guarda. */
-  balance: { owedToMe: number; otherName: string } | null
+  balance: { owedToMe: number; otherName: string; onSettle: () => void } | null
   onToggleHidden: () => void
 }): ReactNode {
   const hidden = view.income === null

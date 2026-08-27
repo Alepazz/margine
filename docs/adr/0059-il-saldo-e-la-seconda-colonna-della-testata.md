@@ -1,6 +1,6 @@
 # ADR-0059: Il saldo è la seconda colonna della testata
 
-**Status:** accepted · **Date:** 2026-08-27 · Supera la sola scelta di presentazione di ADR-0058
+**Status:** accepted — la sola scelta di *presentazione* (colonna a destra dimensionata sul contenuto, senza pulsante) è superata da ADR-0060 · **Date:** 2026-08-27 · Supera la sola scelta di presentazione di ADR-0058
 
 ## Context
 

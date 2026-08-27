@@ -12,12 +12,11 @@ import { useMemo, useState, type ReactNode } from 'react'
 
 import { Card, Notice, ShowMore, StatTile, useToast } from '../components/ui'
 import { formatDate, todayIso } from '../domain/dates'
-import { newSettlementId } from '../domain/ids'
 import { formatEuro, toCents } from '../domain/money'
+import { newSettlement, settlementDirection } from '../domain/settlement'
 import { aTo } from '../domain/text'
 import { tricountLabel } from '../domain/expense-rules'
 import { coupleBalance } from '../domain/selectors'
-import type { Settlement } from '../domain/types'
 import { usePageData } from './usePageData'
 
 const MOVEMENTS_SHOWN = 25
@@ -47,21 +46,21 @@ export function Saldo(): ReactNode {
   const owedToMe = person === 'me' ? balance.balance : -balance.balance
   const cents = toCents(owedToMe)
   const settledUp = cents === 0
-  const debtor = cents > 0 ? other : person
-  const creditor = cents > 0 ? person : other
+  /* Dalla stessa funzione che costruisce il rimborso: la frase che annuncia il
+     verso e il rimborso che lo esegue non possono dire cose diverse. */
+  const { debtor, creditor } = settlementDirection(owedToMe, person, other)
 
   const record = (amount: number) => {
-    if (toCents(amount) <= 0) {
+    const settlement = newSettlement({
+      owedToViewer: owedToMe,
+      viewer: person,
+      other,
+      amount,
+      date: todayIso(),
+    })
+    if (settlement === null) {
       toast.show('L’importo del rimborso deve essere maggiore di zero.')
       return
-    }
-    const date = todayIso()
-    const settlement: Settlement = {
-      id: newSettlementId(date),
-      date,
-      from: debtor,
-      to: creditor,
-      amount: Math.abs(Math.round(amount * 100) / 100),
     }
     addSettlement(settlement)
     setCustomAmount('')

@@ -13,12 +13,15 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type Dispatch,
+  type SetStateAction,
 } from 'react'
 
 import { currentMonthKey, monthKeyOf, todayIso, type MonthKey } from '../domain/dates'
 import {
   CHANGE_GROUPS,
   noticesOf,
+  unseenCount,
   parseChanges,
   unseenSince,
   type Change,
@@ -83,8 +86,17 @@ const IDENTITY_SINCE_KEY = 'margine.person.since.v1'
  * l'opposto. Resta qui anche adesso che l'app saprebbe scriverlo nei dati.
  */
 const HIDE_INCOME_KEY = 'margine.hideIncome.v1'
-/* Fin dove ho letto le novità: lo muove **solo** l'apertura della campanella. */
+/**
+ * **Due segni, non uno.**
+ *
+ * `seenAt` è dove si è **svuotato**: l'elenco mostra ciò che viene dopo.
+ * `readAt` è dove si è **guardato**: il pallino conta ciò che viene dopo.
+ * Chiudere il foglio muove il secondo, il pulsante li muove tutti e due — così
+ * aprire per sbaglio non perde niente, e un elenco già letto non tiene acceso
+ * il pallino. Con un segno solo i due gesti erano lo stesso gesto. → ADR-0061
+ */
 const NEWS_SEEN_KEY = 'margine.news.seenAt.v1'
+const NEWS_READ_KEY = 'margine.news.readAt.v1'
 /* Quali gruppi di eventi contano. Preferenza del dispositivo, non dei dati. */
 const NEWS_GROUPS_KEY = 'margine.news.groups.v1'
 /* Non più di una rilettura al minuto: passare fra le app non è un evento. */
@@ -184,11 +196,14 @@ export interface StoreApi {
   syncNow: () => Promise<void>
   reload: () => void
   /**
-   * Svuota la campanella: da qui in poi contiene solo ciò che arriva dopo.
-   *
-   * Lo chiama **il pulsante**, non l'apertura del foglio: aprire per leggere e
-   * dichiarare letto sono due gesti diversi, e confonderli fa sparire una
-   * notifica mentre la stai guardando. → ADR-0052
+   * **Guardate.** Lo chiama la chiusura del foglio: spegne il pallino e non
+   * tocca l'elenco. → ADR-0061
+   */
+  markNewsRead: () => void
+  /**
+   * **Archiviate.** Lo chiama il pulsante nel piede: svuota l'elenco, e con lui
+   * il pallino. Sono due gesti diversi di proposito — confonderli faceva
+   * sparire una notifica mentre la stavi guardando. → ADR-0061, ADR-0052
    */
   markNewsSeen: () => void
   setNewsGroups: (groups: readonly ChangeGroup[]) => void
@@ -286,9 +301,10 @@ function commitMessage(entries: readonly OutboxEntry[]): string {
   return `${describeOps(entries)} (da Margine)`
 }
 
-function readNewsSeenAt(): string | undefined {
+/** Un segno da `localStorage`: senza storage si riparte da zero, e va bene. */
+function readMark(key: string): string | undefined {
   try {
-    return localStorage.getItem(NEWS_SEEN_KEY) ?? undefined
+    return localStorage.getItem(key) ?? undefined
   } catch {
     return undefined
   }
@@ -366,7 +382,8 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
   const [outbox, setOutbox] = useState<OutboxState>(EMPTY_OUTBOX)
   const [sync, setSync] = useState<SyncState>({ phase: 'idle', pending: 0 })
   const [changes, setChanges] = useState<Change[]>([])
-  const [newsSeenAt, setNewsSeenAt] = useState<string | undefined>(readNewsSeenAt)
+  const [newsSeenAt, setNewsSeenAt] = useState<string | undefined>(() => readMark(NEWS_SEEN_KEY))
+  const [newsReadAt, setNewsReadAt] = useState<string | undefined>(() => readMark(NEWS_READ_KEY))
   const [newsGroups, setNewsGroupsState] = useState<ChangeGroup[]>(readNewsGroups)
   const [newsLoading, setNewsLoading] = useState(false)
   const [newsError, setNewsError] = useState<string | undefined>()
@@ -854,33 +871,56 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
    * visto e ciò che arriva dopo resta nuovo, qualunque cosa facciano gli
    * orologi.
    */
-  const markNewsSeen = useCallback(() => {
-    setChanges((current) => {
-      /*
-       * **Senza novità in mano non si dichiara visto niente.**
-       *
-       * Il ripiego su «adesso» che c'era prima perdeva le novità in silenzio:
-       * la campanella è tappabile appena l'app è pronta, e se la si apriva nei
-       * ~350 ms in cui l'elenco dei commit stava ancora arrivando, il
-       * segnalibro si piantava sull'ora corrente. Quando la lista atterrava, un
-       * istante dopo, ogni commit risultava più vecchio del segnalibro e quindi
-       * già visto — senza che il pallino fosse mai comparso. Un momento di
-       * distrazione dell'utente cancellava novità che non aveva visto.
-       */
-      const newest = current[0]?.at
-      if (newest === undefined) return current
-      setNewsSeenAt((previous) => {
-        const next = previous !== undefined && previous > newest ? previous : newest
-        try {
-          localStorage.setItem(NEWS_SEEN_KEY, next)
-        } catch {
-          /* senza storage il pallino torna alla prossima apertura */
-        }
-        return next
+  /**
+   * Il segno che sposta l'uno o l'altro, con la stessa cautela.
+   *
+   * **Senza novità in mano non si dichiara niente.** Il ripiego su «adesso» che
+   * c'era prima perdeva le novità in silenzio: la campanella è tappabile appena
+   * l'app è pronta, e se la si apriva nei ~350 ms in cui l'elenco dei commit
+   * stava ancora arrivando, il segnalibro si piantava sull'ora corrente. Quando
+   * la lista atterrava, un istante dopo, ogni commit risultava più vecchio del
+   * segnalibro e quindi già visto — senza che il pallino fosse mai comparso. Un
+   * momento di distrazione cancellava novità che nessuno aveva visto.
+   *
+   * E il segno non torna mai indietro: due dispositivi hanno due orologi.
+   */
+  const avanzaSegno = useCallback(
+    (setter: Dispatch<SetStateAction<string | undefined>>, key: string) => {
+      setChanges((current) => {
+        const newest = current[0]?.at
+        if (newest === undefined) return current
+        setter((previous) => {
+          const next = previous !== undefined && previous > newest ? previous : newest
+          try {
+            localStorage.setItem(key, next)
+          } catch {
+            /* senza storage il segno torna alla prossima apertura */
+          }
+          return next
+        })
+        return current
       })
-      return current
-    })
-  }, [])
+    },
+    [],
+  )
+
+  /**
+   * **Guardate.** Chiudere il foglio spegne il pallino e non tocca l'elenco:
+   * ciò che si è letto resta lì finché non lo si archivia. → ADR-0061
+   */
+  const markNewsRead = useCallback(() => {
+    avanzaSegno(setNewsReadAt, NEWS_READ_KEY)
+  }, [avanzaSegno])
+
+  /**
+   * **Archiviate.** Il pulsante svuota l'elenco — e con lui il pallino, perché
+   * ciò che non c'è più non può essere da leggere.
+   */
+  const markNewsSeen = useCallback(() => {
+    avanzaSegno(setNewsSeenAt, NEWS_SEEN_KEY)
+    avanzaSegno(setNewsReadAt, NEWS_READ_KEY)
+  }, [avanzaSegno])
+
 
   const setNewsGroups = useCallback(
     (groups: readonly ChangeGroup[]) => {
@@ -1139,9 +1179,11 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
   /**
    * Le righe della campanella, composte **qui** e non nel foglio.
    *
-   * Il numero sul pallino è la loro lunghezza, quindi elenco e conteggio devono
-   * nascere nello stesso posto: prodotti in due punti diversi, prima o poi
-   * direbbero cose diverse e sarebbe il pallino a mentire. → ADR-0052
+   * Il pallino si conta da queste, quindi elenco e conteggio devono nascere
+   * nello stesso posto: prodotti in due punti diversi, prima o poi direbbero
+   * cose diverse e sarebbe il pallino a mentire. Non è più la loro *lunghezza*
+   * — è quante ne restano oltre il segno di lettura — ma la fonte è la stessa.
+   * → ADR-0061, ADR-0052
    *
    * La visibilità si applica qui, dov'è nota la persona che guarda: ciò che sta
    * nei tricount di cui non sei membro non diventa una riga con un titolo, ma
@@ -1160,6 +1202,10 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
           }),
     [daLeggere, dataset, details, view.person],
   )
+
+  /* Il pallino: quante di quelle righe non sono ancora state guardate. La
+     regola sta nel dominio, con i suoi test. → ADR-0061 */
+  const unseen = useMemo(() => unseenCount(notices, newsReadAt), [notices, newsReadAt])
 
   /*
    * Il contenuto delle novità si carica da sé, senza aspettare che si apra la
@@ -1205,7 +1251,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
          */
         changes: daLeggere,
         notices,
-        unseen: notices.length,
+        unseen,
         groups: newsGroups,
         loading: newsLoading,
         error: newsError,
@@ -1237,6 +1283,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       deletePrice,
       syncNow: flush,
       reload,
+      markNewsRead,
       markNewsSeen,
       setNewsGroups,
       loadNewsDetail: loadDetail,
@@ -1245,6 +1292,8 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
     [
       changes,
       newsSeenAt,
+      newsReadAt,
+      unseen,
       newsGroups,
       newsLoading,
       newsError,
@@ -1253,6 +1302,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       notices,
       loadDetail,
       details,
+      markNewsRead,
       markNewsSeen,
       setNewsGroups,
       addExpense,
