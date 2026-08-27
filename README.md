@@ -95,6 +95,12 @@ Il token resta in questo browser, non entra mai nel repo. Quando scade, il salva
 
 Senza token l'app funziona comunque: le modifiche restano su quel dispositivo, e il contatore nella testata dice quante sono in attesa.
 
+## Le novità
+
+La campanella nella testata dice cosa ha cambiato l'altra persona: una riga per spesa — «Federica ha aggiunto Aperitivo · 11,00 € · 🍔 Bar e ristoranti · Spese condivise» — e non una per salvataggio. Le legge dai **commit** che l'app stessa scrive, e il dettaglio non sta nel messaggio: il repo è pubblico, quindi titolo e importo si ricavano decifrando in locale il file a quel commit e a quello prima. Si vede solo ciò che sta nei tricount di cui sei membro; il resto non lascia traccia, né riga né numero. → [ADR-0051](docs/adr/0051-lo-storico-si-legge-dai-commit.md), [ADR-0052](docs/adr/0052-la-campanella-e-una-casella-di-posta.md)
+
+È una casella di posta: il numero sul pallino è quello che non hai ancora svuotato, e a svuotarla è il pulsante in fondo al foglio — aprirlo non basta. In **Impostazioni → Novità** si sceglie quali gruppi di eventi contano, e spegnerli tutti non le filtra soltanto: l'app smette di chiedere del tutto. Senza token bastano le 60 richieste all'ora che GitHub concede a una rete, ma sono condivise fra i dispositivi sulla stessa wifi; quando finiscono la campanella lo dice invece di sembrare vuota. → [ADR-0054](docs/adr/0054-spente-vuol-dire-spente.md), [ADR-0053](docs/adr/0053-una-campanella-vuota-dice-perche.md)
+
 ## Note
 
 - L'app è in italiano, compresi i commenti nel codice e la documentazione.
