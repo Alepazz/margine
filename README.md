@@ -81,7 +81,7 @@ Nel repo finiscono **solo** i file cifrati. Il master in chiaro e la passphrase 
 
 ## Scrivere dall'app
 
-Dall'app si aggiunge una spesa col **+** al centro della barra — che nella pagina Prezzi registra invece una rilevazione, perché aggiunge la cosa della pagina in cui sei ([ADR-0044](docs/adr/0044-la-barra-serve-i-due-scopi.md)) — si corregge o si elimina dal foglio di dettaglio, si crea un viaggio, si registra un rimborso nella pagina Saldo, e si segna una spesa per il 730. Ogni modifica compare subito e viene committata nel repo in sottofondo, riscrivendo il file cifrato.
+Dall'app si aggiunge una spesa col **+** al centro della barra — che nella pagina Prezzi registra invece una rilevazione, perché aggiunge la cosa della pagina in cui sei ([ADR-0044](docs/adr/0044-la-barra-serve-i-due-scopi.md)) — si corregge o si elimina dal foglio di dettaglio, si crea un viaggio, si registra un rimborso — dalla pagina Saldo in tutti e due i versi, o con un tocco dal Riepilogo se sei tu a dover pagare ([ADR-0062](docs/adr/0062-il-saldo-dice-il-verso-a-parole.md)), e si segna una spesa per il 730. Ogni modifica compare subito e viene committata nel repo in sottofondo, riscrivendo il file cifrato.
 
 Serve un token GitHub, una volta per dispositivo, e il tipo dipende da chi lo crea.
 

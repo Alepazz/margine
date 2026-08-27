@@ -1,11 +1,19 @@
-/** Dati derivati che servono a quasi tutte le pagine, calcolati una volta. */
+/** Dati derivati che le pagine condividono, calcolati una volta. */
 
 import { useMemo } from 'react'
 
 import { useReadyStore, type ReadyStore } from '../data/store'
 import { buildCategoryLookup, type CategoryLookup } from '../domain/categories'
 import { todayIso } from '../domain/dates'
-import { allFor, monthlySeries, vacationIdsOf, visibleFor, type MonthTotal } from '../domain/selectors'
+import {
+  allFor,
+  coupleBalance,
+  monthlySeries,
+  vacationIdsOf,
+  visibleFor,
+  type CoupleBalance,
+  type MonthTotal,
+} from '../domain/selectors'
 import type { Expense } from '../domain/types'
 import type { ChartTheme } from '../theme/palette'
 import { useChartTheme } from '../theme/theme'
@@ -40,4 +48,25 @@ export function usePageData(): PageData {
   const series = useMemo(() => monthlySeries(visible, person), [visible, person])
 
   return { ...store, lookup, chart, visible, all, series, today: todayIso() }
+}
+
+/**
+ * Il saldo fra le due persone, con le stesse opzioni ovunque.
+ *
+ * Sta qui e non nelle pagine perché a mostrarlo sono **tre** — Riepilogo,
+ * Esplora e Saldo — e devono mostrare lo stesso numero: un'anteprima dell'hub
+ * che dicesse una cifra diversa dalla sua pagina toglierebbe la ragione
+ * dell'hub (→ ADR-0044). Con la chiamata ripetuta in tre posti, `today` o le
+ * opzioni potevano divergere in uno solo e nessun test se ne sarebbe accorto.
+ *
+ * Non è dentro `usePageData` di proposito: lo usano tre pagine su undici, e le
+ * altre otto non hanno motivo di pagare una passata su tutte le spese.
+ */
+export function useCoupleBalance(): CoupleBalance {
+  const { config, dataset } = useReadyStore()
+  const today = todayIso()
+  return useMemo(
+    () => coupleBalance(dataset.expenses, dataset.settlements, { ...config.balance, today }),
+    [config.balance, dataset.expenses, dataset.settlements, today],
+  )
 }

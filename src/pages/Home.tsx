@@ -23,7 +23,7 @@ import { Card, DeltaLabel, Notice, StatTile, useToast } from '../components/ui'
 import { donutSlices } from '../domain/categories'
 import { currentMonthKey, monthLabel, monthLabelShort } from '../domain/dates'
 import { EMPTY_INCOME, computeMargin, marginView } from '../domain/income'
-import { newSettlement } from '../domain/settlement'
+import { newSettlement, settlementDirection } from '../domain/settlement'
 import { formatEuro, relativeChange, toCents } from '../domain/money'
 import {
   averageByCategory,
@@ -33,7 +33,6 @@ import {
   compareToAverage,
   comparePeriods,
   compareYearOverYear,
-  coupleBalance,
   expensesOfMonth,
   fillMonthGaps,
   findMonth,
@@ -41,13 +40,12 @@ import {
   topExpenses,
 } from '../domain/selectors'
 import type { Expense, PersonId } from '../domain/types'
-import { usePageData } from './usePageData'
+import { useCoupleBalance, usePageData } from './usePageData'
 
 export function Home(): ReactNode {
   const {
     chart,
     config,
-    dataset,
     view,
     month,
     setMonth,
@@ -111,10 +109,8 @@ export function Home(): ReactNode {
    * uscite. Qui serve solo da mostrare, girato dal punto di vista di chi
    * guarda — il calcolo ha un segno fisso. → ADR-0058, ADR-0019
    */
-  const owedToMe = useMemo(() => {
-    const totale = coupleBalance(dataset.expenses, dataset.settlements, config.balance)
-    return person === 'me' ? totale.balance : -totale.balance
-  }, [config.balance, dataset.expenses, dataset.settlements, person])
+  const balance = useCoupleBalance()
+  const owedToMe = person === 'me' ? balance.balance : -balance.balance
 
   /*
    * Chiudere il conto dal Riepilogo, con lo stesso costruttore della pagina
@@ -127,9 +123,13 @@ export function Home(): ReactNode {
      oggetto nuovo a ogni render non costa un render in più — e memorizzarlo
      vorrebbe dire ragionare su quale versione di `settleAll` resta congelata
      dentro. */
-  const balance = {
+  const heroBalance = {
     owedToMe,
     otherName: config.people[other].name,
+    /* Il pulsante appare a chi paga, e chi paga lo dice la stessa funzione che
+       poi costruisce il rimborso: dedurlo qui con un secondo confronto sul
+       segno vorrebbe dire due espressioni della stessa regola. → ADR-0062 */
+    devePagare: settlementDirection(owedToMe, person, other)?.debtor === person,
     onSettle: () => {
       const settlement = newSettlement({
         owedToViewer: owedToMe,
@@ -181,6 +181,15 @@ export function Home(): ReactNode {
    * corso si confronta quindi la proiezione, e l'etichetta lo dice.
    */
   const inProgress = projection.method === 'stimato'
+  /*
+   * Un mese che non è ancora cominciato non si confronta con niente: la regola
+   * vale per tutto ciò che confronta, non per la sola scheda che l'ha fatta
+   * notare. Le poche voci che quel mese può già avere restano visibili — è
+   * guardandole che ci si accorge di una data sbagliata (→ ADR-0055) — ma
+   * accanto non compare più «−100 % sulla media», che di un mese vuoto è vero
+   * e non significa niente. → ADR-0065
+   */
+  const futureMonth = projection.method === 'futuro'
   const comparedTotal = inProgress ? projection.projected : monthTotal.total
   const comparedVariable = inProgress ? projection.projectedVariable : monthTotal.variable
   const compareSuffix = inProgress ? 'sulla media (proiezione)' : 'sulla media'
@@ -228,7 +237,7 @@ export function Home(): ReactNode {
             projection={projection}
             /* Un solo anno precedente esiste nei dati: è un riferimento, non una media. */
             lastYear={toCents(yoy.lastYear) > 0 ? { month: yoy.lastYearMonth, total: yoy.lastYear } : null}
-            balance={balance}
+            balance={heroBalance}
             onToggleHidden={toggleHideIncome}
           />
         </Card>
@@ -238,46 +247,48 @@ export function Home(): ReactNode {
           guarda per prima sul mese in corso: sapere di aver speso [cifra rimossa] serve a
           poco senza sapere che a luglio, agli stessi giorni, erano [cifra rimossa].
         */}
-        <Card title="Confronti" note={`Quota di ${config.people[person].name}`}>
-          <div className="kpi-row">
-            <StatTile
-              label={`Contro ${monthLabelShort(lastMonth.previousMonth)}`}
-              value={formatEuro(lastMonth.current, { decimals: 0 })}
-              hint={
-                lastMonth.wholePrevious
-                  ? `${monthLabelShort(lastMonth.previousMonth)} intero: ${formatEuro(lastMonth.previous, { decimals: 0 })}`
-                  : `nei primi ${lastMonth.days} giorni: ${formatEuro(lastMonth.previous, { decimals: 0 })}`
-              }
-              delta={<DeltaLabel change={lastMonth.deltaPct} />}
-            />
-            <StatTile
-              label="Ultimi 3 mesi"
-              value={formatEuro(quarter.current, { decimals: 0 })}
-              hint={`3 precedenti: ${formatEuro(quarter.previous, { decimals: 0 })}`}
-              delta={<DeltaLabel change={quarter.deltaPct} />}
-            />
-            <StatTile
-              label={`${monthLabelShort(month)} contro ${monthLabelShort(yoy.lastYearMonth)}`}
-              value={formatEuro(yoy.current, { decimals: 0 })}
-              hint={`anno scorso: ${formatEuro(yoy.lastYear, { decimals: 0 })}`}
-              delta={<DeltaLabel change={yoy.deltaPct} />}
-            />
-          </div>
-          <div className="card-foot">
-            {inProgress
-              ? `Il mese è in corso, quindi il confronto col mese scorso è tagliato agli stessi ${lastMonth.days} giorni: un mese a metà contro un mese intero direbbe «vai benissimo» ogni 5 del mese. `
-              : ''}
-            Il confronto sui tre mesi parte dal mese precedente a quello selezionato, per la stessa
-            ragione.
-          </div>
-        </Card>
+        {futureMonth ? null : (
+          <Card title="Confronti" note={`Quota di ${config.people[person].name}`}>
+            <div className="kpi-row">
+              <StatTile
+                label={`Contro ${monthLabelShort(lastMonth.previousMonth)}`}
+                value={formatEuro(lastMonth.current, { decimals: 0 })}
+                hint={
+                  lastMonth.wholePrevious
+                    ? `${monthLabelShort(lastMonth.previousMonth)} intero: ${formatEuro(lastMonth.previous, { decimals: 0 })}`
+                    : `nei primi ${lastMonth.days} giorni: ${formatEuro(lastMonth.previous, { decimals: 0 })}`
+                }
+                delta={<DeltaLabel change={lastMonth.deltaPct} />}
+              />
+              <StatTile
+                label="Ultimi 3 mesi"
+                value={formatEuro(quarter.current, { decimals: 0 })}
+                hint={`3 precedenti: ${formatEuro(quarter.previous, { decimals: 0 })}`}
+                delta={<DeltaLabel change={quarter.deltaPct} />}
+              />
+              <StatTile
+                label={`${monthLabelShort(month)} contro ${monthLabelShort(yoy.lastYearMonth)}`}
+                value={formatEuro(yoy.current, { decimals: 0 })}
+                hint={`anno scorso: ${formatEuro(yoy.lastYear, { decimals: 0 })}`}
+                delta={<DeltaLabel change={yoy.deltaPct} />}
+              />
+            </div>
+            <div className="card-foot">
+              {inProgress
+                ? `Il mese è in corso, quindi il confronto col mese scorso è tagliato agli stessi ${lastMonth.days} giorni: un mese a metà contro un mese intero direbbe «vai benissimo» ogni 5 del mese. `
+                : ''}
+              Il confronto sui tre mesi parte dal mese precedente a quello selezionato, per la stessa
+              ragione.
+            </div>
+          </Card>
+        )}
 
         <div className="kpi-row">
           <StatTile
             label={inProgress ? 'Speso finora' : 'Speso nel mese'}
             value={formatEuro(monthTotal.total, { decimals: 0 })}
             hint={`media ${formatEuro(average.perMonth, { decimals: 0 })} su ${average.months} mesi`}
-            delta={<DeltaLabel change={monthChange} suffix={compareSuffix} />}
+            delta={futureMonth ? undefined : <DeltaLabel change={monthChange} suffix={compareSuffix} />}
             aside={<Sparkline values={sparkValues} />}
           />
           <StatTile
@@ -290,10 +301,12 @@ export function Home(): ReactNode {
             value={formatEuro(monthTotal.variable, { decimals: 0 })}
             hint="la parte su cui puoi incidere"
             delta={
-              <DeltaLabel
-                change={relativeChange(comparedVariable, average.variablePerMonth)}
-                suffix={compareSuffix}
-              />
+              futureMonth ? undefined : (
+                <DeltaLabel
+                  change={relativeChange(comparedVariable, average.variablePerMonth)}
+                  suffix={compareSuffix}
+                />
+              )
             }
           />
           <StatTile
@@ -302,7 +315,9 @@ export function Home(): ReactNode {
             hint={
               projection.method === 'chiuso'
                 ? 'mese chiuso'
-                : `su ${projection.elapsedDays} giorni di ${projection.totalDays}`
+                : projection.method === 'futuro'
+                  ? 'il mese non è ancora cominciato'
+                  : `su ${projection.elapsedDays} giorni di ${projection.totalDays}`
             }
           />
         </div>
@@ -313,7 +328,9 @@ export function Home(): ReactNode {
           </Card>
 
           <Card title="Sopra o sotto la tua media" note="Scostamento per categoria, questo mese">
-            {versusAverage.length === 0 ? (
+            {futureMonth ? (
+              <p className="empty">Il mese non è ancora cominciato: non c'è niente da confrontare.</p>
+            ) : versusAverage.length === 0 ? (
               <p className="empty">Serve un po' di storia per confrontare.</p>
             ) : (
               <div className="table-wrap">

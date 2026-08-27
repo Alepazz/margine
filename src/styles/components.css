@@ -289,6 +289,20 @@ button.hero-value:focus-visible {
 }
 
 /*
+ * La terza riga della metà del saldo: il verso a parole, e sotto il pulsante
+ * per chi deve pagare. Sta in un contenitore suo perché la riga della griglia è
+ * una sola — le due metà devono avere lo stesso numero di righe, o `subgrid`
+ * non le allinea. → ADR-0062, ADR-0060
+ */
+.hero-balance-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+/*
  * Il pulsante che chiude il conto. Largo quanto il suo testo e non quanto la
  * colonna: a tutta metà scheda peserebbe più del numero che lo giustifica.
  * L'etichetta può andare a capo — su schermo stretto «Saldato tutto ([cifra rimossa])»
@@ -296,8 +310,6 @@ button.hero-value:focus-visible {
  * sborda dalla sua colonna.
  */
 .hero-balance-btn {
-  justify-self: start;
-  margin-top: 8px;
   text-align: center;
   white-space: normal;
 }

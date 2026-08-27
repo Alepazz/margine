@@ -22,7 +22,6 @@ import { Card } from '../components/ui'
 import { formatDate, monthLabelShort } from '../domain/dates'
 import { formatEuro, toCents } from '../domain/money'
 import {
-  coupleBalance,
   expensesOfMonth,
   fillMonthGaps,
   houseLedger,
@@ -31,7 +30,7 @@ import {
   totalShare,
 } from '../domain/selectors'
 import { tripTitleOf, tripsOf } from '../domain/types'
-import { usePageData } from './usePageData'
+import { useCoupleBalance, usePageData } from './usePageData'
 
 interface HubEntry {
   to: string
@@ -77,10 +76,7 @@ export function Esplora(): ReactNode {
   const { houseTricount, houseCategory, catCategory } = config
 
   // ── Saldo: il segno del calcolo è fisso, lo gira chi guarda. → ADR-0019 ──
-  const balance = useMemo(
-    () => coupleBalance(dataset.expenses, dataset.settlements, config.balance),
-    [config.balance, dataset.expenses, dataset.settlements],
-  )
+  const balance = useCoupleBalance()
   const owedToMe = person === 'me' ? balance.balance : -balance.balance
   const owedCents = toCents(owedToMe)
 

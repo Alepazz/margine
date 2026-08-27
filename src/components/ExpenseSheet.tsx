@@ -13,9 +13,9 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { useStore } from '../data/store'
 import type { CategoryLookup } from '../domain/categories'
-import { formatDate } from '../domain/dates'
+import { formatDate, monthKeyOf, monthLabel, todayIso } from '../domain/dates'
 import { formatEuro, toCents } from '../domain/money'
-import { balanceDeltaOf } from '../domain/selectors'
+import { balanceDeltaOf, notYetInBalance } from '../domain/selectors'
 import { tricountLabel } from '../domain/expense-rules'
 import { soleMemberOf, type Expense } from '../domain/types'
 import { ExpenseForm } from './ExpenseForm'
@@ -118,6 +118,18 @@ function MovePanel({ expense, onDone }: { expense: Expense; onDone: () => void }
   const after: Expense = { ...expense, ...fieldsFor() }
   const deltaAfter = balanceDeltaOf(after)
 
+  /*
+   * Una spesa datata dopo questo mese nel saldo non c'è ancora (→ ADR-0064):
+   * spostarla non muove niente a schermo, e la frase qui sotto — «sposta [cifra rimossa]
+   * di debito» — annuncerebbe al presente una cosa che succede il mese
+   * prossimo. Dalla stessa funzione che il saldo usa per non contarla: due
+   * espressioni della stessa soglia prima o poi direbbero cose diverse.
+   */
+  const rinviata = notYetInBalance(expense.date, todayIso())
+  /* Se non muove niente in nessun caso, la frase sul «non ancora» sarebbe una
+     contraddizione: «il saldo non si muove… entra nel saldo da settembre». */
+  const muove = toCents(delta) !== 0 || toCents(deltaAfter) !== 0
+
   const move = (): void => {
     if (blocked || target === current) return
     updateExpense(expense.id, fieldsFor())
@@ -144,7 +156,7 @@ function MovePanel({ expense, onDone }: { expense: Expense; onDone: () => void }
         <p className="delta is-bad">{blocked}</p>
       ) : target !== current ? (
         <p className="hint">
-          {toCents(delta) === 0 && toCents(deltaAfter) === 0
+          {!muove
             ? 'Il saldo non si muove: questa spesa non crea un debito fra voi.'
             : toCents(delta) === toCents(deltaAfter)
               ? `Sposta ${formatEuro(Math.abs(delta))} di debito da «${label(current)}» a «${label(target)}».`
@@ -155,6 +167,9 @@ function MovePanel({ expense, onDone }: { expense: Expense; onDone: () => void }
                 )}, là diventa ${formatEuro(Math.abs(deltaAfter))}.`}
           {targetMember && config
             ? ` Lì la spesa diventa tutta di ${config.people[targetMember].name}.`
+            : ''}
+          {muove && rinviata
+            ? ` Non ancora, però: questa spesa entra nel saldo da ${monthLabel(monthKeyOf(expense.date))}.`
             : ''}
         </p>
       ) : null}

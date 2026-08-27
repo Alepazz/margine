@@ -15,3 +15,6 @@ dist/
 .env
 .env.*
 /.secrets/
+
+# Artefatti del browser di prova: non sono del progetto.
+.playwright-mcp/

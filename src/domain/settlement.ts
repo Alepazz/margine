@@ -14,21 +14,29 @@ import { toCents } from './money'
 import type { PersonId, Settlement } from './types'
 
 /**
- * Chi paga e chi incassa, dato il saldo di chi guarda.
+ * Chi paga e chi incassa, dato il saldo di chi guarda. `null` **se siete in
+ * pari**, perché a saldo zero un debitore non c'è.
  *
- * Esportata perché la pagina Saldo la vuole per **dirlo a parole** («il
- * rimborso va da Federica ad Alessio») prima ancora che il rimborso esista. Se
- * la frase e il rimborso ricavassero il verso per conto proprio, potrebbero
- * dire cose diverse — e a sbagliare sarebbe la frase, cioè l'unica delle due
- * che qualcuno legge prima di premere. → ADR-0060
+ * Esportata perché serve a due domande che devono avere la stessa risposta: la
+ * pagina Saldo la usa per **dirlo a parole** («il rimborso va da Federica ad
+ * Alessio») prima ancora che il rimborso esista, e il Riepilogo per sapere **a
+ * chi mostrare il pulsante** per saldare. Se le due la ricavassero per conto
+ * proprio potrebbero dire cose diverse. → ADR-0060, ADR-0062
+ *
+ * Il `null` non è pignoleria di tipi: tornando una coppia anche a zero, il ramo
+ * «altrimenti» nominava **chi guarda** come debitore, e il pulsante per saldare
+ * compariva a saldo pari. Un tipo che non sa dire «nessuno» costringe ogni
+ * chiamante a ricordarsi il caso, e prima o poi uno se lo dimentica: è successo
+ * lo stesso giorno in cui questa funzione è nata.
  */
 export function settlementDirection(
   owedToViewer: number,
   viewer: PersonId,
   other: PersonId,
-): { debtor: PersonId; creditor: PersonId } {
-  const gliDeve = toCents(owedToViewer) > 0
-  return gliDeve ? { debtor: other, creditor: viewer } : { debtor: viewer, creditor: other }
+): { debtor: PersonId; creditor: PersonId } | null {
+  const cents = toCents(owedToViewer)
+  if (cents === 0) return null
+  return cents > 0 ? { debtor: other, creditor: viewer } : { debtor: viewer, creditor: other }
 }
 
 /**
@@ -60,10 +68,10 @@ export function newSettlement(opts: {
 }): Settlement | null {
   /* `=== 0` prende anche `-0`, che è uguale a zero per `===`. */
   if (!Number.isFinite(opts.amount) || opts.amount === 0) return null
-  /* In pari non c'è niente da rimborsare, e un verso non si potrebbe nemmeno
-     scegliere: `0 > 0` sarebbe falso e il debito finirebbe sempre da una parte. */
-  if (toCents(opts.owedToViewer) === 0) return null
-  const { debtor, creditor } = settlementDirection(opts.owedToViewer, opts.viewer, opts.other)
+  /* In pari non c'è niente da rimborsare, e infatti un verso non esiste. */
+  const verso = settlementDirection(opts.owedToViewer, opts.viewer, opts.other)
+  if (verso === null) return null
+  const { debtor, creditor } = verso
   return {
     id: newSettlementId(opts.date),
     date: opts.date,
