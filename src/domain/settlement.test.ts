@@ -75,9 +75,23 @@ describe('il verso, da solo', () => {
     expect(settlementDirection(-10, 'me', 'partner')).toEqual({ debtor: 'me', creditor: 'partner' })
   })
 
+  /*
+   * **A saldo zero un debitore non c'è**, e il tipo lo deve poter dire.
+   * Tornando una coppia anche qui, il ramo «altrimenti» nominava chi guarda
+   * come debitore: il pulsante per saldare compariva a saldo pari, ed è il
+   * difetto che Alessio ha visto in un colpo d'occhio il giorno stesso in cui
+   * questa funzione è nata. Sotto il centesimo è pari: `0,001 €` non è un
+   * debito che qualcuno possa pagare.
+   */
+  it('in pari non c’è nessun verso', () => {
+    expect(settlementDirection(0, 'me', 'partner')).toBeNull()
+    expect(settlementDirection(-0, 'me', 'partner')).toBeNull()
+    expect(settlementDirection(0.001, 'me', 'partner')).toBeNull()
+  })
+
   it('è lo stesso verso che finisce nel rimborso', () => {
     for (const saldo of [42, -42]) {
-      const verso = settlementDirection(saldo, 'me', 'partner')
+      const verso = settlementDirection(saldo, 'me', 'partner')!
       const s = newSettlement({ owedToViewer: saldo, viewer: 'me', other: 'partner', amount: 42, date: '2026-08-27' })!
       expect(s.from).toBe(verso.debtor)
       expect(s.to).toBe(verso.creditor)

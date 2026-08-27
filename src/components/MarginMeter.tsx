@@ -215,6 +215,8 @@ export function MarginMeter({
 
   const stillOpen = projection.method === 'stimato'
   const bar = marginBar(view, {
+    /* La tacca dice «dove arrivi a questo ritmo»: a mese chiuso il ritmo è
+       finito, e in un mese non ancora cominciato non è mai partito. */
     projectedVariable: stillOpen ? projection.projectedVariable : null,
   })
   /* I pallini sono la legenda **della barra**: senza barra non indicano niente,
@@ -260,6 +262,10 @@ export function MarginMeter({
                 <Money value={view.spendablePerDay} whole /> al giorno da qui a fine mese (
                 {Math.max(0, projection.totalDays - projection.elapsedDays)} giorni)
               </>
+            ) : projection.method === 'futuro' ? (
+              /* Non «chiuso»: un mese che non è cominciato non ha un numero
+                 definitivo, ha qualche voce inserita in anticipo. → ADR-0063 */
+              'Il mese non è ancora cominciato.'
             ) : (
               'Mese chiuso: il numero è definitivo.'
             )}

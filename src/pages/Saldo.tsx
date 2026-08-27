@@ -48,7 +48,7 @@ export function Saldo(): ReactNode {
   const settledUp = cents === 0
   /* Dalla stessa funzione che costruisce il rimborso: la frase che annuncia il
      verso e il rimborso che lo esegue non possono dire cose diverse. */
-  const { debtor, creditor } = settlementDirection(owedToMe, person, other)
+  const verso = settlementDirection(owedToMe, person, other)
 
   const record = (amount: number) => {
     const settlement = newSettlement({
@@ -139,8 +139,11 @@ export function Saldo(): ReactNode {
                 </button>
               </div>
               <p className="hint">
-                Il rimborso va da {config.people[debtor].name} {aTo(config.people[creditor].name)}{' '}
-                {config.people[creditor].name}, con la data di oggi.
+                {verso === null
+                  ? null
+                  : `Il rimborso va da ${config.people[verso.debtor].name} ${aTo(
+                      config.people[verso.creditor].name,
+                    )} ${config.people[verso.creditor].name}, con la data di oggi.`}
               </p>
             </div>
           ) : null}

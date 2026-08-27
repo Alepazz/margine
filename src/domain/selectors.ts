@@ -366,8 +366,12 @@ export function compareToAverage(
 export interface Projection {
   /** Totale atteso a fine mese. */
   projected: number
-  /** `chiuso` = il mese è finito, il numero è definitivo. */
-  method: 'chiuso' | 'stimato'
+  /**
+   * `chiuso` = il mese è finito e il numero è definitivo; `stimato` = è in
+   * corso; `futuro` = **non è ancora cominciato**, e allora non c'è niente da
+   * proiettare: da zero giorni trascorsi non si estende nessun ritmo. → ADR-0063
+   */
+  method: 'chiuso' | 'stimato' | 'futuro'
   elapsedDays: number
   totalDays: number
   /** Parte variabile attesa a fine mese. */
@@ -388,6 +392,24 @@ export function projectMonth(
 ): Projection {
   const totalDays = daysInMonth(month.month)
   const elapsedDays = elapsedDaysInMonth(month.month, today)
+  /*
+   * Mese non ancora cominciato. Le poche voci che può già avere — l'affitto
+   * pagato in anticipo, o una data sbagliata — sono fatti, non un ritmo:
+   * dividerle per zero giorni darebbe `Infinity`, e chiamarlo «mese chiuso»
+   * direbbe che quel numero è definitivo. Le fisse attese invece si sanno già.
+   * → ADR-0063
+   */
+  if (elapsedDays === 0) {
+    const attese = round2(Math.max(month.fixed, averageFixed))
+    return {
+      projected: round2(attese + month.variable),
+      method: 'futuro',
+      elapsedDays,
+      totalDays,
+      projectedVariable: round2(month.variable),
+      expectedFixed: attese,
+    }
+  }
   if (elapsedDays >= totalDays) {
     return {
       projected: round2(month.total),

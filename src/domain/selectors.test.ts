@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import { elapsedDaysInMonth } from './dates'
+
 import {
   EMPTY_FILTER,
   allFor,
@@ -225,6 +227,56 @@ describe('proiezione di fine mese', () => {
     expect(projection.expectedFixed).toBe(420) // la media storica supera le fisse già addebitate
     expect(projection.projectedVariable).toBe(620) // 200 / 10 × 31
     expect(projection.projected).toBe(1040)
+  })
+
+  /*
+   * Un mese futuro può avere già delle voci: l'affitto pagato in anticipo, o una
+   * data sbagliata. Prima `elapsedDaysInMonth` lo dava per **interamente
+   * trascorso** — la condizione era «se non è il mese corrente è tutto passato»,
+   * vera per il passato e falsa per il futuro — e la scheda diceva «mese chiuso,
+   * il numero è definitivo» di un mese non ancora cominciato. → ADR-0063
+   */
+  it('un mese non ancora cominciato non è chiuso', () => {
+    const settembre = { month: '2026-09', total: 2.5, fixed: 0, variable: 2.5, count: 1 }
+    const projection = projectMonth(settembre, '2026-08-27', 539)
+    expect(projection.method).toBe('futuro')
+    expect(projection.elapsedDays).toBe(0)
+  })
+
+  /*
+   * Da zero giorni trascorsi non si estende nessun ritmo: la divisione darebbe
+   * `Infinity`, e il numero grande con lui.
+   */
+  it('non proietta da zero giorni: le variabili restano quelle inserite', () => {
+    const settembre = { month: '2026-09', total: 2.5, fixed: 0, variable: 2.5, count: 1 }
+    const projection = projectMonth(settembre, '2026-08-27', 539)
+    expect(projection.projectedVariable).toBe(2.5)
+    expect(Number.isFinite(projection.projected)).toBe(true)
+    /* Le fisse attese invece si sanno già: sono la media. */
+    expect(projection.expectedFixed).toBe(539)
+    expect(projection.projected).toBe(541.5)
+  })
+
+  it('il mese in corso resta «stimato» anche il primo giorno', () => {
+    const projection = projectMonth({ ...month, variable: 10 }, '2026-08-01', 300)
+    expect(projection.method).toBe('stimato')
+    expect(projection.elapsedDays).toBe(1)
+  })
+})
+
+describe('quanti giorni di un mese sono passati', () => {
+  it('un mese passato è tutto trascorso', () => {
+    expect(elapsedDaysInMonth('2026-07', '2026-08-27')).toBe(31)
+  })
+
+  it('del mese in corso, quelli fino a oggi', () => {
+    expect(elapsedDaysInMonth('2026-08', '2026-08-27')).toBe(27)
+  })
+
+  /* Il difetto: prima anche il futuro tornava «tutto trascorso». → ADR-0063 */
+  it('un mese futuro non ne ha nessuno', () => {
+    expect(elapsedDaysInMonth('2026-09', '2026-08-27')).toBe(0)
+    expect(elapsedDaysInMonth('2027-01', '2026-08-27')).toBe(0)
   })
 })
 
