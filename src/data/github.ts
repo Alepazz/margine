@@ -94,6 +94,35 @@ function contentsUrl(cfg: GithubConfig, path: string = cfg.dataPath): string {
 }
 
 async function failure(response: Response): Promise<GithubError> {
+  /*
+   * **Un 403 con le richieste finite è il limite, non un permesso.**
+   *
+   * GitHub risponde 403 in tutti e due i casi, e il messaggio del token manda a
+   * cercare nelle spunte di un token che magari non c'è nemmeno — è lo stesso
+   * inganno che ADR-0043 documenta per il 404 sulle scritture. L'intestazione
+   * distingue, e si confronta con la **stringa**: assente torna `null`, e
+   * `Number(null)` è `0`, che farebbe passare per limite proprio il permesso
+   * negato. Il corpo JSON non si guarda: è prosa inglese, non contratto.
+   *
+   * La frase non dà per scontato che un token non ci sia — presumere la causa è
+   * l'errore che questo ramo corregge. → ADR-0053
+   */
+  if (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0') {
+    const reset = Number(response.headers.get('x-ratelimit-reset') ?? 0) * 1000
+    const minuti = reset > 0 ? Math.max(1, Math.ceil((reset - Date.now()) / 60_000)) : undefined
+    const quando =
+      minuti === undefined
+        ? '.'
+        : minuti === 1
+          ? ': riprova fra un minuto.'
+          : `: riprova fra ${String(minuti)} minuti.`
+    return new GithubError(
+      403,
+      `Hai esaurito le richieste che GitHub concede a questa rete${quando}` +
+        ' Senza token il limite è 60 all\'ora, con un token in Impostazioni sale a 5000.',
+    )
+  }
+
   let detail = response.statusText
   try {
     const body: unknown = await response.json()

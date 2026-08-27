@@ -215,6 +215,16 @@ export interface NewsState {
   /** Vero mentre si sta leggendo l'elenco: la campanella non si blocca comunque. */
   loading: boolean
   /**
+   * Perché l'elenco non si è potuto leggere.
+   *
+   * Senza, una campanella vuota per un guasto è indistinguibile da una vuota
+   * perché non è successo niente — e la seconda è rassicurante mentre la prima
+   * non lo è. È il posto dove sta scritto il motivo: gli altri due punti che lo
+   * riguardano — il `catch` di `loadNews` e il foglio — rimandano qui.
+   * → ADR-0053, ADR-0043
+   */
+  error?: string
+  /**
    * So qual è il mio login GitHub, e quindi so che le righe rimaste sono
    * dell'altra persona.
    *
@@ -359,6 +369,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
   const [newsSeenAt, setNewsSeenAt] = useState<string | undefined>(readNewsSeenAt)
   const [newsGroups, setNewsGroupsState] = useState<ChangeGroup[]>(readNewsGroups)
   const [newsLoading, setNewsLoading] = useState(false)
+  const [newsError, setNewsError] = useState<string | undefined>()
   const [myLogin, setMyLogin] = useState<string | undefined>(() => loadLogin() ?? undefined)
   const lastRefresh = useRef(0)
   /**
@@ -692,6 +703,27 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
     if (!github) return
 
     /*
+     * **Spente vuol dire spente.** Con nessun gruppo acceso non c'è niente da
+     * mostrare, e chiedere comunque la lista dei commit a ogni apertura
+     * sarebbe lavoro per un risultato che si butta — oltre a consumare il
+     * limite di richieste di chi ha deciso di non volerle. È questo a rendere
+     * lecito il caricamento anticipato: si paga solo se si vuole. → ADR-0054
+     *
+     * Sta **sopra** `lastNews.current = now`: sotto, riaccendere un gruppo
+     * troverebbe un «già letto un attimo fa» che non è mai avvenuto e la
+     * campanella resterebbe muta fino a un minuto.
+     *
+     * L'elenco si sostituisce solo se c'era qualcosa: `loadNews` scatta a ogni
+     * ritorno in primo piano — `visibilitychange` **e** `focus` — e un array
+     * vuoto nuovo di zecca sarebbe un render dell'intero albero per niente.
+     */
+    if (groups.length === 0) {
+      setChanges((precedenti) => (precedenti.length === 0 ? precedenti : []))
+      setNewsError(undefined)
+      return
+    }
+
+    /*
      * Non più di una lettura al minuto, come la rilettura dei dati.
      *
      * Senza, ogni ritorno in primo piano ne faceva **due**: `visibilitychange`
@@ -741,8 +773,10 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       knownShas.current = allShas
       freeDiff.current = undefined
       setChanges(next)
-    } catch {
-      /* Senza rete la campanella resta con ciò che aveva: non è un errore da dire. */
+      setNewsError(undefined)
+    } catch (newsFailure) {
+      /* Dirlo invece di ingoiarlo; il perché sta in `NewsState.error`. → ADR-0053 */
+      setNewsError(describeError(newsFailure))
     } finally {
       setNewsLoading(false)
     }
@@ -1174,6 +1208,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
         unseen: notices.length,
         groups: newsGroups,
         loading: newsLoading,
+        error: newsError,
         knowsMe: myLogin !== undefined,
       },
       identity,
@@ -1212,6 +1247,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       newsSeenAt,
       newsGroups,
       newsLoading,
+      newsError,
       myLogin,
       daLeggere,
       notices,
