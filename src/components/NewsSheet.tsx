@@ -15,7 +15,7 @@
  * come titolo — «1 spesa aggiunta» — obbligava a decifrare invece di leggere.
  */
 
-import { useEffect, useMemo, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
 
 import { useReadyStore } from '../data/store'
 import { phraseOf, type NoticeItem } from '../domain/changes'
@@ -69,19 +69,31 @@ function detailOf(
 }
 
 export function NewsSheet({ onClose }: { onClose: () => void }): ReactNode {
-  const { news, config, dataset, view, markNewsSeen, loadNewsDetail } = useReadyStore()
+  const { news, config, dataset, view, markNewsRead, markNewsSeen, loadNewsDetail } = useReadyStore()
   const sheetRef = useRef<HTMLDivElement | null>(null)
 
   useScrollLock()
 
+  /**
+   * Chiudere dichiara **guardate**, non archiviate: il pallino si spegne e
+   * l'elenco resta finché non lo svuoti col pulsante. Passano tutti e tre i
+   * gesti di chiusura — la X, Esc, il tocco fuori — perché sono tre modi di
+   * fare la stessa cosa e uno che si comportasse diversamente somiglierebbe a
+   * un difetto invece che a una scelta. → ADR-0061
+   */
+  const chiudi = useCallback(() => {
+    markNewsRead()
+    onClose()
+  }, [markNewsRead, onClose])
+
   useEffect(() => {
     sheetRef.current?.focus()
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') chiudi()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [chiudi])
 
   const other = config.people[view.person === 'me' ? 'partner' : 'me']
   const today = todayIso()
@@ -110,7 +122,7 @@ export function NewsSheet({ onClose }: { onClose: () => void }): ReactNode {
     <div
       className="sheet-backdrop"
       onClick={(event) => {
-        if (event.target === event.currentTarget) onClose()
+        if (event.target === event.currentTarget) chiudi()
       }}
     >
       <div
@@ -131,7 +143,7 @@ export function NewsSheet({ onClose }: { onClose: () => void }): ReactNode {
                 : 'Senza token non so quali commit siano miei, quindi ci sono anche quelli'}
             </p>
           </div>
-          <button type="button" className="btn btn-icon btn-ghost" onClick={onClose} aria-label="Chiudi">
+          <button type="button" className="btn btn-icon btn-ghost" onClick={chiudi} aria-label="Chiudi">
             ✕
           </button>
         </div>
