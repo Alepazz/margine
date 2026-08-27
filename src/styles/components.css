@@ -175,83 +175,84 @@ button.hero-value:focus-visible {
 }
 
 /*
- * A destra del numero grande: il semaforo e il saldo con l'altra persona.
+ * La testata della scheda: due colonne parallele, «come sto col mese» a
+ * sinistra e «come sto con lei» a destra.
  *
- * Sono due cose diverse messe vicine di proposito — «come sto col mese» e «come
- * sto con lei» — ed è la riga che le contiene ad andare a capo sul telefono,
- * perché `.row` avvolge. Il saldo non entra in nessun conto del margine: sta
- * qui perché è la seconda domanda che ci si fa aprendo l'app. → ADR-0058
+ * **Griglia e non flex.** In flex la prima colonna prende come larghezza di
+ * partenza il proprio contenuto, e il suggerimento sotto il numero grande —
+ * «88 € al giorno da qui a fine mese (4 giorni)» — è lungo abbastanza da
+ * occupare la riga e spingere il saldo a capo: misurato, 304px di min-content
+ * contro 324 disponibili. `minmax(0, 1fr)` toglie quel minimo implicito, e la
+ * seconda colonna prende solo ciò che le serve. È lo stesso difetto di
+ * ADR-0044, dove una traccia dichiarata `1fr` si allargava al suo contenuto.
  */
-.hero-aside {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  /*
-   * In fila e non in colonna, e cresce invece di stare stretto: così la stessa
-   * regola serve i due casi senza sapere in quale si trova. Accanto al numero
-   * grande occupa lo spazio che avanza e resta appoggiato a destra; sul
-   * telefono, dove `.row` avvolge, prende la riga intera e semaforo e saldo
-   * stanno affiancati sotto il numero invece di ammucchiarsi a sinistra.
-   *
-   * Niente `flex-wrap: nowrap` sulla riga per tenerli affiancati per forza: è
-   * il modo in cui un contenuto decide la larghezza del suo contenitore, ed è
-   * già costato una volta. → ADR-0033
-   */
-  flex: 1 1 auto;
+.hero-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
 }
 
-.balance-tag {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 1px;
-  /* Si tocca per andare al Saldo: 44px è il minimo perché un pollice lo prenda. */
-  min-height: 44px;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--surface-2);
+/*
+ * **Solo dentro la riga a due colonne** il numero grande può rimpicciolirsi.
+ *
+ * La sua colonna a 320px vale 135px, e «−1.384 €» a 2,1rem ne misura 136: un
+ * pixel, e il simbolo dell'euro finiva da solo sulla seconda riga. Il minimo
+ * del `clamp` scende quindi a 1,8rem, e morde solo sotto i ~372px di viewport
+ * — sopra vince `9vw` e non cambia niente.
+ *
+ * La regola sta qui e non su `.hero-value`, che è condivisa con la pagina
+ * Saldo: là il numero ha tutta la larghezza della scheda e non ha nessun motivo
+ * di rimpicciolirsi. Una modifica fatta per una pagina non deve cambiarne
+ * un'altra in silenzio. → ADR-0059
+ */
+.hero-row .hero-value {
+  font-size: clamp(1.8rem, 9vw, 3rem);
+}
+
+/*
+ * La colonna del saldo: stessa impaginazione del numero grande (riusa `.hero`),
+ * allineata a destra. È un collegamento al Saldo, quindi ha l'altezza minima di
+ * un bersaglio per il pollice.
+ */
+.hero-balance {
+  text-align: right;
   text-decoration: none;
   color: inherit;
+  min-height: 44px;
+  border-radius: var(--r-sm);
 }
 
-.balance-tag:focus-visible {
+.hero-balance:focus-visible {
   outline: 2px solid var(--ink);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
-.balance-tag-label {
-  font-size: 0.7rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
-
-.balance-tag-value {
+/*
+ * Più piccola del numero grande, e non per timidezza: due cifre della stessa
+ * taglia competono, e il Riepilogo esiste per darne una sola. → ADR-0015
+ */
+.hero-balance-value {
   font-family: var(--font-num);
   font-variant-numeric: tabular-nums;
-  font-size: 1.05rem;
+  font-size: clamp(1.45rem, 6vw, 1.9rem);
   font-weight: 500;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  white-space: nowrap;
 }
 
-.balance-tag-value.is-good {
+/* Il segno porta il significato, il colore lo rinforza: `+` rientra, `−` esce. */
+.hero-balance-value.is-good {
   color: var(--good-text);
 }
 
-.balance-tag-value.is-bad {
+.hero-balance-value.is-bad {
   color: var(--critical-text);
 }
 
-.balance-tag-value.is-even {
+.hero-balance-value.is-even {
   color: var(--ink-2);
-}
-
-.balance-tag-hint {
-  font-size: 0.72rem;
-  color: var(--ink-3);
 }
 
 /* ─────────────────────────── misuratore ─────────────────────────── */

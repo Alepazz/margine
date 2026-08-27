@@ -1,6 +1,6 @@
 # ADR-0058: Il saldo sta accanto al numero grande
 
-**Status:** accepted · **Date:** 2026-08-27
+**Status:** accepted — la sola scelta di *presentazione* (riquadro sotto il semaforo, con la frase che dice il verso) è superata da ADR-0059 · **Date:** 2026-08-27
 
 ## Context
 
