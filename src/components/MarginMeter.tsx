@@ -30,6 +30,7 @@ import { monthLabel, type MonthKey } from '../domain/dates'
 import { marginBar, type MarginSegmentKey, type MarginView } from '../domain/income'
 import { formatEuro, toCents } from '../domain/money'
 import type { Projection } from '../domain/selectors'
+import { aTo } from '../domain/text'
 import { StatusChip, VEIL } from './ui'
 
 /** Un valore in euro, o i pallini se è coperto. */
@@ -69,26 +70,41 @@ function Row({
 }
 
 /**
- * Il saldo con l'altra persona, accanto al numero grande.
+ * Il saldo con l'altra persona: **la seconda colonna della testata**.
  *
- * Non segue il mese scelto: è un totale corrente, e lo dice. Sta qui perché è
- * la seconda domanda che ci si fa aprendo l'app — «e con lei come sto?» — e
- * mandarla in un'altra pagina per un numero solo costava due tocchi ogni
- * volta. → ADR-0058
+ * Stessa impaginazione del numero grande — etichetta piccola sopra, cifra sotto
+ * — perché sono due risposte allo stesso genere di domanda: «come sto col
+ * mese?» e «come sto con lei?». La cifra è più piccola di proposito: due numeri
+ * della stessa taglia competerebbero, e il Riepilogo perderebbe il singolo
+ * numero per cui l'app esiste. → ADR-0015
+ *
+ * Il **segno è il messaggio**: `+` verde vuol dire che rientrano soldi, `−`
+ * rosso che ne escono. Prima c'era una frase sotto («te li deve»), dentro un
+ * riquadro: si leggeva come un fumetto appiccicato al numero grande, e a dirlo
+ * è stato Alessio vedendola. Il segno lo dice già, e a chi non vede il colore lo
+ * dice comunque — il colore non porta nulla che il `+` non porti.
+ * → ADR-0059, ADR-0058
  */
 function BalanceTag({ owedToMe, otherName }: { owedToMe: number; otherName: string }): ReactNode {
   const cents = toCents(owedToMe)
   const tono = cents > 0 ? 'is-good' : cents < 0 ? 'is-bad' : 'is-even'
+  const cifra = formatEuro(Math.abs(owedToMe), { decimals: 0 })
   return (
-    <Link to="/saldo" className="balance-tag">
-      <span className="balance-tag-label">Con {otherName}</span>
-      <span className={`balance-tag-value ${tono}`}>
-        {cents === 0
-          ? 'Pari'
-          : `${cents > 0 ? '+' : '−'}${formatEuro(Math.abs(owedToMe), { decimals: 0 })}`}
-      </span>
-      <span className="balance-tag-hint">
-        {cents > 0 ? 'te li deve' : cents < 0 ? 'glieli devi' : 'nessun debito'}
+    <Link
+      to="/saldo"
+      className="hero hero-balance"
+      /* Il segno non si legge ad alta voce: il nome accessibile dice la frase. */
+      aria-label={
+        cents > 0
+          ? `${otherName} ti deve ${cifra}. Vai al saldo`
+          : cents < 0
+            ? `Devi ${cifra} ${aTo(otherName)} ${otherName}. Vai al saldo`
+            : `In pari con ${otherName}. Vai al saldo`
+      }
+    >
+      <span className="hero-label">Con {otherName}</span>
+      <span className={`hero-balance-value ${tono}`} aria-hidden="true">
+        {cents === 0 ? 'Pari' : `${cents > 0 ? '+' : '−'}${cifra}`}
       </span>
     </Link>
   )
@@ -112,15 +128,25 @@ export function MarginMeter({
   const hidden = view.income === null
 
   if (!view.known) {
+    /*
+     * Senza profilo entrate il margine non si può calcolare, ma **il saldo sì**:
+     * non dipende dalle entrate, dipende da chi ha anticipato cosa. Nella prima
+     * versione questo ramo tornava la sola colonna di sinistra e portava via
+     * anche il saldo — visto sul banco nella vista di chi non ha compilato il
+     * profilo, che è poi la situazione di chi apre l'app per la prima volta.
+     */
     return (
-      <div className="hero">
-        <span className="hero-label">Puoi ancora spendere</span>
-        <span className="hero-value is-sconosciuto">—</span>
-        <span className="hero-hint">
-          Il profilo entrate non è ancora impostato: hai speso{' '}
-          <strong>{formatEuro(view.spent)}</strong>. Compila le entrate nelle impostazioni per
-          sapere quanto ti resta.
-        </span>
+      <div className="hero-row">
+        <div className="hero">
+          <span className="hero-label">Puoi ancora spendere</span>
+          <span className="hero-value is-sconosciuto">—</span>
+          <span className="hero-hint">
+            Il profilo entrate non è ancora impostato: hai speso{' '}
+            <strong>{formatEuro(view.spent)}</strong>. Compila le entrate nelle impostazioni per
+            sapere quanto ti resta.
+          </span>
+        </div>
+        {balance ? <BalanceTag {...balance} /> : null}
       </div>
     )
   }
@@ -138,7 +164,14 @@ export function MarginMeter({
 
   return (
     <div className="stack" style={{ gap: 12 }}>
-      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      {/*
+        Due colonne, non una riga che avvolge: la griglia le tiene affiancate a
+        ogni larghezza, e `minmax(0, 1fr)` sulla prima le impedisce di allargarsi
+        al suo contenuto — il suggerimento «88 € al giorno da qui a fine mese»
+        ha un min-content largo, e in flex bastava a spingere il saldo a capo.
+        → ADR-0059, ADR-0044
+      */}
+      <div className="hero-row">
         <div className="hero">
           <span className="hero-label">Puoi ancora spendere</span>
           {/*
@@ -170,10 +203,14 @@ export function MarginMeter({
             )}
           </span>
         </div>
-        <div className="hero-aside">
-          <StatusChip status={view.status} />
-          {balance ? <BalanceTag {...balance} /> : null}
-        </div>
+        {balance ? <BalanceTag {...balance} /> : null}
+      </div>
+
+      {/* Il semaforo è un commento alla barra, non al numero: sta appena sopra
+          di essa, dove serve a leggerla. Dentro una `.row` perché figlio diretto
+          di una colonna flex si stirerebbe a tutta larghezza. */}
+      <div className="row">
+        <StatusChip status={view.status} />
       </div>
 
       <div className="meter">
