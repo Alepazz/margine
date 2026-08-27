@@ -23,7 +23,7 @@ import { Card, DeltaLabel, Notice, StatTile, useToast } from '../components/ui'
 import { donutSlices } from '../domain/categories'
 import { currentMonthKey, monthLabel, monthLabelShort } from '../domain/dates'
 import { EMPTY_INCOME, computeMargin, marginView } from '../domain/income'
-import { newSettlement } from '../domain/settlement'
+import { newSettlement, settlementDirection } from '../domain/settlement'
 import { formatEuro, relativeChange, toCents } from '../domain/money'
 import {
   averageByCategory,
@@ -130,6 +130,10 @@ export function Home(): ReactNode {
   const balance = {
     owedToMe,
     otherName: config.people[other].name,
+    /* Il pulsante appare a chi paga, e chi paga lo dice la stessa funzione che
+       poi costruisce il rimborso: dedurlo qui con un secondo confronto sul
+       segno vorrebbe dire due espressioni della stessa regola. → ADR-0062 */
+    devePagare: settlementDirection(owedToMe, person, other).debtor === person,
     onSettle: () => {
       const settlement = newSettlement({
         owedToViewer: owedToMe,

@@ -78,52 +78,91 @@ function Row({
  * destra: quella forma le faceva sembrare due cose scollegate ai due estremi di
  * una scheda vuota in mezzo. → ADR-0060
  *
- * Il titolo è **fisso** e dice cosa è il numero. «Con Federica» era un contesto,
- * non un titolo: non diceva che quello fosse un saldo.
+ * Il titolo è **fisso** e dice cosa è il numero; il **verso lo dice una frase**,
+ * «Devi ricevere» o «Devi dare». Per un giro il verso l'ha portato il solo
+ * segno della cifra, e non è bastato: `+` e `−` dicono da che parte pende il
+ * conto solo a chi ha già in testa la convenzione. → ADR-0062
  *
- * Il **segno è il verso**: `+` verde vuol dire che rientrano soldi, `−` rosso
- * che ne escono. La cifra è più piccola di quella del margine, che resta il
- * numero per cui l'app esiste. → ADR-0015
+ * La cifra è più piccola di quella del margine, che resta il numero per cui
+ * l'app esiste. → ADR-0015
  */
 function BalanceTag({
   owedToMe,
   otherName,
+  devePagare,
   onSettle,
 }: {
   owedToMe: number
   otherName: string
+  /**
+   * Vero quando è **chi guarda** a dover pagare. Arriva da fuori, calcolato con
+   * `settlementDirection` — la stessa funzione che poi costruisce il rimborso —
+   * perché «a chi appare il pulsante» e «chi il rimborso fa pagare» sono lo
+   * stesso fatto: dedotti in due posti diversi potrebbero divergere, e il
+   * pulsante comparirebbe a chi incassa, registrando un pagamento che non ha
+   * fatto. → ADR-0062, ADR-0060
+   */
+  devePagare: boolean
   onSettle: () => void
 }): ReactNode {
   const cents = toCents(owedToMe)
-  const tono = cents > 0 ? 'is-good' : cents < 0 ? 'is-bad' : 'is-even'
   const cifra = formatEuro(Math.abs(owedToMe), { decimals: 0 })
-  /* Il segno non si legge ad alta voce: la frase la porta il nome accessibile. */
-  const frase =
+
+  /*
+   * Dal segno del saldo dipendono tre cose, e nascono insieme perché non
+   * possano contraddirsi: il colore, la frase a schermo e il nome accessibile.
+   * Scritte come tre espressioni separate, bastava invertire una condizione per
+   * avere «Devi ricevere» sopra e «Devi 193 € ad Alessio» nell'etichetta — due
+   * testi che dicono il contrario, uno letto dall'occhio e uno dal lettore di
+   * schermo, e nessun test che se ne accorga.
+   *
+   * La quarta cosa che dipende dal segno — a chi appare il pulsante — **non è
+   * qui**: la decide il dominio, insieme al verso del rimborso.
+   *
+   * `frase` non è `verso` più il nome: il segno non si legge ad alta voce, e
+   * «Devi ricevere» da solo non dice da chi.
+   */
+  const stato =
     cents > 0
-      ? `${otherName} ti deve ${cifra}`
+      ? { tono: 'is-good', verso: 'Devi ricevere', frase: `${otherName} ti deve ${cifra}` }
       : cents < 0
-        ? `Devi ${cifra} ${aTo(otherName)} ${otherName}`
-        : `In pari con ${otherName}`
+        ? {
+            tono: 'is-bad',
+            verso: 'Devi dare',
+            frase: `Devi ${cifra} ${aTo(otherName)} ${otherName}`,
+          }
+        : { tono: 'is-even', verso: 'Siete in pari', frase: `In pari con ${otherName}` }
 
   return (
     <div className="hero hero-balance">
       <span className="hero-label">Il vostro saldo</span>
-      <Link to="/saldo" className="hero-balance-link" aria-label={`${frase}. Vai al saldo`}>
-        <span className={`hero-balance-value ${tono}`} aria-hidden="true">
+      <Link to="/saldo" className="hero-balance-link" aria-label={`${stato.frase}. Vai al saldo`}>
+        <span className={`hero-balance-value ${stato.tono}`} aria-hidden="true">
           {cents === 0 ? 'Pari' : `${cents > 0 ? '+' : '−'}${cifra}`}
         </span>
       </Link>
-      {/*
-        Chiudere il conto da qui, con le stesse parole della pagina Saldo: è il
-        gesto che si fa **guardando** il saldo, e mandarlo in un'altra pagina
-        costava due tocchi ogni volta. Compare nei due versi, come là: se lei ti
-        ha pagato, il rimborso va da lei a te. → ADR-0060, ADR-0019
-      */}
-      {cents === 0 ? null : (
-        <button type="button" className="btn btn-sm hero-balance-btn" onClick={onSettle}>
-          Saldato tutto ({cifra})
-        </button>
-      )}
+      <div className="hero-balance-foot">
+        <span className="hero-hint">{stato.verso}</span>
+        {/*
+          **Il pulsante appare a chi deve pagare**, e a nessun altro.
+          «Saldare» è un gesto che si compie pagando: offrirlo a chi deve
+          incassare gli chiede di dichiarare un pagamento che non ha fatto lui.
+          Per un giro è comparso nei due versi — come nella pagina Saldo, dove
+          però la frase «il rimborso va da X a Y» toglie l'ambiguità — e Alessio
+          l'ha respinto vedendolo: «devo ricevere, non dare, quindi il bottone
+          non dovrebbe apparire a me». La condizione arriva da `settlementDirection`,
+          la stessa che poi costruisce il rimborso.
+
+          Conseguenza accettata: quando è l'altra persona a pagarti, il rimborso
+          lo registra lei dal suo telefono, dove il pulsante c'è. Oppure tu dalla
+          pagina Saldo, che offre tutti e due i versi. → ADR-0062, ADR-0060
+        */}
+        {devePagare ? (
+          <button type="button" className="btn btn-sm hero-balance-btn" onClick={onSettle}>
+            Saldato tutto ({cifra})
+          </button>
+        ) : null}
+      </div>
     </div>
   )
 }
@@ -140,7 +179,12 @@ export function MarginMeter({
   /** Lo stesso mese dell'anno prima: unico riferimento stagionale che i dati permettono. */
   lastYear: { month: MonthKey; total: number } | null
   /** Il saldo con l'altra persona, già girato dal punto di vista di chi guarda. */
-  balance: { owedToMe: number; otherName: string; onSettle: () => void } | null
+  balance: {
+    owedToMe: number
+    otherName: string
+    devePagare: boolean
+    onSettle: () => void
+  } | null
   onToggleHidden: () => void
 }): ReactNode {
   const hidden = view.income === null
