@@ -217,12 +217,22 @@ export const EMPTY_AVERAGE: Average = { perMonth: 0, fixedPerMonth: 0, variableP
 /**
  * Media storica. Il mese in corso va escluso: è parziale e abbasserebbe la media
  * proprio mentre la si usa per giudicarlo.
+ *
+ * `until` esclude i mesi **futuri**, e non è un'ipotesi di scuola: una sola
+ * spesa datata per sbaglio nel mese prossimo allunga la serie fino a lì, e
+ * `fillMonthGaps` riempie il buco con mesi a zero che entrano nella media come
+ * se fossero stati vissuti. Misurato sui dati veri il 27/08/2026 — un modem da
+ * 5 € datato 15 settembre — la media delle fisse scendeva da 487,61 € a
+ * 466,41 €: ventun euro di soldi che sembravano spendibili e non lo erano. Un
+ * mese che non è ancora arrivato non è un mese leggero. → ADR-0055
  */
 export function averageMonthly(
   series: readonly MonthTotal[],
-  opts: { excludeMonth?: MonthKey; lastN?: number } = {},
+  opts: { excludeMonth?: MonthKey; until?: MonthKey; lastN?: number } = {},
 ): Average {
   let rows = fillMonthGaps(series)
+  const until = opts.until
+  if (until !== undefined) rows = rows.filter((r) => r.month <= until)
   if (opts.excludeMonth) rows = rows.filter((r) => r.month !== opts.excludeMonth)
   if (opts.lastN && rows.length > opts.lastN) rows = rows.slice(-opts.lastN)
   if (rows.length === 0) return EMPTY_AVERAGE
@@ -295,15 +305,23 @@ export function tripBreakdown(scope: readonly Expense[], person: PersonId): Cate
   return sliceBy(scope, person, (e) => e.subcategory ?? e.category)
 }
 
-/** Media mensile per categoria, sui mesi osservati (mese escluso a parte). */
+/**
+ * Media mensile per categoria, sui mesi osservati (mese escluso a parte).
+ *
+ * `until` per la stessa ragione di `averageMonthly`: qui il mese futuro non
+ * porta spesa ma allunga il divisore, quindi **tutte** le categorie risultano
+ * più leggere della verità.
+ */
 export function averageByCategory(
   visible: readonly Expense[],
   person: PersonId,
-  opts: { excludeMonth?: MonthKey } = {},
+  opts: { excludeMonth?: MonthKey; until?: MonthKey } = {},
 ): Map<string, number> {
-  const scope = opts.excludeMonth
-    ? visible.filter((e) => monthKeyOf(e.date) !== opts.excludeMonth)
-    : [...visible]
+  const until = opts.until
+  const scope = visible.filter(
+    (e) =>
+      monthKeyOf(e.date) !== opts.excludeMonth && (until === undefined || monthKeyOf(e.date) <= until),
+  )
   const months = fillMonthGaps(monthlySeries(scope, person)).length
   const out = new Map<string, number>()
   if (months === 0) return out
@@ -548,12 +566,20 @@ export function yearlyTotals(series: readonly MonthTotal[]): YearTotal[] {
 /**
  * Il mese più caro e il più leggero. Il mese in corso si esclude: è parziale, e
  * vincerebbe come «più leggero» ogni primo del mese.
+ *
+ * `until` per la stessa ragione, un passo più in là: `count > 0` scarta i mesi
+ * riempiti a zero ma **non** un mese futuro che contiene davvero una spesa
+ * datata in avanti. Sui dati veri il 27/08/2026 il mese più leggero risultava
+ * «settembre 2026, 2,50 €» — un mese che non era ancora cominciato. → ADR-0055
  */
 export function extremeMonths(
   series: readonly MonthTotal[],
-  opts: { excludeMonth?: MonthKey } = {},
+  opts: { excludeMonth?: MonthKey; until?: MonthKey } = {},
 ): { highest: MonthTotal | null; lowest: MonthTotal | null } {
-  const rows = series.filter((r) => r.month !== opts.excludeMonth && r.count > 0)
+  const until = opts.until
+  const rows = series.filter(
+    (r) => r.month !== opts.excludeMonth && r.count > 0 && (until === undefined || r.month <= until),
+  )
   if (rows.length === 0) return { highest: null, lowest: null }
   let highest = rows[0]!
   let lowest = rows[0]!
@@ -587,12 +613,20 @@ export interface FixedShare {
  */
 export function fixedShareSeries(
   series: readonly MonthTotal[],
-  opts: { excludeMonth?: MonthKey } = {},
+  opts: { excludeMonth?: MonthKey; until?: MonthKey } = {},
 ): FixedShare {
   /* Un mese a zero non ha una quota di fisse: la divisione non esiste, e
-     inventarle uno zero direbbe «quel mese era tutto discrezionale». */
+     inventarle uno zero direbbe «quel mese era tutto discrezionale». E un mese
+     futuro con dentro una spesa datata per sbaglio entrerebbe allo 0% di fisse,
+     che è la stessa bugia con un'altra faccia. → ADR-0055 */
+  const until = opts.until
   const points = series
-    .filter((row) => toCents(row.total) > 0 && row.month !== opts.excludeMonth)
+    .filter(
+      (row) =>
+        toCents(row.total) > 0 &&
+        row.month !== opts.excludeMonth &&
+        (until === undefined || row.month <= until),
+    )
     .map((row) => ({ month: row.month, share: toCents(row.fixed) / toCents(row.total) }))
   if (points.length === 0) return { points: [], average: 0, highest: null, lowest: null }
   let highest = points[0]!

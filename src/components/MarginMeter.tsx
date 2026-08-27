@@ -7,9 +7,16 @@
  * perché un numero più piccolo di quello che ti aspetti deve poter essere
  * verificato riga per riga. → ADR-0015
  *
- * Il misuratore è un rapporto contro un limite, e il limite è il fondo
- * discrezionale del mese, non le entrate: barra piena = variabili già spese,
- * tacca = dove arrivi a questo ritmo.
+ * La barra è il **mese intero**: entrate da un capo all'altro, e dentro, in
+ * fila, i soldi nell'ordine in cui smettono di essere tuoi — risparmio, fisse
+ * arrivate, fisse ancora attese (tratteggiate), variabili spese, e in coda ciò
+ * che resta. Prima era un rapporto contro il solo fondo discrezionale, e
+ * risparmio e fisse non ci stavano dentro per costruzione: l'affitto sembrava
+ * arrivare dal nulla il giorno che lo si registrava. → ADR-0057
+ *
+ * Accanto al numero grande c'è il saldo con l'altra persona, che è una
+ * grandezza **diversa** e non entra in nessuno di questi conti: le spese
+ * contano già solo la propria quota. → ADR-0058, ADR-0019
  *
  * Con i guadagni oscurati i campi segreti arrivano già a `null` da
  * `marginView()`: qui non c'è nessun numero da velare, e la barra diventa
@@ -17,10 +24,11 @@
  */
 
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 
 import { monthLabel, type MonthKey } from '../domain/dates'
-import type { MarginView } from '../domain/income'
-import { formatEuro } from '../domain/money'
+import { marginBar, type MarginSegmentKey, type MarginView } from '../domain/income'
+import { formatEuro, toCents } from '../domain/money'
 import type { Projection } from '../domain/selectors'
 import { StatusChip, VEIL } from './ui'
 
@@ -30,10 +38,28 @@ function Money({ value, whole = false }: { value: number | null; whole?: boolean
   return <>{formatEuro(value, whole ? { decimals: 0 } : {})}</>
 }
 
-function Row({ label, value, sub }: { label: string; value: ReactNode; sub?: string }): ReactNode {
+/**
+ * Una riga del conto, col pallino del segmento a cui corrisponde nella barra.
+ *
+ * Il pallino **è** la legenda: mettere sotto la barra un elenco di colori
+ * duplicherebbe queste stesse righe, che i numeri li portano già. Chi guarda un
+ * pezzo di barra e vuole sapere quanto vale scende con l'occhio e lo trova.
+ */
+function Row({
+  label,
+  value,
+  sub,
+  dot,
+}: {
+  label: string
+  value: ReactNode
+  sub?: string
+  dot?: string
+}): ReactNode {
   return (
     <div className="kv-row">
       <dt>
+        {dot ? <span className={`kv-dot ${dot}`} aria-hidden="true" /> : null}
         {label}
         {sub ? <span className="kv-tag">{sub}</span> : null}
       </dt>
@@ -42,16 +68,45 @@ function Row({ label, value, sub }: { label: string; value: ReactNode; sub?: str
   )
 }
 
+/**
+ * Il saldo con l'altra persona, accanto al numero grande.
+ *
+ * Non segue il mese scelto: è un totale corrente, e lo dice. Sta qui perché è
+ * la seconda domanda che ci si fa aprendo l'app — «e con lei come sto?» — e
+ * mandarla in un'altra pagina per un numero solo costava due tocchi ogni
+ * volta. → ADR-0058
+ */
+function BalanceTag({ owedToMe, otherName }: { owedToMe: number; otherName: string }): ReactNode {
+  const cents = toCents(owedToMe)
+  const tono = cents > 0 ? 'is-good' : cents < 0 ? 'is-bad' : 'is-even'
+  return (
+    <Link to="/saldo" className="balance-tag">
+      <span className="balance-tag-label">Con {otherName}</span>
+      <span className={`balance-tag-value ${tono}`}>
+        {cents === 0
+          ? 'Pari'
+          : `${cents > 0 ? '+' : '−'}${formatEuro(Math.abs(owedToMe), { decimals: 0 })}`}
+      </span>
+      <span className="balance-tag-hint">
+        {cents > 0 ? 'te li deve' : cents < 0 ? 'glieli devi' : 'nessun debito'}
+      </span>
+    </Link>
+  )
+}
+
 export function MarginMeter({
   view,
   projection,
   lastYear,
+  balance,
   onToggleHidden,
 }: {
   view: MarginView
   projection: Projection
   /** Lo stesso mese dell'anno prima: unico riferimento stagionale che i dati permettono. */
   lastYear: { month: MonthKey; total: number } | null
+  /** Il saldo con l'altra persona, già girato dal punto di vista di chi guarda. */
+  balance: { owedToMe: number; otherName: string } | null
   onToggleHidden: () => void
 }): ReactNode {
   const hidden = view.income === null
@@ -70,12 +125,16 @@ export function MarginMeter({
     )
   }
 
-  const budget = view.discretionaryBudget
-  const pct = (part: number): number | null =>
-    budget === null || budget <= 0 ? null : Math.min(100, Math.max(0, (part / budget) * 100))
-  const fillPct = pct(view.variableSpent)
-  const projectionPct = pct(projection.projectedVariable)
   const stillOpen = projection.method === 'stimato'
+  const bar = marginBar(view, {
+    projectedVariable: stillOpen ? projection.projectedVariable : null,
+  })
+  /* I pallini sono la legenda **della barra**: senza barra non indicano niente,
+     e una legenda che rimanda al nulla è solo rumore. Prendono la tinta dalla
+     stessa funzione dei segmenti, così «le variabili seguono il semaforo» resta
+     scritto una volta sola — e una chiave sbagliata non compila. */
+  const dot = (key: MarginSegmentKey): string | undefined =>
+    bar === null ? undefined : segmentTint(key, view.status)
 
   return (
     <div className="stack" style={{ gap: 12 }}>
@@ -111,7 +170,10 @@ export function MarginMeter({
             )}
           </span>
         </div>
-        <StatusChip status={view.status} />
+        <div className="hero-aside">
+          <StatusChip status={view.status} />
+          {balance ? <BalanceTag {...balance} /> : null}
+        </div>
       </div>
 
       <div className="meter">
@@ -119,36 +181,54 @@ export function MarginMeter({
           className="meter-track"
           role="meter"
           aria-valuemin={0}
-          aria-valuemax={budget ?? undefined}
-          aria-valuenow={hidden ? undefined : view.variableSpent}
+          aria-valuemax={bar?.total ?? undefined}
+          aria-valuenow={bar?.committed}
           aria-label={
-            hidden
-              ? 'Quota del fondo del mese già spesa, nascosta'
-              : 'Quota del fondo del mese già spesa'
+            bar === null
+              ? 'Quota delle entrate del mese già impegnata, nascosta'
+              : 'Quota delle entrate del mese già impegnata'
           }
         >
-          {hidden ? (
-            /* Neutra e piena: un riempimento parziale racconterebbe la percentuale. */
+          {bar === null ? (
+            /* Neutra e piena: le proporzioni **sono** i numeri, e a guadagni
+               oscurati `marginBar` non compone niente proprio per questo. */
             <div className="meter-fill is-hidden" style={{ width: '100%' }} />
           ) : (
             <>
-              <div className={`meter-fill is-${view.status}`} style={{ width: `${fillPct ?? 0}%` }} />
-              {stillOpen && projectionPct !== null ? (
+              {bar.segments.map((segment) => (
+                <div
+                  key={segment.key}
+                  className={`meter-seg ${segmentTint(segment.key, view.status)}`}
+                  style={{ width: `${String(segment.pct)}%` }}
+                />
+              ))}
+              {bar.projectionPct !== null ? (
                 <div
                   className="meter-projection"
-                  style={{ left: `calc(${projectionPct}% - 1px)` }}
-                  title={`A questo ritmo spendi ${formatEuro(projection.projectedVariable)} di variabili`}
+                  /* `clamp` perché la traccia taglia ciò che sborda: a ritmo da
+                     sforamento la tacca finiva **fuori** dal bordo e spariva,
+                     proprio nel mese in cui serve vederla. */
+                  style={{
+                    left: `clamp(0px, calc(${String(bar.projectionPct)}% - 1px), calc(100% - 2px))`,
+                  }}
+                  title={`A questo ritmo chiudi il mese a ${formatEuro(projection.projected)}`}
                 />
               ) : null}
             </>
           )}
         </div>
-        <div className="meter-scale">
-          <span>{formatEuro(view.variableSpent, { decimals: 0 })} di variabili</span>
-          <span>
-            <Money value={budget} whole /> il fondo del mese
-          </span>
-        </div>
+        <p className="meter-note">
+          {view.fixedStillDue > 0 ? (
+            <>
+              Il tratteggio sono{' '}
+              <strong>{formatEuro(view.fixedStillDue, { decimals: 0 })}</strong> di fisse che devono
+              ancora arrivare — affitto, bollette, abbonamenti. Sono già tolte dal numero grande:
+              quando le registri, il tratteggio diventa pieno e lo spendibile non si muove.
+            </>
+          ) : (
+            'Tutte le fisse attese del mese sono già arrivate.'
+          )}
+        </p>
       </div>
 
       {/* Il conto per intero: il numero grande è più piccolo di quello che ti
@@ -157,10 +237,12 @@ export function MarginMeter({
         <Row label="Entrate del mese" value={<Money value={view.income} />} />
         <Row
           label="Da mettere da parte"
+          dot={dot('risparmio')}
           value={<>− <Money value={view.savingsTarget} /></>}
         />
         <Row
           label="Spese fisse attese"
+          dot={dot('fisse')}
           sub={
             view.fixedStillDue > 0
               ? `di cui ${formatEuro(view.fixedStillDue, { decimals: 0 })} non ancora arrivate`
@@ -168,8 +250,12 @@ export function MarginMeter({
           }
           value={<>− {formatEuro(view.expectedFixed)}</>}
         />
-        <Row label="Variabili già spese" value={<>− {formatEuro(view.variableSpent)}</>} />
-        <Row label="Puoi ancora spendere" value={<Money value={view.spendable} />} />
+        <Row
+          label="Variabili già spese"
+          dot={dot('variabili')}
+          value={<>− {formatEuro(view.variableSpent)}</>}
+        />
+        <Row label="Puoi ancora spendere" dot={dot('resto')} value={<Money value={view.spendable} />} />
       </dl>
 
       <div className="stack" style={{ gap: 4, fontSize: '0.88rem', color: 'var(--ink-2)' }}>
@@ -196,4 +282,16 @@ export function MarginMeter({
       </div>
     </div>
   )
+}
+
+/**
+ * I modificatori di un segmento, per la barra e per il pallino della sua riga.
+ *
+ * Solo le variabili prendono la tinta del semaforo: sono la parte su cui si può
+ * ancora incidere, e l'unica il cui colore deve poter cambiare guardandola. Una
+ * funzione sola per tutti e due i posti, perché sono la stessa decisione e
+ * scriverla due volte vuol dire vederle divergere.
+ */
+function segmentTint(key: MarginSegmentKey, status: MarginView['status']): string {
+  return key === 'variabili' ? `is-variabili is-${status}` : `is-${key}`
 }
