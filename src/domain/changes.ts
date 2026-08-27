@@ -13,6 +13,7 @@
 
 import { OP_WORDS } from '../data/outbox'
 import type { Op } from '../data/outbox'
+import type { ExpenseDelta } from './diff'
 
 /**
  * Il suffisso che l'app aggiunge a ogni suo messaggio di commit.
@@ -78,6 +79,10 @@ export interface Change {
   groups: ChangeGroup[]
   /** Con cosa confrontare per sapere quali spese ha toccato. */
   parent: string | null
+  /** Quante cose ha toccato: il contributo di questa riga al numero sul pallino. */
+  count: number
+  /** Le operazioni dentro, per scriverne le frasi senza rileggere il messaggio. */
+  parts: SummaryPart[]
 }
 
 /**
@@ -93,23 +98,87 @@ const KIND_OF_WORDS = (() => {
   return map
 })()
 
+/** Un pezzo di messaggio riconosciuto: «2 spese aggiunte» → `create` ×2. */
+export interface SummaryPart {
+  kind: Op['kind']
+  count: number
+}
+
 /**
- * I gruppi toccati da un messaggio come «2 spese aggiunte, 1 prezzo rilevato».
+ * Le operazioni dentro un messaggio come «2 spese aggiunte, 1 prezzo rilevato».
  *
  * Una parte che non si riconosce viene **ignorata**, non fatta diventare un
- * gruppo di ripiego: un messaggio scritto a mano che finisse per caso con il
- * suffisso non deve inventarsi una categoria. Se nessuna parte si riconosce il
- * risultato è vuoto, e chi chiama decide cosa farne.
+ * ripiego: un messaggio scritto a mano che finisse per caso con il suffisso non
+ * deve inventarsi un'operazione. Se nessuna parte si riconosce il risultato è
+ * vuoto, e chi chiama decide cosa farne.
  */
-export function groupsOfSummary(summary: string): ChangeGroup[] {
-  const found = new Set<ChangeGroup>()
-  for (const part of summary.split(',')) {
-    const match = /^\s*\d+\s+(.+?)\s*$/.exec(part)
+export function partsOfSummary(summary: string): SummaryPart[] {
+  const out: SummaryPart[] = []
+  for (const chunk of summary.split(',')) {
+    const match = /^\s*(\d+)\s+(.+?)\s*$/.exec(chunk)
     if (!match) continue
-    const kind = KIND_OF_WORDS.get(match[1]!)
-    if (kind) found.add(GROUP_OF[kind])
+    const kind = KIND_OF_WORDS.get(match[2]!)
+    if (kind) out.push({ kind, count: Number(match[1]) })
   }
+  return out
+}
+
+export function groupsOfSummary(summary: string): ChangeGroup[] {
+  const found = new Set(partsOfSummary(summary).map((part) => GROUP_OF[part.kind]))
   return CHANGE_GROUPS.filter((group) => found.has(group))
+}
+
+/**
+ * Quante cose ha toccato un commit: è il numero sulla campanella.
+ *
+ * Si ricava **dal messaggio**, quindi si sa senza scaricare il dettaglio. È la
+ * ragione per cui il pallino può contare le spese e non i salvataggi senza
+ * costare una richiesta: «3 spese aggiunte» sono tre, e lo dice il testo.
+ */
+export function countOfSummary(summary: string): number {
+  return partsOfSummary(summary).reduce((total, part) => total + part.count, 0)
+}
+
+/** Le operazioni che riguardano una spesa: per queste il dettaglio esiste. */
+export const EXPENSE_KINDS: ReadonlySet<Op['kind']> = new Set<Op['kind']>([
+  'create',
+  'update',
+  'delete',
+  'patch',
+])
+
+/**
+ * Il verbo, per scriverci una frase invece di un'etichetta.
+ *
+ * `OP_WORDS` dice «spesa aggiunta», che va bene in un messaggio di commit e
+ * male in una notifica: «Federica ha aggiunto una spesa» si legge, «Federica ·
+ * 1 spesa aggiunta» si decifra. Sono due registri diversi della stessa cosa, e
+ * questa è la seconda coniugazione — non una duplicazione, una traduzione. Il
+ * test di parità copre anche questa tabella. → ADR-0052
+ *
+ * `{n}` si sostituisce col numero. Dove la lingua non distingue, le due voci
+ * coincidono.
+ */
+export const PHRASES: Record<Op['kind'], [string, string]> = {
+  create: ['ha aggiunto una spesa', 'ha aggiunto {n} spese'],
+  update: ['ha corretto una spesa', 'ha corretto {n} spese'],
+  delete: ['ha eliminato una spesa', 'ha eliminato {n} spese'],
+  patch: ['ha annotato una spesa', 'ha annotato {n} spese'],
+  tricount: ['ha creato un tricount', 'ha creato {n} tricount'],
+  'tricount-edit': ['ha modificato un tricount', 'ha modificato {n} tricount'],
+  settle: ['ha registrato un rimborso', 'ha registrato {n} rimborsi'],
+  unsettle: ['ha annullato un rimborso', 'ha annullato {n} rimborsi'],
+  price: ['ha rilevato un prezzo', 'ha rilevato {n} prezzi'],
+  'price-delete': ['ha eliminato una rilevazione', 'ha eliminato {n} rilevazioni'],
+  categories: ['ha aggiornato le categorie', 'ha aggiornato le categorie'],
+  recategorize: ['ha svuotato una categoria', 'ha svuotato {n} categorie'],
+  income: ['ha aggiornato le entrate', 'ha aggiornato le entrate'],
+}
+
+/** «Federica ha rilevato 2 prezzi». Il soggetto lo mette chi chiama. */
+export function phraseOf(part: SummaryPart): string {
+  const [one, many] = PHRASES[part.kind]
+  return part.count === 1 ? one : many.replace('{n}', String(part.count))
 }
 
 export interface ParseOptions {
@@ -146,7 +215,17 @@ export function parseChanges(commits: readonly RawCommit[], options: ParseOption
     const groups = groupsOfSummary(summary)
     if (!groups.some((group) => wanted.has(group))) continue
 
-    out.push({ sha: commit.sha, at: commit.date, who, summary, groups, parent: commit.parent })
+    const parts = partsOfSummary(summary)
+    out.push({
+      sha: commit.sha,
+      at: commit.date,
+      who,
+      summary,
+      groups,
+      parent: commit.parent,
+      parts,
+      count: countOfSummary(summary),
+    })
   }
   return out.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
 }
@@ -168,4 +247,92 @@ export function unseenSince(changes: readonly Change[], seenAt: string | undefin
 export function badgeLabel(count: number): string {
   if (count <= 0) return ''
   return count > 9 ? '9+' : String(count)
+}
+
+// ─────────────────────── da commit a righe di notifica ───────────────────────
+
+/**
+ * Una riga della campanella, in forma strutturale: il testo lo scrive chi
+ * disegna, che conosce i nomi delle persone e delle categorie.
+ *
+ * Sta **qui** e non nel componente perché il numero sul pallino conta le righe:
+ * se l'elenco e il conteggio nascessero in due posti diversi, prima o poi
+ * direbbero cose diverse — e sarebbe il pallino a mentire, promettendo righe che
+ * non ci sono. Una definizione sola, e il conteggio è la sua lunghezza.
+ * → ADR-0052
+ */
+export type NoticeItem =
+  /** Una spesa vera, con titolo e importo: il dettaglio è arrivato. */
+  | { kind: 'delta'; key: string; sha: string; at: string; who: string; delta: ExpenseDelta }
+  /**
+   * Ciò che non è (o non è ancora) una spesa con un nome: le altre operazioni,
+   * le spese di cui il dettaglio non è arrivato, e quelle che restano fuori dai
+   * tricount di chi guarda.
+   */
+  | {
+      kind: 'summary'
+      key: string
+      sha: string
+      at: string
+      who: string
+      part: SummaryPart
+      /** Il dettaglio sta ancora arrivando: la frase è generica per ora. */
+      pending?: boolean
+      /** Il dettaglio non si è potuto leggere: toccando si riprova. */
+      failed?: boolean
+    }
+
+/** Cosa si sa del dettaglio di un commit. `deltas` è **già filtrato** per visibilità. */
+export interface NewsDetailView {
+  deltas?: readonly ExpenseDelta[]
+  failed?: boolean
+}
+
+/**
+ * Le righe della campanella.
+ *
+ * Una riga per **cosa**, non per salvataggio: tre spese salvate insieme sono un
+ * commit solo e tre righe. Le operazioni che non toccano una spesa (prezzi,
+ * tricount, categorie) restano una riga ciascuna, e la riga dichiara il proprio
+ * numero — «ha rilevato 2 prezzi» sono due cose in una riga, e si legge.
+ *
+ * **Ciò che sta fuori dai tricount di chi guarda non lascia traccia**: né una
+ * riga, né un numero. Non è una svista ed è una scelta di Alessio, contro la
+ * prima versione che ne mostrava una che diceva «e 2 fuori dai tuoi tricount»:
+ * una notifica per qualcosa che non ti riguarda è rumore, e sapere *che* è
+ * successo qualcosa nel compartimento personale dell'altra persona è già più di
+ * quanto serva. La separazione qui è più forte che altrove nell'app.
+ *
+ * Il prezzo, dichiarato: finché il dettaglio non è arrivato non si può sapere
+ * che un commit era tutto personale, quindi la riga generica compare e poi
+ * sparisce. La finestra è quella di una richiesta, e il caricamento parte da
+ * solo appena la lista dei commit atterra. → ADR-0052, ADR-0039
+ */
+export function noticesOf(
+  changes: readonly Change[],
+  detailOf: (sha: string) => NewsDetailView,
+): NoticeItem[] {
+  const out: NoticeItem[] = []
+  for (const change of changes) {
+    const { deltas, failed } = detailOf(change.sha)
+    const base = { sha: change.sha, at: change.at, who: change.who }
+
+    for (const part of change.parts) {
+      if (EXPENSE_KINDS.has(part.kind) && deltas !== undefined) continue
+      out.push({
+        kind: 'summary',
+        key: `${change.sha}-${part.kind}`,
+        ...base,
+        part,
+        pending: EXPENSE_KINDS.has(part.kind) && failed !== true ? true : undefined,
+        failed: EXPENSE_KINDS.has(part.kind) && failed === true ? true : undefined,
+      })
+    }
+
+    for (const delta of deltas ?? []) {
+      out.push({ kind: 'delta', key: `${change.sha}-${delta.expense.id}`, ...base, delta })
+    }
+
+  }
+  return out
 }

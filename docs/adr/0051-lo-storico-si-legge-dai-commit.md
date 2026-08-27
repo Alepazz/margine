@@ -1,6 +1,6 @@
 # ADR-0051: Lo storico delle novità si legge dai commit, non da un campo nei dati
 
-**Status:** accepted · **Date:** 2026-08-26
+**Status:** accepted — le scelte di *presentazione* (una riga per commit; il segnalibro mosso dall'apertura) sono superate da ADR-0052 · **Date:** 2026-08-26
 
 ## Context
 

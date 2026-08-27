@@ -18,13 +18,15 @@ import {
 import { currentMonthKey, monthKeyOf, todayIso, type MonthKey } from '../domain/dates'
 import {
   CHANGE_GROUPS,
+  noticesOf,
   parseChanges,
   unseenSince,
   type Change,
   type ChangeGroup,
+  type NoticeItem,
   type RawCommit,
 } from '../domain/changes'
-import { diffExpenses, type ExpenseDelta } from '../domain/diff'
+import { diffExpenses, visibleDeltas, type ExpenseDelta } from '../domain/diff'
 import { DEFAULT_VIEW, monthsOf, type ViewOptions } from '../domain/selectors'
 import type {
   Annotation,
@@ -87,6 +89,17 @@ const NEWS_SEEN_KEY = 'margine.news.seenAt.v1'
 const NEWS_GROUPS_KEY = 'margine.news.groups.v1'
 /* Non più di una rilettura al minuto: passare fra le app non è un evento. */
 const REFRESH_EVERY_MS = 60_000
+/**
+ * Quante novità caricano il contenuto da sole.
+ *
+ * Sta **nello store** e non nel foglio perché il numero sul pallino conta le
+ * righe, e le righe delle spese esistono solo se il dettaglio è stato letto:
+ * aspettare l'apertura della campanella vorrebbe dire mostrare un numero
+ * sbagliato fino a quel momento. Oltre il tetto le righe restano quelle
+ * generiche, che contano una per operazione — un'approssimazione dichiarata,
+ * che si presenta solo dopo una lunga assenza.
+ */
+const MAX_AUTO_DETAIL = 5
 /**
  * Quante versioni decifrate tenere in memoria.
  *
@@ -170,7 +183,13 @@ export interface StoreApi {
   deletePrice: (priceId: string) => void
   syncNow: () => Promise<void>
   reload: () => void
-  /** Segna letto fino all'ultima novità conosciuta. Lo chiama solo la campanella. */
+  /**
+   * Svuota la campanella: da qui in poi contiene solo ciò che arriva dopo.
+   *
+   * Lo chiama **il pulsante**, non l'apertura del foglio: aprire per leggere e
+   * dichiarare letto sono due gesti diversi, e confonderli fa sparire una
+   * notifica mentre la stai guardando. → ADR-0052
+   */
   markNewsSeen: () => void
   setNewsGroups: (groups: readonly ChangeGroup[]) => void
   /** Chiede il dettaglio di una novità: cosa ha toccato quel commit. */
@@ -185,9 +204,11 @@ export type NewsDetail =
   | { state: 'done'; deltas: ExpenseDelta[] }
 
 export interface NewsState {
-  /** Tutte le novità visibili, dalla più recente. */
+  /** I commit non ancora svuotati, dal più recente. */
   changes: Change[]
-  /** Quante non ho ancora visto: è il numero sul pallino. */
+  /** Le righe da mostrare: una per cosa, non per salvataggio. */
+  notices: NoticeItem[]
+  /** Il numero sul pallino: **è** la lunghezza di `notices`, non una stima. */
   unseen: number
   /** I gruppi accesi in Impostazioni. */
   groups: ChangeGroup[]
@@ -1078,6 +1099,58 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
 
   const months = useMemo(() => (dataset ? monthsOf(dataset.expenses) : []), [dataset])
 
+  /* Filtrato una volta: serve sia come elenco sia come conteggio del pallino. */
+  const daLeggere = useMemo(() => unseenSince(changes, newsSeenAt), [changes, newsSeenAt])
+
+  /**
+   * Le righe della campanella, composte **qui** e non nel foglio.
+   *
+   * Il numero sul pallino è la loro lunghezza, quindi elenco e conteggio devono
+   * nascere nello stesso posto: prodotti in due punti diversi, prima o poi
+   * direbbero cose diverse e sarebbe il pallino a mentire. → ADR-0052
+   *
+   * La visibilità si applica qui, dov'è nota la persona che guarda: ciò che sta
+   * nei tricount di cui non sei membro non diventa una riga con un titolo, ma
+   * **si conta lo stesso** in una riga che dice quante sono.
+   */
+  const notices = useMemo(
+    () =>
+      dataset === undefined
+        ? []
+        : noticesOf(daLeggere, (sha) => {
+            const entry = details.get(sha)
+            if (entry?.state === 'done') {
+              return { deltas: visibleDeltas(entry.deltas, dataset.tricounts, view.person) }
+            }
+            return { failed: entry?.state === 'failed' }
+          }),
+    [daLeggere, dataset, details, view.person],
+  )
+
+  /*
+   * Il contenuto delle novità si carica da sé, senza aspettare che si apra la
+   * campanella: è ciò che rende esatto il numero sul pallino.
+   *
+   * In fila e non in parallelo — novità consecutive condividono i file e la
+   * cache per sha se ne accorge solo se le richieste non si accavallano — e
+   * saltando ciò che ha già uno stato, altrimenti ogni rilettura della lista
+   * rilancerebbe anche i tentativi falliti.
+   */
+  useEffect(() => {
+    if (status !== 'ready') return
+    let cancelled = false
+    void (async () => {
+      for (const change of daLeggere.slice(0, MAX_AUTO_DETAIL)) {
+        if (cancelled) return
+        if (detailCache.current.has(change.sha)) continue
+        await loadDetail(change)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [daLeggere, loadDetail, status])
+
   const api = useMemo<StoreApi>(
     () => ({
       status,
@@ -1090,8 +1163,15 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       sync: { ...sync, pending: outbox.pending.length },
       hasStoredPassphrase,
       news: {
-        changes,
-        unseen: unseenSince(changes, newsSeenAt).length,
+        /*
+         * **Solo le non lette.** La campanella non è un registro: contiene ciò
+         * che non hai ancora svuotato, e dopo il pulsante è vuota finché non
+         * arriva altro. Lo storico si legge da `git log`, che è dove sta.
+         * → ADR-0052
+         */
+        changes: daLeggere,
+        notices,
+        unseen: notices.length,
         groups: newsGroups,
         loading: newsLoading,
         knowsMe: myLogin !== undefined,
@@ -1133,6 +1213,8 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       newsGroups,
       newsLoading,
       myLogin,
+      daLeggere,
+      notices,
       loadDetail,
       details,
       markNewsSeen,

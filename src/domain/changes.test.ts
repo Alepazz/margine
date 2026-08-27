@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest'
 
 import { OP_WORDS, describeOps } from '../data/outbox'
+import type { ExpenseDelta } from './diff'
 import type { Op, OutboxEntry } from '../data/outbox'
 import {
   APP_COMMIT_SUFFIX,
+  EXPENSE_KINDS,
+  PHRASES,
   badgeLabel,
+  countOfSummary,
   groupsOfSummary,
+  noticesOf,
   parseChanges,
+  partsOfSummary,
+  phraseOf,
   unseenSince,
   type RawCommit,
 } from './changes'
@@ -42,6 +49,23 @@ describe('parità col vocabolario delle operazioni', () => {
     }
   })
 
+  /*
+   * `PHRASES` è la seconda coniugazione dello stesso vocabolario: se un tipo
+   * nuovo arriva in `OP_WORDS` senza una frase, la notifica direbbe «Federica
+   * ha fatto undefined». Il tipo lo impedisce a compilazione, questo lo dice
+   * anche a chi legge — e prova che la frase non resti vuota.
+   */
+  it('ogni tipo ha una frase, al singolare e al plurale', () => {
+    for (const kind of Object.keys(OP_WORDS) as Op['kind'][]) {
+      expect(phraseOf({ kind, count: 1 }), `singolare di ${kind}`).toMatch(/\S/)
+      const tre = phraseOf({ kind, count: 3 })
+      expect(tre, `plurale di ${kind}`).toMatch(/\S/)
+      expect(tre, `«{n}» non sostituito in ${kind}`).not.toContain('{n}')
+      /* Dove la lingua distingue, il numero deve comparire. */
+      if (PHRASES[kind][0] !== PHRASES[kind][1]) expect(tre).toContain('3')
+    }
+  })
+
   /* Due tipi che condividessero una parola renderebbero la mappa inversa
      ambigua, e il gruppo dipenderebbe dall'ordine di dichiarazione. */
   it('nessuna parola appartiene a due tipi diversi', () => {
@@ -52,6 +76,47 @@ describe('parità col vocabolario delle operazioni', () => {
         seen.set(word, kind)
       }
     }
+  })
+})
+
+describe('quante cose ha toccato un commit', () => {
+  it('somma i pezzi del messaggio', () => {
+    expect(countOfSummary('3 spese aggiunte')).toBe(3)
+    expect(countOfSummary('2 spese aggiunte, 1 prezzo rilevato')).toBe(3)
+    expect(countOfSummary('1 spesa aggiunta, 2 spese corrette, 1 rimborso registrato')).toBe(4)
+  })
+
+  it('ciò che non riconosce non conta', () => {
+    expect(countOfSummary('3 rane cotte')).toBe(0)
+    expect(countOfSummary('3 rane cotte, 2 spese aggiunte')).toBe(2)
+  })
+
+  it('le parti portano tipo e numero', () => {
+    expect(partsOfSummary('2 spese aggiunte, 1 prezzo rilevato')).toEqual([
+      { kind: 'create', count: 2 },
+      { kind: 'price', count: 1 },
+    ])
+  })
+
+  it('le operazioni sulle spese sono quelle che hanno un dettaglio', () => {
+    expect([...EXPENSE_KINDS].sort()).toEqual(['create', 'delete', 'patch', 'update'])
+  })
+})
+
+describe('la frase', () => {
+  it('al singolare non porta numeri', () => {
+    expect(phraseOf({ kind: 'create', count: 1 })).toBe('ha aggiunto una spesa')
+  })
+
+  it('al plurale mette il numero', () => {
+    expect(phraseOf({ kind: 'price', count: 4 })).toBe('ha rilevato 4 prezzi')
+  })
+
+  /* «Le categorie» non ha singolare né plurale: la frase è la stessa e non
+     deve comparirci un numero appiccicato. */
+  it('dove la lingua non distingue, resta uguale', () => {
+    expect(phraseOf({ kind: 'categories', count: 1 })).toBe('ha aggiornato le categorie')
+    expect(phraseOf({ kind: 'categories', count: 3 })).toBe('ha aggiornato le categorie')
   })
 })
 
@@ -127,6 +192,13 @@ describe('quali commit diventano novità', () => {
   it('toglie il suffisso dal riassunto', () => {
     expect(parseChanges([commit()])[0]?.summary).toBe('1 spesa aggiunta')
   })
+
+  it('porta con sé quante cose ha toccato', () => {
+    const raw = [commit({ message: `2 spese aggiunte, 1 prezzo rilevato${APP_COMMIT_SUFFIX}` })]
+    const change = parseChanges(raw)[0]!
+    expect(change.count).toBe(3)
+    expect(change.parts).toHaveLength(2)
+  })
 })
 
 describe('cosa è ancora da vedere', () => {
@@ -162,5 +234,78 @@ describe('il pallino', () => {
   it('oltre nove dice 9+', () => {
     expect(badgeLabel(10)).toBe('9+')
     expect(badgeLabel(438)).toBe('9+')
+  })
+})
+
+describe('le righe della campanella', () => {
+  const spesa = (id: string, tricount = 'condivise'): ExpenseDelta => ({
+    kind: 'added',
+    expense: {
+      id,
+      date: '2026-08-26',
+      title: id,
+      amount: 10,
+      shares: { me: 5, partner: 5 },
+      paidBy: 'partner',
+      tricount,
+      category: 'cibo',
+      recurring: false,
+    },
+  })
+
+  const change = (message: string) =>
+    parseChanges([commit({ sha: 'c1', message: `${message}${APP_COMMIT_SUFFIX}` })])
+
+  it('senza dettaglio: una riga per operazione, generica', () => {
+    const righe = noticesOf(change('2 spese aggiunte, 1 prezzo rilevato'), () => ({}))
+    expect(righe).toHaveLength(2)
+    expect(righe.every((r) => r.kind === 'summary')).toBe(true)
+    expect(righe[0]).toMatchObject({ kind: 'summary', pending: true })
+    /* Un prezzo non ha un dettaglio da aspettare: non è «in arrivo». */
+    expect(righe[1]).toMatchObject({ kind: 'summary', pending: undefined })
+  })
+
+  it('col dettaglio: una riga per spesa, e la generica sparisce', () => {
+    const righe = noticesOf(change('2 spese aggiunte'), () => ({
+      deltas: [spesa('aperitivo'), spesa('benzina')],
+    }))
+    expect(righe.map((r) => r.kind)).toEqual(['delta', 'delta'])
+    expect(righe.map((r) => (r.kind === 'delta' ? r.delta.expense.id : ''))).toEqual([
+      'aperitivo',
+      'benzina',
+    ])
+  })
+
+  /*
+   * Ciò che sta fuori dai tricount di chi guarda non lascia **nessuna** traccia:
+   * né riga né numero. È una richiesta esplicita di Alessio contro la prima
+   * versione, che ne mostrava una a dire «e 1 fuori dai tuoi tricount» — una
+   * notifica per qualcosa che non ti riguarda è rumore, e che sia successo
+   * qualcosa nel personale dell'altra persona è già più di quanto serva sapere.
+   */
+  it('la spesa filtrata via non lascia traccia, nemmeno un conteggio', () => {
+    const righe = noticesOf(change('2 spese aggiunte'), () => ({ deltas: [spesa('aperitivo')] }))
+    expect(righe).toHaveLength(1)
+    expect(righe[0]).toMatchObject({ kind: 'delta' })
+  })
+
+  it('un salvataggio tutto fuori sparisce del tutto', () => {
+    expect(noticesOf(change('3 spese aggiunte'), () => ({ deltas: [] }))).toEqual([])
+  })
+
+  it('dettaglio fallito: resta la generica, e si sa che si può riprovare', () => {
+    const righe = noticesOf(change('1 spesa aggiunta'), () => ({ failed: true }))
+    expect(righe[0]).toMatchObject({ kind: 'summary', failed: true, pending: undefined })
+  })
+
+  /*
+   * Due prezzi sono **una** riga che dice «2», non due righe: il conteggio del
+   * pallino è la lunghezza di questo elenco, quindi vale 1. Ed è giusto — la
+   * riga dichiara il proprio numero e si legge.
+   */
+  it('le operazioni non-spesa restano una riga, e non aspettano dettagli', () => {
+    const righe = noticesOf(change('2 prezzi rilevati'), () => ({ deltas: [] }))
+    expect(righe).toHaveLength(1)
+    expect(righe[0]).toMatchObject({ kind: 'summary', pending: undefined })
   })
 })
