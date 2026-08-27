@@ -4,6 +4,7 @@ import {
   EMPTY_FILTER,
   allFor,
   applyFilter,
+  averageByCategory,
   averageMonthly,
   balanceDeltaOf,
   catStats,
@@ -131,6 +132,69 @@ describe('serie mensile', () => {
     expect(average.months).toBe(2)
     expect(average.perMonth).toBe(37.5)
   })
+
+  /*
+   * Una spesa datata per sbaglio nel futuro allunga la serie fino a lì, e
+   * `fillMonthGaps` riempie il buco con mesi a zero: entrano nella media come
+   * mesi vissuti, e ogni cifra derivata risulta più leggera della verità. Sui
+   * dati veri il 27/08/2026 costava 21 € sulla media delle fisse. → ADR-0055
+   */
+  it('i mesi futuri non entrano nella media', () => {
+    const conRefuso = monthlySeries(
+      visibleFor(
+        [...DATA, expense({ id: 'refuso', date: '2026-11-15', amount: 10 })],
+        { person: 'me', includeVacations: false },
+        VACANZE,
+      ),
+      'me',
+    )
+    /* Senza `until`: settembre, ottobre e novembre contano come mesi vissuti. */
+    expect(averageMonthly(conRefuso, { excludeMonth: '2026-08' }).months).toBe(5)
+    const media = averageMonthly(conRefuso, { excludeMonth: '2026-08', until: '2026-08' })
+    expect(media.months).toBe(2)
+    expect(media.perMonth).toBe(37.5)
+  })
+
+  it('«fino a» è inclusivo, e il mese in corso lo toglie l’altra opzione', () => {
+    expect(averageMonthly(series, { until: '2026-08' }).months).toBe(3)
+    expect(averageMonthly(series, { until: '2026-07' }).months).toBe(2)
+  })
+
+  /*
+   * `count > 0` scarta i mesi riempiti a zero, ma non un mese futuro che
+   * contiene davvero una spesa: sui dati veri il mese più leggero risultava
+   * settembre 2026 con 2,50 €. → ADR-0055
+   */
+  it('un mese futuro non vince come «il più leggero»', () => {
+    const conRefuso = monthlySeries(
+      visibleFor(
+        [...DATA, expense({ id: 'refuso', date: '2026-11-15', amount: 4 })],
+        { person: 'me', includeVacations: false },
+        VACANZE,
+      ),
+      'me',
+    )
+    expect(extremeMonths(conRefuso, { excludeMonth: '2026-08' }).lowest?.month).toBe('2026-11')
+    expect(
+      extremeMonths(conRefuso, { excludeMonth: '2026-08', until: '2026-08' }).lowest?.month,
+    ).toBe('2026-06')
+  })
+
+  it('la finestra mobile prende gli ultimi mesi rimasti, non gli ultimi della serie', () => {
+    const conRefuso = monthlySeries(
+      visibleFor(
+        [...DATA, expense({ id: 'refuso', date: '2026-11-15', amount: 10 })],
+        { person: 'me', includeVacations: false },
+        VACANZE,
+      ),
+      'me',
+    )
+    /* Con `lastN: 2` e senza `until` si prenderebbero ottobre e novembre, cioè
+       due mesi che non sono ancora esistiti: la media delle fisse verrebbe 0. */
+    const media = averageMonthly(conRefuso, { excludeMonth: '2026-08', until: '2026-08', lastN: 2 })
+    expect(media.months).toBe(2)
+    expect(media.fixedPerMonth).toBe(25) // giugno 50 e luglio 0
+  })
 })
 
 describe('proiezione di fine mese', () => {
@@ -183,6 +247,23 @@ describe('categorie', () => {
     expect(slices[0]?.key).toBe('salute')
     expect(slices[0]?.total).toBe(200)
     expect(slices.reduce((acc, s) => acc + s.pct, 0)).toBeCloseTo(1)
+  })
+
+  /* Stessa trappola di `averageMonthly`, con un effetto peggiore: il mese
+     futuro non porta spesa ma allunga il divisore, quindi **tutte** le
+     categorie risultano più leggere della verità. → ADR-0055 */
+  it('i mesi futuri non allungano il divisore della media per categoria', () => {
+    /* Due mesi vissuti con 100 € di quota ciascuno, e un refuso a novembre. */
+    const conRefuso = [
+      expense({ id: 'x1', date: '2026-06-10', amount: 200, category: 'casa' }),
+      expense({ id: 'x2', date: '2026-07-10', amount: 200, category: 'casa' }),
+      expense({ id: 'refuso', date: '2026-11-15', amount: 10, category: 'spesa' }),
+    ]
+    const senza = averageByCategory(conRefuso, 'me', { excludeMonth: '2026-08' })
+    const con = averageByCategory(conRefuso, 'me', { excludeMonth: '2026-08', until: '2026-08' })
+    // 200 di quota su 2 mesi fa 100; su 6 (giugno → novembre) farebbe 33,33.
+    expect(con.get('casa')).toBe(100)
+    expect(senza.get('casa')).toBe(33.33)
   })
 })
 

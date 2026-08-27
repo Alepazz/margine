@@ -6,7 +6,7 @@
  * lo dice apertamente invece di mostrare un margine costruito su numeri finti.
  */
 
-import { round2 } from './money'
+import { fromCents, round2, toCents } from './money'
 import type { MonthTotal, Projection } from './selectors'
 import type { IncomeProfile } from './types'
 
@@ -74,6 +74,13 @@ export interface MarginResult {
   expectedFixed: number
   /** Parte discrezionale già spesa: è la sola su cui si può ancora incidere. */
   variableSpent: number
+  /**
+   * Fisse **già addebitate** questo mese. Insieme a `fixedStillDue` compone
+   * `expectedFixed`, e serve a distinguere il pieno dal tratteggio nella barra:
+   * l'affitto pagato e l'affitto atteso valgono lo stesso nel conto, ma non
+   * sono la stessa cosa da guardare. → ADR-0057
+   */
+  fixedSpent: number
   /**
    * Il fondo discrezionale del mese: entrate meno risparmio e fisse attese.
    * È il limite contro cui si misura quanto si è già speso — non le entrate,
@@ -151,6 +158,7 @@ export function computeMargin(
     projectedMarginAfterSavings: round2(income - projectedSpent - savingsTarget),
     expectedFixed,
     variableSpent: month.variable,
+    fixedSpent: month.fixed,
     discretionaryBudget,
     fixedStillDue: round2(Math.max(0, expectedFixed - month.fixed)),
     spendable,
@@ -189,6 +197,7 @@ const PUBLIC_MARGIN_FIELDS = [
   'projectedSpent',
   'expectedFixed',
   'variableSpent',
+  'fixedSpent',
   'fixedStillDue',
 ] as const
 
@@ -208,4 +217,142 @@ export function marginView(result: MarginResult, opts: { hideIncome: boolean }):
     if (!PUBLIC.has(key)) veiled[key] = null
   }
   return veiled as MarginView
+}
+
+/*
+ * ─────────────────────── la barra: il mese intero ───────────────────────
+ *
+ * ADR-0015 aveva fatto della barra un rapporto contro il **fondo
+ * discrezionale**: piena = variabili già spese. Diceva il vero e nascondeva
+ * proprio ciò che serviva capire — dove finiscono i soldi che il fondo non
+ * contiene. Risparmio e fisse stanno *fuori* da quel limite per costruzione,
+ * quindi in quella barra non c'era posto per mostrarli, e l'affitto sembrava
+ * arrivare dal nulla il giorno che lo si registrava.
+ *
+ * Ora il fondo della barra sono le **entrate**, e i soldi del mese si vedono
+ * tutti, nell'ordine in cui smettono di essere tuoi. → ADR-0057
+ */
+
+/*
+ * **`eccedenza` e non `oltre`**: `oltre` è già uno stato del semaforo, e le due
+ * cose finivano nella stessa classe CSS — la regola dell'eccedenza colpiva
+ * anche il segmento delle variabili, che quando si sfora porta `is-oltre` per
+ * via del semaforo. Misurato: il filo che segna la riga delle entrate veniva
+ * disegnato due volte, in due posti diversi.
+ */
+export type MarginSegmentKey =
+  | 'risparmio'
+  | 'fisse'
+  | 'attese'
+  | 'variabili'
+  | 'eccedenza'
+  | 'resto'
+
+export interface MarginSegment {
+  key: MarginSegmentKey
+  amount: number
+  /** Quota della barra, 0–100. */
+  pct: number
+}
+
+export interface MarginBar {
+  /** In ordine, da sinistra. I segmenti a zero non ci sono. */
+  segments: MarginSegment[]
+  /** Il denominatore: le entrate, o quanto è impegnato se le si è superate. */
+  total: number
+  /**
+   * Quanto del mese è già impegnato: tutto tranne la coda vuota. Sta qui e non
+   * si ricostruisce fuori — `total − spendibile` è la stessa cosa solo grazie a
+   * un'identità che vale in un ramo e non nell'altro.
+   */
+  committed: number
+  /** Dove arrivi a questo ritmo, 0–100. `null` a mese chiuso. */
+  projectionPct: number | null
+}
+
+/*
+ * I segmenti non portano un'etichetta.
+ *
+ * Ce l'avevano, e serviva al solo `title` del pezzo di barra: un suggerimento
+ * che sul telefono non compare mai — e questa è un'app che si usa in piedi con
+ * un pollice — mentre a schermo largo mostrava un numero che sta già in chiaro
+ * quaranta pixel più sotto, nella riga del conto con lo stesso pallino. Tre
+ * stringhe duplicate per niente.
+ */
+
+/**
+ * I segmenti della barra, in centesimi interi e senza React.
+ *
+ * Torna `null` quando non c'è niente da disegnare: profilo entrate non
+ * compilato, entrate a zero, o guadagni oscurati — e in quel caso è `income` a
+ * essere `null`, quindi la barra non si può comporre nemmeno volendo. È la
+ * stessa protezione di `marginView()` un piano più in là: la vista non riceve i
+ * numeri, quindi non può rivelarli con le proporzioni.
+ */
+export function marginBar(
+  view: MarginView,
+  opts: { projectedVariable: number | null },
+): MarginBar | null {
+  const { income, savingsTarget, discretionaryBudget, spendable } = view
+  if (!view.known) return null
+  if (income === null || savingsTarget === null || discretionaryBudget === null) return null
+  if (spendable === null) return null
+
+  const entrate = toCents(income)
+  if (entrate <= 0) return null
+
+  const risparmio = Math.max(0, toCents(savingsTarget))
+  const fisse = Math.max(0, toCents(view.fixedSpent))
+  const attese = Math.max(0, toCents(view.fixedStillDue))
+  const variabili = Math.max(0, toCents(view.variableSpent))
+
+  const impegnato = risparmio + fisse + attese + variabili
+  /*
+   * Il fondo della barra sono le entrate, tranne quando si è speso di più: là
+   * diventa l'impegnato, così la barra resta piena invece di sfondare, e
+   * l'eccedenza ha il suo pezzo rosso in coda.
+   */
+  const totale = Math.max(entrate, impegnato)
+
+  /*
+   * L'eccedenza si stacca dalle **variabili**, che è da dove arriva sempre nella
+   * pratica. Nel caso patologico in cui risparmio e fisse da soli superino le
+   * entrate — cioè non ti puoi permettere l'affitto — il pezzo rosso vale tutte
+   * le variabili invece che la sola parte oltre la riga: dice comunque «sei
+   * oltre», che è l'unica cosa che conta a quel punto.
+   */
+  const fondo = Math.max(0, toCents(discretionaryBudget))
+  const eccedenza = Math.max(0, variabili - fondo)
+  const dentro = variabili - eccedenza
+  const resto = Math.max(0, totale - impegnato)
+
+  const quota = (cents: number): number => (cents / totale) * 100
+  const segments: MarginSegment[] = []
+  const push = (key: MarginSegmentKey, cents: number): void => {
+    if (cents <= 0) return
+    segments.push({ key, amount: fromCents(cents), pct: quota(cents) })
+  }
+
+  push('risparmio', risparmio)
+  push('fisse', fisse)
+  push('attese', attese)
+  push('variabili', dentro)
+  push('eccedenza', eccedenza)
+  push('resto', resto)
+
+  const projectedVariable = opts.projectedVariable
+  const projectionPct =
+    projectedVariable === null
+      ? null
+      : Math.min(
+          100,
+          Math.max(0, quota(risparmio + fisse + attese + Math.max(0, toCents(projectedVariable)))),
+        )
+
+  return {
+    segments,
+    total: fromCents(totale),
+    committed: fromCents(impegnato),
+    projectionPct,
+  }
 }

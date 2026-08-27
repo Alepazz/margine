@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { computeMargin, incomeBreakdown, marginStatus, marginView } from './income'
+import { computeMargin, incomeBreakdown, marginBar, marginStatus, marginView } from './income'
+import { toCents } from './money'
 import type { MonthTotal, Projection } from './selectors'
 import type { IncomeProfile } from './types'
 
@@ -156,6 +157,7 @@ describe('oscurare i guadagni', () => {
     'projectedSpent',
     'expectedFixed',
     'variableSpent',
+    'fixedSpent',
     'fixedStillDue',
   ]
 
@@ -178,5 +180,193 @@ describe('oscurare i guadagni', () => {
 
   it('non tocca niente quando i guadagni sono in chiaro', () => {
     expect(marginView(result, { hideIncome: false })).toEqual(result)
+  })
+})
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────
+ * Il difetto che ha fatto nascere la barra a segmenti, scritto come test.
+ *
+ * Il 27/08/2026 Alessio ha registrato l'affitto e si è trovato oltre il mese,
+ * senza aspettarselo: «mi sarei aspettato che quella spesa fosse già contata in
+ * precedenza». Lo era — `expectedFixed` la scontava dal primo giorno del mese —
+ * ma **solo se la spesa porta la spunta «ricorrente»**. Senza, l'affitto entra
+ * fra le variabili *in aggiunta* alla media delle fisse già sottratta, e lo si
+ * paga due volte. Questi due test sono le due strade, una accanto all'altra.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+describe('una spesa fissa che arriva', () => {
+  const AFFITTO = 500
+  const chiusura = (mese: MonthTotal, fisseAttese: number): Projection => ({
+    projected: fisseAttese + mese.variable,
+    method: 'stimato',
+    elapsedDays: 27,
+    totalDays: 31,
+    projectedVariable: mese.variable,
+    expectedFixed: fisseAttese,
+  })
+
+  it('non muove lo spendibile, se ha la spunta di ricorrente', () => {
+    const prima: MonthTotal = { month: '2026-08', total: 1100, fixed: 20, variable: 1000, count: 30 }
+    const dopo: MonthTotal = {
+      month: '2026-08',
+      total: 1100 + AFFITTO,
+      fixed: 20 + AFFITTO,
+      variable: 1083,
+      count: 31,
+    }
+    /* Le fisse attese non cambiano: la media le prevedeva già. */
+    const attese = 520
+    expect(computeMargin(dopo, chiusura(dopo, attese), PROFILE).spendable).toBe(
+      computeMargin(prima, chiusura(prima, attese), PROFILE).spendable,
+    )
+  })
+
+  it('lo abbatte di tutto il suo importo, se la spunta manca', () => {
+    const prima: MonthTotal = { month: '2026-08', total: 1100, fixed: 20, variable: 1000, count: 30 }
+    const senzaSpunta: MonthTotal = {
+      month: '2026-08',
+      total: 1100 + AFFITTO,
+      fixed: 17,
+      variable: 1000 + AFFITTO,
+      count: 31,
+    }
+    const attese = 520
+    /* In centesimi: la sottrazione fra due euro in virgola mobile darebbe
+       444,00000000000006, che è il difetto contro cui esiste `money.ts`. */
+    const perso =
+      toCents(computeMargin(prima, chiusura(prima, attese), PROFILE).spendable) -
+      toCents(computeMargin(senzaSpunta, chiusura(senzaSpunta, attese), PROFILE).spendable)
+    expect(perso).toBe(toCents(AFFITTO))
+  })
+})
+
+describe('la barra del mese intero', () => {
+  const mese: MonthTotal = { month: '2026-08', total: 1100, fixed: 300, variable: 800, count: 30 }
+  const proiezione: Projection = {
+    projected: 1270,
+    method: 'stimato',
+    elapsedDays: 20,
+    totalDays: 31,
+    projectedVariable: 1000,
+    expectedFixed: 470,
+  }
+  const vista = computeMargin(mese, proiezione, PROFILE)
+  const barra = marginBar(vista, { projectedVariable: proiezione.projectedVariable })!
+
+  it('copre esattamente il cento per cento', () => {
+    const somma = barra.segments.reduce((acc, s) => acc + s.pct, 0)
+    expect(somma).toBeCloseTo(100, 6)
+  })
+
+  /* La somma dei segmenti **è** il conto riga per riga della scheda: se la barra
+     e le righe potessero divergere, una delle due mentirebbe. */
+  it('i segmenti sommano alle entrate', () => {
+    const somma = barra.segments.reduce((acc, s) => acc + s.amount, 0)
+    expect(somma).toBeCloseTo(vista.income, 2)
+    expect(barra.total).toBe(vista.income)
+  })
+
+  it('mette in coda lo spendibile, ed è quello che dice il numero grande', () => {
+    const resto = barra.segments.find((s) => s.key === 'resto')
+    expect(resto?.amount).toBe(vista.spendable)
+    expect(barra.segments[barra.segments.length - 1]?.key).toBe('resto')
+  })
+
+  it('l’ordine è quello in cui i soldi smettono di essere tuoi', () => {
+    expect(barra.segments.map((s) => s.key)).toEqual([
+      'risparmio',
+      'fisse',
+      'attese',
+      'variabili',
+      'resto',
+    ])
+  })
+
+  /*
+   * È la richiesta, alla lettera: «la parte tratteggiata diventa continua quando
+   * inserisco l'effettivo affitto pagato questo mese». Il tratteggio non si
+   * accorcia soltanto — sparisce — e la sua lunghezza passa al pieno.
+   */
+  it('il tratteggio sparisce quando la fissa arriva, e il pieno cresce di altrettanto', () => {
+    const attese = barra.segments.find((s) => s.key === 'attese')
+    expect(attese?.amount).toBe(170) // 470 attese − 300 già arrivate
+
+    const arrivata: MonthTotal = { ...mese, total: 1270, fixed: 470, variable: 800 }
+    const dopo = marginBar(computeMargin(arrivata, { ...proiezione, expectedFixed: 470 }, PROFILE), {
+      projectedVariable: 1000,
+    })!
+    expect(dopo.segments.find((s) => s.key === 'attese')).toBeUndefined()
+    expect(dopo.segments.find((s) => s.key === 'fisse')?.amount).toBe(470)
+    /* E lo spendibile non si è mosso: era già contato. */
+    expect(dopo.segments.find((s) => s.key === 'resto')?.amount).toBe(
+      barra.segments.find((s) => s.key === 'resto')?.amount,
+    )
+  })
+
+  it('la tacca sta dove arrivi a questo ritmo', () => {
+    /* risparmio 300 + fisse attese 470 + variabili proiettate 1000 = 1770 su 2668,33 */
+    expect(barra.projectionPct).toBeCloseTo((1770 / 2668.33) * 100, 4)
+  })
+
+  it('a mese chiuso la tacca non c’è', () => {
+    expect(marginBar(vista, { projectedVariable: null })?.projectionPct).toBeNull()
+  })
+})
+
+describe('la barra quando si è andati oltre', () => {
+  /* Entrate 2668,33 − risparmio 300 − fisse 470 = 1898,33 di fondo: 2000 lo sfonda. */
+  const mese: MonthTotal = { month: '2026-08', total: 2470, fixed: 470, variable: 2000, count: 40 }
+  const proiezione: Projection = {
+    projected: 2470,
+    method: 'chiuso',
+    elapsedDays: 31,
+    totalDays: 31,
+    projectedVariable: 2000,
+    expectedFixed: 470,
+  }
+  const vista = computeMargin(mese, proiezione, PROFILE)
+  const barra = marginBar(vista, { projectedVariable: null })!
+
+  it('lo spendibile è negativo e la coda vuota non c’è', () => {
+    expect(vista.spendable).toBeLessThan(0)
+    expect(barra.segments.find((s) => s.key === 'resto')).toBeUndefined()
+  })
+
+  it('l’eccedenza è un segmento suo, lungo quanto si è sforato', () => {
+    const eccedenza = barra.segments.find((s) => s.key === 'eccedenza')
+    expect(eccedenza?.amount).toBeCloseTo(-vista.spendable, 2)
+  })
+
+  it('la barra resta piena invece di sfondare', () => {
+    expect(barra.segments.reduce((acc, s) => acc + s.pct, 0)).toBeCloseTo(100, 6)
+    expect(barra.total).toBeGreaterThan(vista.income)
+  })
+})
+
+describe('la barra a guadagni oscurati', () => {
+  const mese: MonthTotal = { month: '2026-08', total: 1100, fixed: 300, variable: 800, count: 30 }
+  const proiezione: Projection = {
+    projected: 1270,
+    method: 'stimato',
+    elapsedDays: 20,
+    totalDays: 31,
+    projectedVariable: 1000,
+    expectedFixed: 470,
+  }
+
+  /*
+   * Non è una precauzione in più: le proporzioni **sono** i numeri. Una barra
+   * col risparmio a 300 su un totale disegnato restituirebbe le entrate con una
+   * divisione, che è esattamente ciò da cui ADR-0016 protegge.
+   */
+  it('non si compone affatto', () => {
+    const coperta = marginView(computeMargin(mese, proiezione, PROFILE), { hideIncome: true })
+    expect(marginBar(coperta, { projectedVariable: 1000 })).toBeNull()
+  })
+
+  it('e nemmeno senza profilo entrate', () => {
+    const senza = computeMargin(mese, proiezione, { ...PROFILE, configured: false })
+    expect(marginBar(senza, { projectedVariable: 1000 })).toBeNull()
   })
 })

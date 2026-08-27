@@ -32,6 +32,7 @@ import {
   compareToAverage,
   comparePeriods,
   compareYearOverYear,
+  coupleBalance,
   expensesOfMonth,
   fillMonthGaps,
   findMonth,
@@ -45,6 +46,7 @@ export function Home(): ReactNode {
   const {
     chart,
     config,
+    dataset,
     view,
     month,
     setMonth,
@@ -63,10 +65,32 @@ export function Home(): ReactNode {
 
   const monthExpenses = useMemo(() => expensesOfMonth(visible, month), [visible, month])
   const monthTotal = useMemo(() => findMonth(series, month), [series, month])
-  const average = useMemo(() => averageMonthly(series, { excludeMonth: partialMonth }), [series, partialMonth])
+  const average = useMemo(
+    () => averageMonthly(series, { excludeMonth: partialMonth, until: partialMonth }),
+    [series, partialMonth],
+  )
+
+  /*
+   * Le fisse attese si stimano sugli **ultimi dodici mesi**, non su tutta la
+   * storia, e sono l'unica media con una finestra mobile.
+   *
+   * I tricount partono da ottobre 2024 ma l'affitto compare da dicembre:
+   * ottobre fa [cifra rimossa] di fisse e novembre [cifra rimossa], due mesi che non sono mai
+   * esistiti così. Tenerli dentro fa [cifra rimossa] contro i [cifra rimossa] degli ultimi
+   * dodici, e quella differenza è tratteggio che manca nella barra e soldi che
+   * sembrano spendibili e non lo sono. Il resto delle medie resta su tutta la
+   * storia: là la domanda è «rispetto a come vivo di solito», qui è «quanto mi
+   * aspetta a fine mese». → ADR-0056
+   */
+  const fixedBase = useMemo(
+    () =>
+      averageMonthly(series, { excludeMonth: partialMonth, until: partialMonth, lastN: 12 })
+        .fixedPerMonth,
+    [series, partialMonth],
+  )
   const projection = useMemo(
-    () => projectMonth(monthTotal, today, average.fixedPerMonth),
-    [average.fixedPerMonth, monthTotal, today],
+    () => projectMonth(monthTotal, today, fixedBase),
+    [fixedBase, monthTotal, today],
   )
 
   const profile = person === 'me' ? config.income.me : (config.income.partner ?? EMPTY_INCOME)
@@ -78,13 +102,30 @@ export function Home(): ReactNode {
    */
   const marginShown = useMemo(() => marginView(margin, { hideIncome }), [hideIncome, margin])
 
+  /*
+   * Il saldo **non** entra nel margine e non passa da `visibleFor()`: vuole
+   * tutte le spese, e le quote sono già contate una volta sola nelle proprie
+   * uscite. Qui serve solo da mostrare, girato dal punto di vista di chi
+   * guarda — il calcolo ha un segno fisso. → ADR-0058, ADR-0019
+   */
+  const balance = useMemo(() => {
+    const totale = coupleBalance(dataset.expenses, dataset.settlements, config.balance)
+    return {
+      owedToMe: person === 'me' ? totale.balance : -totale.balance,
+      otherName: config.people[person === 'me' ? 'partner' : 'me'].name,
+    }
+  }, [config.balance, config.people, dataset.expenses, dataset.settlements, person])
+
   const slices = useMemo<DonutSlice[]>(
     () => donutSlices(monthExpenses, person, lookup),
     [lookup, monthExpenses, person],
   )
 
   const versusAverage = useMemo(() => {
-    const averages = averageByCategory(visible, person, { excludeMonth: partialMonth })
+    const averages = averageByCategory(visible, person, {
+      excludeMonth: partialMonth,
+      until: partialMonth,
+    })
     const current = categoryBreakdown(monthExpenses, person)
     return compareToAverage(current, averages)
       .filter((row) => toCents(row.current) !== 0 || toCents(row.average) !== 0)
@@ -159,6 +200,7 @@ export function Home(): ReactNode {
             projection={projection}
             /* Un solo anno precedente esiste nei dati: è un riferimento, non una media. */
             lastYear={toCents(yoy.lastYear) > 0 ? { month: yoy.lastYearMonth, total: yoy.lastYear } : null}
+            balance={balance}
             onToggleHidden={toggleHideIncome}
           />
         </Card>
@@ -309,9 +351,12 @@ export function Home(): ReactNode {
                   label: 'Fisse',
                   value: monthTotal.fixed,
                   color: chart.seq[5] ?? '#256abf',
+                  /* La stessa media con cui si stimano le fisse attese: due
+                     numeri diversi per la stessa cosa, sulla stessa pagina,
+                     sarebbero solo da spiegare. */
                   sub:
-                    average.fixedPerMonth > 0
-                      ? `media ${formatEuro(average.fixedPerMonth, { decimals: 0 })}`
+                    fixedBase > 0
+                      ? `media ${formatEuro(fixedBase, { decimals: 0 })} su 12 mesi`
                       : undefined,
                 },
                 {

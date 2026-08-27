@@ -174,6 +174,86 @@ button.hero-value:focus-visible {
   color: var(--ink-2);
 }
 
+/*
+ * A destra del numero grande: il semaforo e il saldo con l'altra persona.
+ *
+ * Sono due cose diverse messe vicine di proposito — «come sto col mese» e «come
+ * sto con lei» — ed è la riga che le contiene ad andare a capo sul telefono,
+ * perché `.row` avvolge. Il saldo non entra in nessun conto del margine: sta
+ * qui perché è la seconda domanda che ci si fa aprendo l'app. → ADR-0058
+ */
+.hero-aside {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  /*
+   * In fila e non in colonna, e cresce invece di stare stretto: così la stessa
+   * regola serve i due casi senza sapere in quale si trova. Accanto al numero
+   * grande occupa lo spazio che avanza e resta appoggiato a destra; sul
+   * telefono, dove `.row` avvolge, prende la riga intera e semaforo e saldo
+   * stanno affiancati sotto il numero invece di ammucchiarsi a sinistra.
+   *
+   * Niente `flex-wrap: nowrap` sulla riga per tenerli affiancati per forza: è
+   * il modo in cui un contenuto decide la larghezza del suo contenitore, ed è
+   * già costato una volta. → ADR-0033
+   */
+  flex: 1 1 auto;
+}
+
+.balance-tag {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 1px;
+  /* Si tocca per andare al Saldo: 44px è il minimo perché un pollice lo prenda. */
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  text-decoration: none;
+  color: inherit;
+}
+
+.balance-tag:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.balance-tag-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.balance-tag-value {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.05rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.balance-tag-value.is-good {
+  color: var(--good-text);
+}
+
+.balance-tag-value.is-bad {
+  color: var(--critical-text);
+}
+
+.balance-tag-value.is-even {
+  color: var(--ink-2);
+}
+
+.balance-tag-hint {
+  font-size: 0.72rem;
+  color: var(--ink-3);
+}
+
 /* ─────────────────────────── misuratore ─────────────────────────── */
 
 .meter {
@@ -184,6 +264,9 @@ button.hero-value:focus-visible {
 
 .meter-track {
   position: relative;
+  /* Una fila di segmenti, non un riempimento: il fondo della barra sono le
+     entrate, e dentro ci stanno tutti i soldi del mese. → ADR-0057 */
+  display: flex;
   height: 14px;
   border-radius: 7px;
   background: var(--surface-sunken);
@@ -191,27 +274,87 @@ button.hero-value:focus-visible {
   overflow: hidden;
 }
 
+/*
+ * I segmenti, nell'ordine in cui i soldi smettono di essere tuoi.
+ *
+ * `flex: none` con la larghezza in percentuale: senza, un segmento sottile
+ * verrebbe allargato al suo min-content — che qui è zero, ma la traccia è
+ * condivisa e l'abitudine di `1fr`/`auto` è la stessa che ha già morso in
+ * ADR-0033 e ADR-0044.
+ */
+.meter-seg {
+  flex: none;
+  height: 100%;
+  min-width: 0;
+}
+
+.meter-seg.is-risparmio {
+  background: var(--meter-savings);
+}
+
+.meter-seg.is-fisse {
+  background: var(--meter-fixed);
+}
+
+/*
+ * Le fisse che devono ancora arrivare: **tratteggiate**, perché sono già
+ * scontate dal numero grande ma non sono ancora uscite dal conto. Quando la
+ * spesa si registra, questo pezzo sparisce e cresce quello pieno accanto: è la
+ * stessa lunghezza che cambia stato, e si vede.
+ */
+.meter-seg.is-attese {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--meter-fixed) 0 3px,
+    var(--surface-sunken) 3px 7px
+  );
+}
+
+.meter-seg.is-variabili.is-ok {
+  background: var(--good);
+}
+
+.meter-seg.is-variabili.is-attenzione {
+  background: var(--warn);
+}
+
+.meter-seg.is-variabili.is-oltre {
+  background: var(--critical);
+}
+
+.meter-seg.is-variabili.is-sconosciuto {
+  background: var(--series-rest);
+}
+
+/*
+ * Quanto si è andati oltre le entrate: la barra resta piena e l'eccedenza ha il
+ * suo pezzo in coda, invece di sfondare in silenzio.
+ *
+ * Il filo chiaro sul bordo sinistro **è la riga delle entrate**, e non è una
+ * rifinitura: quando si è oltre il semaforo è rosso, quindi anche le variabili
+ * lo sono, e senza quel taglio i due segmenti diventavano un unico blocco rosso
+ * in cui lo sforamento non si vedeva più. Misurato: [cifra rimossa] di variabili e 66 €
+ * di eccedenza, indistinguibili.
+ *
+ * Si chiama `is-eccedenza` e non `is-oltre` perché `oltre` è già uno stato del
+ * semaforo: con lo stesso nome questa regola prendeva anche le variabili, che
+ * quando si sfora portano `is-oltre` per via del semaforo.
+ */
+.meter-seg.is-eccedenza {
+  background: var(--critical);
+  box-shadow: inset 2px 0 0 var(--surface);
+}
+
+/* Ciò che resta: il fondo della traccia, cioè niente addosso. */
+.meter-seg.is-resto {
+  background: transparent;
+}
+
 .meter-fill {
   position: absolute;
   inset: 0 auto 0 0;
   border-radius: 7px 4px 4px 7px;
   background: var(--seq-5);
-}
-
-.meter-fill.is-ok {
-  background: var(--good);
-}
-
-.meter-fill.is-attenzione {
-  background: var(--warn);
-}
-
-.meter-fill.is-oltre {
-  background: var(--critical);
-}
-
-.meter-fill.is-sconosciuto {
-  background: var(--series-rest);
 }
 
 /*
@@ -244,6 +387,59 @@ button.hero-value:focus-visible {
   font-size: 0.74rem;
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Sotto la barra, una riga sola, e dice **la cosa nuova**: cos'è il tratteggio.
+ * Ha preso il posto della scala a due estremi, che ripeteva due numeri già
+ * presenti nel conto riga per riga qui sotto.
+ */
+.meter-note {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+
+/* ── i pallini del conto: la legenda della barra sta nelle righe ── */
+
+.kv-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 7px;
+  vertical-align: baseline;
+}
+
+.kv-dot.is-risparmio {
+  background: var(--meter-savings);
+}
+
+.kv-dot.is-fisse {
+  background: var(--meter-fixed);
+}
+
+.kv-dot.is-variabili.is-ok {
+  background: var(--good);
+}
+
+.kv-dot.is-variabili.is-attenzione {
+  background: var(--warn);
+}
+
+.kv-dot.is-variabili.is-oltre {
+  background: var(--critical);
+}
+
+.kv-dot.is-variabili.is-sconosciuto {
+  background: var(--series-rest);
+}
+
+/* Il resto è la traccia vuota: un pallino con il solo bordo, come si vede. */
+.kv-dot.is-resto {
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 
 /* ─────────────────────────── etichette ─────────────────────────── */

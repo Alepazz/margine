@@ -54,8 +54,14 @@ export function Statistiche(): ReactNode {
   const partialMonth = currentMonthKey()
 
   const filled = useMemo(() => fillMonthGaps(series), [series])
+  /*
+    * Le stesse opzioni del Riepilogo, e non è una ripetizione da togliere: se
+    * le due pagine divergono mostrano **numeri diversi per la stessa media**.
+    * Misurato sui dati veri con un mese fantasma in mezzo — [cifra rimossa] su 22
+    * mesi di qua, [cifra rimossa] su 23 di là. → ADR-0055
+    */
   const average = useMemo(
-    () => averageMonthly(series, { excludeMonth: partialMonth }),
+    () => averageMonthly(series, { excludeMonth: partialMonth, until: partialMonth }),
     [partialMonth, series],
   )
   /* Il denaro si somma solo con `money.ts`: un reduce a mano qui reintrodurrebbe
@@ -70,11 +76,11 @@ export function Statistiche(): ReactNode {
 
   const years = useMemo(() => yearlyTotals(series), [series])
   const extremes = useMemo(
-    () => extremeMonths(series, { excludeMonth: partialMonth }),
+    () => extremeMonths(series, { excludeMonth: partialMonth, until: partialMonth }),
     [partialMonth, series],
   )
   const fixed = useMemo(
-    () => fixedShareSeries(series, { excludeMonth: partialMonth }),
+    () => fixedShareSeries(series, { excludeMonth: partialMonth, until: partialMonth }),
     [partialMonth, series],
   )
   const recurring = useMemo(() => recurringProfile(visible, person), [person, visible])
@@ -96,7 +102,10 @@ export function Statistiche(): ReactNode {
 
   /** Categorie di sempre, con quanto pesano in un mese medio. */
   const categories = useMemo(() => {
-    const averages = averageByCategory(visible, person, { excludeMonth: partialMonth })
+    const averages = averageByCategory(visible, person, {
+      excludeMonth: partialMonth,
+      until: partialMonth,
+    })
     return categoryBreakdown(visible, person).map((slice) => ({
       ...slice,
       perMonth: averages.get(slice.key) ?? 0,
