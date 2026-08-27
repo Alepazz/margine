@@ -405,7 +405,7 @@ button.hero-value:focus-visible {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 8px 0;
+  padding: 9px 0;
   border-bottom: 1px solid var(--line);
 }
 
@@ -413,28 +413,41 @@ button.hero-value:focus-visible {
   border-bottom: none;
 }
 
-/* Il ripiego quando non so chi sono: il login dell'autore, per esteso. */
-.news-who {
-  flex: none;
-  max-width: 8.5rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--ink-3);
+/* Una riga che si può toccare per riprovare: deve sembrarlo. */
+.news-row.is-retry {
+  cursor: pointer;
+  margin-inline: -6px;
+  padding-inline: 6px;
+  border-radius: var(--r-sm);
 }
 
-.news-emoji {
-  flex: none;
-  font-size: 1.05rem;
+.news-row.is-retry:hover {
+  background: var(--surface-2);
 }
 
-/* Il testo è l'unica parte comprimibile: senza questo, un riassunto lungo
-   spinge l'ora fuori dal foglio invece di andare a capo. */
+
+/* Il testo è l'unica parte comprimibile: senza questo, una frase lunga spinge
+   l'ora fuori dal foglio invece di andare a capo. */
 .news-text {
   flex: 1 1 auto;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+/* Il contorno: importo, categoria, tricount. Sotto la frase, non dentro. */
+.news-sub {
+  font-size: 0.8rem;
+  color: var(--ink-3);
+}
+
+/* La frase generica, mentre il contenuto sta ancora arrivando. Non un'animazione
+   che pulsa: solo un grigio che dice «non è questo il testo definitivo». */
+.news-pending {
+  color: var(--ink-3);
 }
 
 .news-new {
@@ -452,62 +465,12 @@ button.hero-value:focus-visible {
   vertical-align: 1px;
 }
 
-/* ── il dettaglio di una novità ── */
 
-.news-more {
-  margin: 2px 0 6px 30px;
-  min-height: 0;
-  padding: 4px 8px;
-  font-size: 0.78rem;
-}
 
-.news-detail {
-  margin: 2px 0 8px 30px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
 
-/*
- * Tre colonne: verbo, titolo, importo — e la riga di contesto sotto, a tutta
- * larghezza. `minmax(0, 1fr)` sul titolo e non `1fr`: il minimo implicito di
- * `1fr` è il min-content, quindi una descrizione lunga allargherebbe la traccia
- * e con lei tutte le altre righe della griglia.
- */
-.news-detail-row {
-  display: grid;
-  grid-template-columns: 12px minmax(0, 1fr) auto;
-  gap: 2px 8px;
-  align-items: baseline;
-  font-size: 0.85rem;
-}
 
-.news-detail-verb {
-  font-family: var(--font-mono);
-  color: var(--ink-3);
-  text-align: center;
-}
 
-.news-detail-title {
-  min-width: 0;
-  overflow-wrap: break-word;
-}
 
-.news-detail-amount {
-  white-space: nowrap;
-}
-
-.news-detail-where {
-  grid-column: 2 / -1;
-  font-size: 0.76rem;
-  color: var(--ink-3);
-}
-
-.news-detail-none {
-  margin: 2px 0 8px 30px;
-  font-size: 0.78rem;
-  color: var(--ink-3);
-}
 
 .news-time {
   flex: none;
