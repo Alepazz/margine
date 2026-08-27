@@ -20,3 +20,19 @@
 export function nameKey(text: string): string {
   return text.trim().replace(/\s+/g, ' ').toLowerCase()
 }
+
+/**
+ * «a» o «ad» davanti a un nome: la d eufonica.
+ *
+ * «Devi a Alessio» è sbagliato, «devi ad Alessio» no. Non è una finezza da
+ * grammatico: i nomi arrivano dalla configurazione, quindi la frase giusta non
+ * si può scegliere una volta per tutte scrivendola a mano.
+ *
+ * Stava dentro `Saldo.tsx`, ed è tornata a mancare appena un secondo posto ha
+ * avuto bisogno di dire la stessa frase — il saldo nel Riepilogo, che diceva
+ * «Devi [cifra rimossa] a Alessio». Qui perché una regola di lingua italiana non è di
+ * nessuna pagina in particolare.
+ */
+export function aTo(name: string): string {
+  return /^[aeiouàèéìòù]/i.test(name.trim()) ? 'ad' : 'a'
+}

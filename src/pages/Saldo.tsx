@@ -14,21 +14,13 @@ import { Card, Notice, ShowMore, StatTile, useToast } from '../components/ui'
 import { formatDate, todayIso } from '../domain/dates'
 import { newSettlementId } from '../domain/ids'
 import { formatEuro, toCents } from '../domain/money'
+import { aTo } from '../domain/text'
 import { tricountLabel } from '../domain/expense-rules'
 import { coupleBalance } from '../domain/selectors'
 import type { Settlement } from '../domain/types'
 import { usePageData } from './usePageData'
 
 const MOVEMENTS_SHOWN = 25
-
-/**
- * «Devi a Alessio» è sbagliato, «devi ad Alessio» no. La d eufonica davanti a
- * vocale non è una finezza: i nomi qui arrivano dalla configurazione, quindi non
- * si può scegliere la frase giusta una volta per tutte.
- */
-function aTo(name: string): string {
-  return /^[aeiouàèéìòù]/i.test(name.trim()) ? 'ad' : 'a'
-}
 
 export function Saldo(): ReactNode {
   const { config, dataset, view, addSettlement, removeSettlement } = usePageData()
