@@ -895,6 +895,14 @@ export interface CoupleBalance {
   settled: number
   /** Quote vostre che ha anticipato qualcun altro: non sono un debito fra voi. */
   outsideCouple: number
+  /**
+   * Quante voci — spese o rimborsi — sono datate **dopo il mese corrente**, e
+   * quindi non sono ancora contate qui. Zero quasi sempre. Diverso da zero vuol
+   * dire che questo totale e quello di Tricount non coincidono, e questo è
+   * l'unico posto che può dirlo: senza, la differenza resterebbe muta.
+   * → ADR-0064
+   */
+  deferred: number
   /** Cosa ha mosso il saldo, dal più recente. */
   movements: BalanceMovement[]
 }
@@ -947,15 +955,48 @@ interface Bucket {
   history: number
 }
 
+/**
+ * Vero se quella data cade **dopo il mese corrente**, cioè fuori da ciò che il
+ * saldo considera già successo.
+ *
+ * Esportata perché serve a due domande che devono avere la stessa risposta: il
+ * saldo la usa per **non contare** una voce, e il pannello che sposta una spesa
+ * di tricount per **non annunciare al presente** un debito che si muoverà solo
+ * il mese prossimo. → ADR-0064
+ */
+export function notYetInBalance(date: string, today: string): boolean {
+  return monthKeyOf(date) > monthKeyOf(today)
+}
+
 export function coupleBalance(
   allExpenses: readonly Expense[],
   settlements: readonly Settlement[],
-  opts: { since: string; opening: number; groups?: Record<string, BalanceStart> },
+  opts: {
+    since: string
+    opening: number
+    /**
+     * Oggi. Obbligatorio di proposito: da qui si ricava il mese oltre il quale
+     * un movimento non è ancora successo, e un valore di ripiego avrebbe fatto
+     * contare il futuro a chiunque si fosse dimenticato di passarlo — cioè il
+     * difetto che questa opzione esiste per togliere. → ADR-0064
+     */
+    today: string
+    groups?: Record<string, BalanceStart>
+  },
 ): CoupleBalance {
   const movements: BalanceMovement[] = []
   const buckets = new Map<string, Bucket>()
   let settled = 0
   let outsideCouple = 0
+  let deferred = 0
+
+  /*
+   * La soglia è il **mese**, non il giorno: una spesa del 27 agosto e una del 31
+   * sono tutte e due di questo mese, e un debito non è una cosa che matura a
+   * mezzanotte. Una voce datata a settembre entra nel saldo il 1º settembre.
+   * → ADR-0064
+   */
+  const notYet = (date: string): boolean => notYetInBalance(date, opts.today)
 
   /**
    * Il punto di partenza di un tricount. Quello generale fa da data di ripiego,
@@ -984,6 +1025,17 @@ export function coupleBalance(
   for (const key of Object.keys(opts.groups ?? {})) bucketOf(key)
 
   for (const expense of allExpenses) {
+    /* Datata dopo questo mese: non è ancora un debito. Esce **prima** di
+       `bucketOf`, quindi non conta nemmeno nella storia del tricount: uno che
+       esiste solo nel futuro non ha niente da dire oggi. → ADR-0064 */
+    if (notYet(expense.date)) {
+      /* Rinviata **solo se avrebbe mosso il saldo**: una spesa personale, o una
+         pagata da qualcun altro, non crea un debito fra voi né oggi né a
+         settembre. Contarla qui accenderebbe l'avviso che annuncia una
+         divergenza da Tricount, e quella divergenza non esisterebbe. */
+      if (expense.paidBy !== 'others' && toCents(owedOf(expense)) !== 0) deferred += 1
+      continue
+    }
     const key = expense.tricount
     const bucket = bucketOf(key)
     const owed = owedOf(expense)
@@ -1017,6 +1069,12 @@ export function coupleBalance(
 
   let settlementDelta = 0
   for (const settlement of settlements) {
+    /* La stessa regola delle spese, e non per simmetria: un rimborso datato
+       avanti abbasserebbe un debito che ancora non esiste. → ADR-0064 */
+    if (notYet(settlement.date)) {
+      deferred += 1
+      continue
+    }
     /* Un rimborso non appartiene a un tricount: è denaro che passa di mano. Vale
        dalla data generale in poi, e sposta il totale, non un gruppo. */
     if (settlement.date <= opts.since) continue
@@ -1076,6 +1134,7 @@ export function coupleBalance(
     frontedByPartner: frontedByPartner / 100,
     settled: settled / 100,
     outsideCouple: outsideCouple / 100,
+    deferred,
     movements: movements.sort((a, b) => (a.date === b.date ? 0 : a.date < b.date ? 1 : -1)),
   }
 }

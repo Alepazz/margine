@@ -20,6 +20,7 @@ import {
   houseLedger,
   houseOutside,
   monthlySeries,
+  notYetInBalance,
   owedOf,
   projectMonth,
   recurringProfile,
@@ -30,7 +31,7 @@ import {
   visibleFor,
   yearlyTotals,
 } from './selectors'
-import type { Expense, Trip } from './types'
+import type { Expense, Settlement, Trip } from './types'
 
 function expense(partial: Partial<Expense> & { id: string; date: string; amount: number }): Expense {
   const half = Math.round((partial.amount * 100) / 2) / 100
@@ -541,8 +542,15 @@ describe('la casa: due insiemi che non coincidono', () => {
   })
 })
 
+/*
+ * «Oggi» per i test del saldo: tutte le date qui sotto stanno in agosto 2026 o
+ * prima, quindi con questo valore niente cade nel futuro e le attese di prima
+ * restano quelle. I test che il futuro lo provano si scelgono il loro.
+ */
+const OGGI = '2026-08-31'
+
 describe('il saldo fra le due persone', () => {
-  const OPTS = { since: '2026-08-01', opening: 0 }
+  const OPTS = { since: '2026-08-01', opening: 0, today: OGGI }
 
   const SPESE: Expense[] = [
     // prima del punto di partenza: sta già dentro `opening`, non si conta
@@ -626,7 +634,7 @@ describe('il saldo tricount per tricount', () => {
   ]
 
   it('separa i tricount, e le vacanze una per viaggio', () => {
-    const saldo = coupleBalance(SPESE, [], { since: '2026-08-01', opening: 0 })
+    const saldo = coupleBalance(SPESE, [], { since: '2026-08-01', opening: 0, today: OGGI })
     /* In ordine alfabetico: senza il prefisso «vacanze/» i viaggi si mescolano. */
     expect(saldo.groups.map((g) => g.key).sort()).toEqual(['condivise', 'creta-2025', 'fisse'])
     const per = (key: string) => saldo.groups.find((g) => g.key === key)
@@ -641,6 +649,7 @@ describe('il saldo tricount per tricount', () => {
     const saldo = coupleBalance(SPESE, [], {
       since: '2026-08-01',
       opening: 0,
+      today: OGGI,
       groups: {
         /* Dichiarato dopo la spesa: quella sta già dentro il numero di partenza. */
         fisse: { since: '2026-08-31', opening: 16.93 },
@@ -664,7 +673,7 @@ describe('il saldo tricount per tricount', () => {
      * silenzio. `opening` è un residuo del rapporto, non il valore di partenza
      * dei gruppi.
      */
-    const saldo = coupleBalance(SPESE, [], { since: '2026-08-01', opening: 100 })
+    const saldo = coupleBalance(SPESE, [], { since: '2026-08-01', opening: 100, today: OGGI })
     expect(saldo.groups).toHaveLength(3)
     expect(saldo.balance).toBe(140)
     for (const group of saldo.groups) expect(group.opening).toBe(0)
@@ -674,6 +683,7 @@ describe('il saldo tricount per tricount', () => {
     const saldo = coupleBalance([], [], {
       since: '2026-08-01',
       opening: 0,
+      today: OGGI,
       groups: { 'sud-italia-2026': { since: '2026-08-20', opening: 0 } },
     })
     expect(saldo.groups.map((g) => g.key)).toEqual(['sud-italia-2026'])
@@ -696,7 +706,7 @@ describe('il saldo tricount per tricount', () => {
         tricount: 'germania-2024',
       }),
     ]
-    const saldo = coupleBalance(vecchia, [], { since: '2026-08-16', opening: 0 })
+    const saldo = coupleBalance(vecchia, [], { since: '2026-08-16', opening: 0, today: OGGI })
     expect(saldo.groups.map((g) => g.key)).toEqual(['germania-2024'])
     expect(saldo.groups[0]?.declared).toBe(false)
     expect(saldo.groups[0]?.movements).toBe(0)
@@ -714,16 +724,104 @@ describe('il saldo tricount per tricount', () => {
         shares: { me: 20, partner: 0 },
       }),
     ]
-    expect(coupleBalance(personali, [], { since: '2026-08-01', opening: 0 }).groups).toEqual([])
+    expect(coupleBalance(personali, [], { since: '2026-08-01', opening: 0, today: OGGI }).groups).toEqual([])
   })
 
   it('ogni movimento sa da quale tricount viene', () => {
-    const saldo = coupleBalance(SPESE, [], { since: '2026-08-01', opening: 0 })
+    const saldo = coupleBalance(SPESE, [], { since: '2026-08-01', opening: 0, today: OGGI })
     expect(saldo.movements.map((m) => m.group)).toEqual([
       'creta-2025',
       'condivise',
       'fisse',
     ])
+  })
+})
+
+/*
+ * Il difetto da cui nasce: una spesa da 5 € datata per sbaglio al 15 settembre
+ * muoveva il saldo di agosto. Una voce datata avanti non è un debito che c'è
+ * già — è un debito che ci sarà, e finché non comincia il suo mese il conto fra
+ * le due persone non la conosce. → ADR-0064
+ */
+describe('il saldo non conta ciò che è datato dopo questo mese', () => {
+  const BASE = { since: '2026-08-01', opening: 0 }
+  const futura = expense({ id: 'f1', date: '2026-09-15', amount: 100, paidBy: 'me' })
+
+  it('una spesa del mese prossimo non muove il saldo, e viene contata a parte', () => {
+    const saldo = coupleBalance([futura], [], { ...BASE, today: '2026-08-31' })
+    expect(saldo.balance).toBe(0)
+    expect(saldo.movements).toEqual([])
+    expect(saldo.deferred).toBe(1)
+  })
+
+  it('la stessa spesa entra nel saldo dal primo giorno del suo mese', () => {
+    const saldo = coupleBalance([futura], [], { ...BASE, today: '2026-09-01' })
+    expect(saldo.balance).toBe(50)
+    expect(saldo.deferred).toBe(0)
+  })
+
+  it('la soglia è il mese e non il giorno: più avanti nello stesso mese conta già', () => {
+    /* Senza questo il saldo diventerebbe una cosa che matura a mezzanotte, e
+       l'affitto registrato il 27 con la data del 31 sparirebbe per quattro
+       giorni dal conto di chi l'ha anticipato. */
+    const piuAvanti = expense({ id: 'f2', date: '2026-08-31', amount: 100, paidBy: 'me' })
+    const saldo = coupleBalance([piuAvanti], [], { ...BASE, today: '2026-08-01' })
+    expect(saldo.balance).toBe(50)
+    expect(saldo.deferred).toBe(0)
+  })
+
+  it('un rimborso datato avanti non abbassa un debito che ancora non esiste', () => {
+    const debito = expense({ id: 'd1', date: '2026-08-05', amount: 100, paidBy: 'me' })
+    const rimborso: Settlement = {
+      id: 'r1',
+      date: '2026-09-02',
+      from: 'partner',
+      to: 'me',
+      amount: 50,
+    }
+    const saldo = coupleBalance([debito], [rimborso], { ...BASE, today: '2026-08-31' })
+    expect(saldo.balance).toBe(50)
+    expect(saldo.settled).toBe(0)
+    expect(saldo.deferred).toBe(1)
+  })
+
+  it('la soglia è esportata, perché la usa anche il pannello che sposta una spesa', () => {
+    /* Due espressioni della stessa soglia prima o poi direbbero cose diverse:
+       il saldo la usa per non contare, il pannello per non annunciare al
+       presente un debito che si muove il mese prossimo. */
+    expect(notYetInBalance('2026-09-01', '2026-08-31')).toBe(true)
+    expect(notYetInBalance('2026-08-31', '2026-08-01')).toBe(false)
+    expect(notYetInBalance('2026-08-01', '2026-09-15')).toBe(false)
+  })
+
+  it('conta come rinviato solo ciò che avrebbe mosso il saldo', () => {
+    /* `deferred` accende una riga che annuncia una divergenza da Tricount. Per
+       una spesa senza quota dell'altra persona, o anticipata da qualcun altro,
+       quella divergenza non esiste: annunciarla sarebbe un falso allarme. */
+    const personale = expense({
+      id: 'f3',
+      date: '2026-09-10',
+      amount: 40,
+      paidBy: 'me',
+      tricount: 'personali',
+      shares: { me: 40, partner: 0 },
+    })
+    const daTerzi = expense({ id: 'f4', date: '2026-09-11', amount: 60, paidBy: 'others' })
+    const saldo = coupleBalance([personale, daTerzi], [], { ...BASE, today: '2026-08-31' })
+    expect(saldo.balance).toBe(0)
+    expect(saldo.deferred).toBe(0)
+  })
+
+  it('un tricount che esiste solo nel futuro non compare fra i gruppi', () => {
+    /* La spesa esce **prima** di `bucketOf`: contandola nella storia del
+       tricount comparirebbe una riga a zero, marcata «senza punto di partenza»,
+       per un tricount che oggi non ha ancora niente da dire. */
+    const saldo = coupleBalance([{ ...futura, tricount: 'creta-2027' }], [], {
+      ...BASE,
+      today: '2026-08-31',
+    })
+    expect(saldo.groups).toEqual([])
+    expect(saldo.undeclared).toEqual([])
   })
 })
 
@@ -757,7 +855,7 @@ describe('quanto sposta il saldo una spesa', () => {
    */
   it('spostare una spesa muove quel numero da un gruppo all’altro, e il totale resta', () => {
     const spesa = expense({ id: 'x', date: '2026-08-10', amount: 50, paidBy: 'me' })
-    const opts = { since: '2026-08-01', opening: 0 }
+    const opts = { since: '2026-08-01', opening: 0, today: OGGI }
     const prima = coupleBalance([spesa], [], opts)
     const dopo = coupleBalance([{ ...spesa, tricount: 'fisse' }], [], opts)
 
@@ -797,7 +895,7 @@ describe('portare una spesa in «Personale»', () => {
 
   it('e il saldo la conta, anche se è un tricount personale', () => {
     const mia = { ...pagataDaLei, tricount: 'personali' as const, shares: { me: 50, partner: 0 } }
-    const saldo = coupleBalance([mia], [], { since: '2026-08-01', opening: 0 })
+    const saldo = coupleBalance([mia], [], { since: '2026-08-01', opening: 0, today: OGGI })
     expect(saldo.balance).toBe(-50)
     expect(saldo.groups.map((g) => g.key)).toEqual(['personali'])
   })
