@@ -129,12 +129,15 @@ export function Impostazioni(): ReactNode {
                 <StatTile
                   label="Entrate mensili"
                   value={money(breakdown?.totale ?? 0)}
+                  /* L'obiettivo di risparmio si vede **anche** a guadagni
+                     oscurati: non è un guadagno, ed è la stessa cifra che il
+                     Riepilogo mostra nella riga «Da mettere da parte». Velarlo
+                     qui e non là sarebbe lo stesso numero con due trattamenti.
+                     → ADR-0066 */
                   hint={
-                    hideIncome
-                      ? undefined
-                      : profile.monthlySavingsTarget > 0
-                        ? `obiettivo risparmio ${formatEuro(profile.monthlySavingsTarget, { decimals: 0 })}`
-                        : 'nessun obiettivo di risparmio impostato'
+                    profile.monthlySavingsTarget > 0
+                      ? `obiettivo risparmio ${formatEuro(profile.monthlySavingsTarget, { decimals: 0 })}`
+                      : 'nessun obiettivo di risparmio impostato'
                   }
                 />
               </div>
@@ -193,16 +196,21 @@ export function Impostazioni(): ReactNode {
             ]}
           />
           <div className="card-foot">
-            Copre entrate, margine, spendibile e obiettivo di risparmio — qui e nel Riepilogo. Le
-            spese restano visibili: sono uscite, non guadagni. Per scoprire il numero un momento
-            basta toccarlo, e quel tocco vale solo per questa sessione: quello che resta è la scelta
-            qui sopra. Vive in questo browser come la persona scelta e il token, quindi non finisce
-            nei dati e non segue gli altri dispositivi.
+            Copre <strong>quanto guadagni</strong>: le entrate del mese e la loro composizione qui
+            sopra, e nel Riepilogo la riga «Entrate del mese» e i soldi rimasti in cassa. Resta
+            visibile <strong>quanto puoi spendere</strong> — il numero grande, quanto al giorno,
+            l'obiettivo di risparmio e la barra: è la risposta dell'app, e coprirla vorrebbe dire
+            spegnerla proprio mentre la mostri a qualcuno. Le spese si vedono sempre: sono uscite,
+            non guadagni. Per scoprire un numero un momento basta toccarlo, e quel tocco vale solo
+            per questa sessione. Vive in questo browser come la persona scelta e il token, quindi
+            non finisce nei dati e non segue gli altri dispositivi.
           </div>
           <div className="card-foot">
-            Un limite dichiarato: la pastiglia «sotto controllo / da tenere d'occhio» resta
-            visibile, e dice che le entrate stanno sopra la spesa prevista. Regala una soglia, non
-            una cifra — è il prezzo di conservare lo stato del mese.
+            Due limiti dichiarati. Il conto del Riepilogo è una sottrazione a cui manca la prima
+            riga, quindi chi somma le altre quattro ricava il totale: protegge dallo sguardo, non
+            dall'aritmetica — e il totale che ne esce è il profilo <em>stimato</em>, non una busta
+            paga. E la pastiglia «sotto controllo / da tenere d'occhio» dice che le entrate stanno
+            sopra la spesa prevista: regala una soglia, non una cifra.
           </div>
         </Card>
 

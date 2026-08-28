@@ -19,8 +19,10 @@
  * contano già solo la propria quota. → ADR-0058, ADR-0019
  *
  * Con i guadagni oscurati i campi segreti arrivano già a `null` da
- * `marginView()`: qui non c'è nessun numero da velare, e la barra diventa
- * neutra perché un riempimento parziale **è** la quota spesa.
+ * `marginView()`: qui non c'è nessun numero da velare. La barra invece resta
+ * quella di sempre — non ha bisogno delle entrate per comporsi — e con lei il
+ * numero grande e il conto: il velo copre quanto guadagni, non quanto puoi
+ * spendere. → ADR-0066
  */
 
 import type { ReactNode } from 'react'
@@ -286,17 +288,22 @@ export function MarginMeter({
           className="meter-track"
           role="meter"
           aria-valuemin={0}
-          aria-valuemax={bar?.total ?? undefined}
-          aria-valuenow={bar?.committed}
+          /* In **percentuale**, non in euro: il totale della barra sono le
+             entrate, e a guadagni oscurati non devono uscire da una porta di
+             servizio — un lettore di schermo le annuncerebbe. La proporzione è
+             la stessa cosa che la barra mostra a chi la guarda. → ADR-0066 */
+          aria-valuemax={100}
+          aria-valuenow={bar === null ? undefined : Math.round((bar.committed / bar.total) * 100)}
           aria-label={
             bar === null
-              ? 'Quota delle entrate del mese già impegnata, nascosta'
-              : 'Quota delle entrate del mese già impegnata'
+              ? 'Quota del mese già impegnata, nascosta'
+              : 'Quota del mese già impegnata'
           }
         >
           {bar === null ? (
-            /* Neutra e piena: le proporzioni **sono** i numeri, e a guadagni
-               oscurati `marginBar` non compone niente proprio per questo. */
+            /* Neutra e piena. Non è più il caso dei guadagni oscurati — da
+               ADR-0066 la barra si compone lo stesso, perché non ha bisogno
+               delle entrate — ma quello di un mese senza niente da dividere. */
             <div className="meter-fill is-hidden" style={{ width: '100%' }} />
           ) : (
             <>

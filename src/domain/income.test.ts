@@ -159,16 +159,20 @@ describe('oscurare i guadagni', () => {
     'variableSpent',
     'fixedSpent',
     'fixedStillDue',
+    /* Da ADR-0066: il velo copre quanto guadagni, non quanto puoi spendere. */
+    'savingsTarget',
+    'spendable',
+    'spendablePerDay',
   ]
 
-  it('lascia in chiaro solo i campi che parlano di spese', () => {
+  it('lascia in chiaro le spese e ciò che resta da spendere', () => {
     const view = marginView(result, { hideIncome: true })
     for (const key of VISIBILI) {
       expect(view[key as keyof typeof view]).toBe(result[key as keyof typeof result])
     }
   })
 
-  it('azzera ogni altro campo, compresi quelli da cui le entrate si ricavano per sottrazione', () => {
+  it('azzera ogni altro campo, a partire dai guadagni nudi', () => {
     const view = marginView(result, { hideIncome: true })
     const azzerati = Object.keys(result).filter((key) => !VISIBILI.includes(key))
     // Se questo elenco si svuota, il test non sta più presidiando niente.
@@ -176,6 +180,33 @@ describe('oscurare i guadagni', () => {
     for (const key of azzerati) {
       expect(view[key as keyof typeof view]).toBeNull()
     }
+  })
+
+  it('copre i guadagni e tutto ciò che è «entrate meno qualcosa»', () => {
+    /* Nominati uno per uno, e non per differenza: questi non chiedono una somma
+       a chi guarda, basta leggerli. → ADR-0066 */
+    const view = marginView(result, { hideIncome: true })
+    for (const key of [
+      'income',
+      'breakdown',
+      'margin',
+      'marginAfterSavings',
+      'projectedMargin',
+      'projectedMarginAfterSavings',
+      'discretionaryBudget',
+      'usedPct',
+    ] as const) {
+      expect(view[key]).toBeNull()
+    }
+  })
+
+  it('lo spendibile resta leggibile: è la risposta dell’app, non un guadagno', () => {
+    /* Il difetto che ha fatto nascere ADR-0066: coperto anche questo, l'app
+       mostrata a un amico non diceva più niente, e l'oscuramento restava
+       spento. */
+    const view = marginView(result, { hideIncome: true })
+    expect(view.spendable).toBe(result.spendable)
+    expect(view.savingsTarget).toBe(result.savingsTarget)
   })
 
   it('non tocca niente quando i guadagni sono in chiaro', () => {
@@ -342,6 +373,27 @@ describe('la barra quando si è andati oltre', () => {
     expect(barra.segments.reduce((acc, s) => acc + s.pct, 0)).toBeCloseTo(100, 6)
     expect(barra.total).toBeGreaterThan(vista.income)
   })
+
+  /*
+   * Il caso patologico: risparmio e fisse **da soli** superano le entrate, cioè
+   * non ti puoi permettere l'affitto. È l'unico ramo in cui l'eccedenza va
+   * limitata alle variabili: senza il taglio verrebbe più lunga di loro, e il
+   * segmento delle variabili «dentro» diventerebbe negativo. → ADR-0066
+   */
+  it('quando non ti puoi permettere le fisse, il rosso vale tutte le variabili', () => {
+    const povero: IncomeProfile = { ...PROFILE, netMonthly: 400, extraMonths: 0, annualBonusNet: 0 }
+    const risultato = computeMargin(
+      { month: '2026-08', total: 1100, fixed: 300, variable: 800, count: 30 },
+      { ...proiezione, expectedFixed: 470 },
+      povero,
+    )
+    expect(risultato.discretionaryBudget).toBeLessThan(0)
+    const b = marginBar(risultato, { projectedVariable: null })!
+    const seg = (key: string): number => b.segments.find((x) => x.key === key)?.amount ?? 0
+    expect(seg('eccedenza')).toBeCloseTo(risultato.variableSpent, 2)
+    expect(seg('variabili')).toBe(0)
+    expect(b.segments.reduce((acc, x) => acc + x.pct, 0)).toBeCloseTo(100, 6)
+  })
 })
 
 describe('la barra a guadagni oscurati', () => {
@@ -356,13 +408,30 @@ describe('la barra a guadagni oscurati', () => {
   }
 
   /*
-   * Non è una precauzione in più: le proporzioni **sono** i numeri. Una barra
-   * col risparmio a 300 su un totale disegnato restituirebbe le entrate con una
-   * divisione, che è esattamente ciò da cui ADR-0016 protegge.
+   * La barra si compone **anche** a guadagni oscurati, e deve venire identica:
+   * non ha bisogno delle entrate, perché il suo fondo è l'impegnato più ciò che
+   * avanza — che è la stessa misura scritta senza nominarle. Se un giorno
+   * divergesse, vorrebbe dire che una delle due strade ha smesso di essere la
+   * definizione dell'altra. → ADR-0066
    */
-  it('non si compone affatto', () => {
-    const coperta = marginView(computeMargin(mese, proiezione, PROFILE), { hideIncome: true })
-    expect(marginBar(coperta, { projectedVariable: 1000 })).toBeNull()
+  it('si compone identica, coperta o no', () => {
+    const risultato = computeMargin(mese, proiezione, PROFILE)
+    const chiara = marginBar(risultato, { projectedVariable: 1000 })
+    const coperta = marginBar(marginView(risultato, { hideIncome: true }), {
+      projectedVariable: 1000,
+    })
+    expect(coperta).toEqual(chiara)
+    expect(coperta).not.toBeNull()
+  })
+
+  it('il totale della barra resta le entrate, che però non passano di qui', () => {
+    /* Il totale disegnato **è** le entrate: è il limite dichiarato di ADR-0066,
+       e questo test lo tiene scritto invece di lasciarlo scoprire. */
+    const risultato = computeMargin(mese, proiezione, PROFILE)
+    const barra = marginBar(marginView(risultato, { hideIncome: true }), {
+      projectedVariable: 1000,
+    })
+    expect(barra?.total).toBe(risultato.income)
   })
 
   it('e nemmeno senza profilo entrate', () => {
