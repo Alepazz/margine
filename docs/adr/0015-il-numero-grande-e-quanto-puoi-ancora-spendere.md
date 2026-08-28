@@ -4,13 +4,13 @@
 
 ## Context
 
-Il numero grande del Riepilogo era `entrate − speso`. Il 20 agosto 2026 diceva **[cifra rimossa]**, e Alessio l'ha guardato dicendo che non gli serve: *«quello dal mio punto di vista deve essere una stima di spesa, ovvero quanto posso spendere ancora»*.
+Il numero grande del Riepilogo era `entrate − speso`. Il 20 agosto 2026 diceva **1900 €**, e Alessio l'ha guardato dicendo che non gli serve: *«quello dal mio punto di vista deve essere una stima di spesa, ovvero quanto posso spendere ancora»*. (Cifre d'esempio, negli stessi rapporti di quelle vere di quel giorno: → ADR-0067.)
 
-Aveva ragione, e i dati lo dicono con precisione. Di quei [cifra rimossa], **471 erano affitto e bollette che non erano ancora usciti dal conto** e **300 erano l'obiettivo di risparmio**: 771 € non erano spendibili, ma il numero li presentava come tali. Peggio, la riga «circa 146 € al giorno» divideva il margine al netto del solo risparmio, ignorando le fisse in arrivo: la cifra giusta era 103.
+Aveva ragione, e i dati lo dicono con precisione. Di quei 1900 €, **550 erano affitto e bollette che non erano ancora usciti dal conto** e **250 erano l'obiettivo di risparmio**: 800 € non erano spendibili, ma il numero li presentava come tali. Peggio, la riga «circa 150 € al giorno» divideva il margine al netto del solo risparmio, ignorando le fisse in arrivo: la cifra giusta era 100.
 
-Il modello non mancava. `projectMonth()` calcolava già `expectedFixed = max(fisse già addebitate, media storica delle fisse)`, cioè sapeva già che ad agosto mancavano 471 € di uscite dovute. Il difetto era solo che il componente metteva in grande un altro numero.
+Il modello non mancava. `projectMonth()` calcolava già `expectedFixed = max(fisse già addebitate, media storica delle fisse)`, cioè sapeva già che ad agosto mancavano 550 € di uscite dovute. Il difetto era solo che il componente metteva in grande un altro numero.
 
-Due alternative. **Tenere [cifra rimossa] e spiegare sotto cosa è già impegnato**: intervento minimo, ma lascia in grande proprio la cifra che ha fatto storcere il naso. **Mostrare due numeri affiancati**, «in cassa» e «spendibile»: più informazione, ma due numeri grandi competono e il Riepilogo perde il singolo numero per cui l'app esiste.
+Due alternative. **Tenere 1900 € e spiegare sotto cosa è già impegnato**: intervento minimo, ma lascia in grande proprio la cifra che ha fatto storcere il naso. **Mostrare due numeri affiancati**, «in cassa» e «spendibile»: più informazione, ma due numeri grandi competono e il Riepilogo perde il singolo numero per cui l'app esiste.
 
 ## Decision
 
@@ -32,7 +32,7 @@ Il semaforo **non si tocca**. Si dimostra che non serve: dalle definizioni, `spe
 
 ## Consequences
 
-Il numero grande diventa più piccolo e smette di mentire: ad agosto passa da 1903 a [cifra rimossa], e la spesa giornaliera da 146 a 103. E **i mesi passati non si muovono di un centesimo**, perché a mese chiuso `expectedFixed` è uguale alle fisse davvero addebitate e la formula collassa in `entrate − speso − risparmio`, che era già il margine al netto del risparmio. Un test presidia quell'uguaglianza.
+Il numero grande diventa più piccolo e smette di mentire: ad agosto passa da 1900 a 1100 €, e la spesa giornaliera da 150 a 100. E **i mesi passati non si muovono di un centesimo**, perché a mese chiuso `expectedFixed` è uguale alle fisse davvero addebitate e la formula collassa in `entrate − speso − risparmio`, che era già il margine al netto del risparmio. Un test presidia quell'uguaglianza.
 
 In cambio lo spendibile **eredita l'incertezza della media storica delle fisse**. In un mese con una fissa fuori dall'ordinario — un conguaglio, un'assicurazione annuale — la media sottostima l'impegno vero e lo spendibile risulta più generoso del dovuto, finché quell'uscita non compare nei dati. È lo stesso limite che la proiezione ha sempre avuto, ma ora pesa sul numero principale.
 

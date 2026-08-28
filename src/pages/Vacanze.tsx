@@ -394,8 +394,9 @@ export function Vacanze(): ReactNode {
             ) : (
               <>
             <div className="kpi-row" style={{ marginBottom: 14 }}>
-              {/* Senza centesimi: su telefono «[cifra rimossa]» non ci sta nella piastrella
-                  e viene troncato. I centesimi esatti stanno nelle righe qui sotto. */}
+              {/* Senza centesimi: su telefono «1234,56 €» — cifra d'esempio, larga
+                  come le vere (→ ADR-0067) — non ci sta nella piastrella e viene
+                  troncato. I centesimi esatti stanno nelle righe qui sotto. */}
               <StatTile label="La tua quota" value={formatEuro(trip.share, { decimals: 0 })} />
               <StatTile
                 label="Costato a voi due"

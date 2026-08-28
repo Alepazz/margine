@@ -11,7 +11,7 @@ const CONFIG = {
 
 const CONDIVISE = { id: 'condivise', name: 'Condivise', members: ['me', 'partner'] }
 const TRIP = {
-  id: 'creta',
+  id: 'vacanza',
   name: 'Creta',
   members: ['me', 'partner'],
   trip: { place: 'Creta', year: 2025, start: '2025-08-17', end: '2025-08-25' },
@@ -45,7 +45,7 @@ describe('quote', () => {
             amount: 180,
             shares: { me: 30, partner: 30, others: 120 },
             paidBy: 'others',
-            tricount: 'creta',
+            tricount: 'vacanza',
             category: 'viaggi',
             subcategory: 'cibo',
           }),
@@ -64,7 +64,7 @@ describe('quote', () => {
           expense({
             amount: 180,
             shares: { me: 30, partner: 30 },
-            tricount: 'creta',
+            tricount: 'vacanza',
             category: 'viaggi',
           }),
         ],
@@ -108,7 +108,7 @@ describe('quote', () => {
           expense({
             amount: 180,
             shares: { me: 30, partner: 30, others: 120 },
-            tricount: 'creta',
+            tricount: 'vacanza',
             category: 'viaggi',
           }),
         ],

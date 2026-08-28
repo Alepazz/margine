@@ -75,13 +75,14 @@ export function Home(): ReactNode {
    * Le fisse attese si stimano sugli **ultimi dodici mesi**, non su tutta la
    * storia, e sono l'unica media con una finestra mobile.
    *
-   * I tricount partono da ottobre 2024 ma l'affitto compare da dicembre:
-   * ottobre fa [cifra rimossa] di fisse e novembre [cifra rimossa], due mesi che non sono mai
-   * esistiti così. Tenerli dentro fa [cifra rimossa] contro i [cifra rimossa] degli ultimi
-   * dodici, e quella differenza è tratteggio che manca nella barra e soldi che
-   * sembrano spendibili e non lo sono. Il resto delle medie resta su tutta la
-   * storia: là la domanda è «rispetto a come vivo di solito», qui è «quanto mi
-   * aspetta a fine mese». → ADR-0056
+   * I tricount partono da ottobre 2024 ma l'affitto compare da dicembre: in
+   * ottobre e novembre le fisse sono quasi niente, due mesi che non sono mai
+   * esistiti così. Tenerli dentro abbassa la media delle fisse di una
+   * cinquantina di euro rispetto agli ultimi dodici, e quella differenza è
+   * tratteggio che manca nella barra e soldi che sembrano spendibili e non lo
+   * sono. Il resto delle medie resta su tutta la storia: là la domanda è
+   * «rispetto a come vivo di solito», qui è «quanto mi aspetta a fine mese».
+   * → ADR-0056
    */
   const fixedBase = useMemo(
     () =>
@@ -244,8 +245,9 @@ export function Home(): ReactNode {
 
         {/*
           Il confronto col mese scorso sta in alto perché è la statistica che si
-          guarda per prima sul mese in corso: sapere di aver speso [cifra rimossa] serve a
-          poco senza sapere che a luglio, agli stessi giorni, erano [cifra rimossa].
+          guarda per prima sul mese in corso: sapere quanto si è speso finora
+          serve a poco senza sapere quanto era, agli stessi giorni, il mese
+          scorso.
         */}
         {futureMonth ? null : (
           <Card title="Confronti" note={`Quota di ${config.people[person].name}`}>

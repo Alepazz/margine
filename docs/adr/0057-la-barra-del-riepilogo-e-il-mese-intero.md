@@ -6,9 +6,9 @@
 
 Il 27 agosto 2026 Alessio ha registrato l'affitto e si è trovato oltre il mese. Le sue parole: *«mi sono trovato ad aver sforato il mese, mentre non me lo sarei aspettato ma mi sarei aspettato che quella spesa fosse già contata in precedenza»*.
 
-Il modello **la contava già**. `expectedFixed` sconta le fisse dal primo giorno del mese, quindi registrare l'affitto non muove lo spendibile di un centesimo — verificato sui dati veri e ora presidiato da un test. Quel giorno però l'affitto era stato inserito **senza la spunta «ricorrente»**, quindi non era una spesa fissa: era finito fra le variabili, in aggiunta alla media delle fisse già sottratta. Pagato due volte, e lo spendibile da +[cifra rimossa] a −[cifra rimossa]. Differenza [cifra rimossa], la sua quota al centesimo.
+Il modello **la contava già**. `expectedFixed` sconta le fisse dal primo giorno del mese, quindi registrare l'affitto non muove lo spendibile di un centesimo — verificato sui dati veri e ora presidiato da un test. Quel giorno però l'affitto era stato inserito **senza la spunta «ricorrente»**, quindi non era una spesa fissa: era finito fra le variabili, in aggiunta alla media delle fisse già sottratta. Pagato due volte, e lo spendibile è passato da positivo a negativo: la differenza era la sua quota d'affitto, al centesimo.
 
-Ma la spunta dimenticata è solo l'innesco. La domanda vera è perché il meccanismo non fosse visibile, e la risposta sta in una scelta di ADR-0015: il misuratore era il rapporto fra **variabili spese** e **fondo discrezionale**. Diceva il vero ed era la grandezza giusta per «quanto mi resta da spendere», ma risparmio e fisse stanno *fuori* da quel fondo per costruzione — non c'era posto per mostrarli. Chi guardava la barra non vedeva mai i 300 € da mettere da parte né i [cifra rimossa] di fisse: vedeva solo il pezzo di mese in cui poteva ancora decidere. L'affitto sembrava arrivare dal nulla il giorno che compariva.
+Ma la spunta dimenticata è solo l'innesco. La domanda vera è perché il meccanismo non fosse visibile, e la risposta sta in una scelta di ADR-0015: il misuratore era il rapporto fra **variabili spese** e **fondo discrezionale**. Diceva il vero ed era la grandezza giusta per «quanto mi resta da spendere», ma risparmio e fisse stanno *fuori* da quel fondo per costruzione — non c'era posto per mostrarli. Chi guardava la barra non vedeva mai i soldi da mettere da parte né le fisse: vedeva solo il pezzo di mese in cui poteva ancora decidere. L'affitto sembrava arrivare dal nulla il giorno che compariva.
 
 ## Decision
 
@@ -22,7 +22,7 @@ Le **fisse ancora attese sono tratteggiate**: già scontate dal numero grande, m
 
 Il **risparmio ha un colore suo** perché è l'unica cosa nella barra che non è una spesa. Le **variabili** prendono la tinta del semaforo: sono la parte su cui si può ancora incidere, e l'unica il cui colore deve poter cambiare mentre la guardi. La **coda vuota è lo spendibile**, cioè il numero grande, disegnato.
 
-Quando si supera la riga delle entrate la barra **non sfonda**: il denominatore diventa l'impegnato, e l'eccedenza prende un pezzo rosso in coda, separato da un filo chiaro che segna dov'erano le entrate. Senza quel filo, con il semaforo rosso anche le variabili sono rosse e i due segmenti diventano un unico blocco: misurato, [cifra rimossa] di variabili e 66 € di eccedenza indistinguibili.
+Quando si supera la riga delle entrate la barra **non sfonda**: il denominatore diventa l'impegnato, e l'eccedenza prende un pezzo rosso in coda, separato da un filo chiaro che segna dov'erano le entrate. Senza quel filo, con il semaforo rosso anche le variabili sono rosse e i due segmenti diventano un unico blocco: misurato su un mese vero, un'eccedenza piccola in coda a un segmento di variabili molto più lungo era indistinguibile.
 
 **La legenda sono le righe del conto**, con un pallino del colore del loro segmento. Un elenco di colori sotto la barra avrebbe ripetuto quelle stesse righe, che i numeri li portano già.
 

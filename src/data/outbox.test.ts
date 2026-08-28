@@ -459,7 +459,7 @@ const CONFIG: AppConfig = {
       annualBonusNet: 0,
       mealVouchers: { valuePerDay: 0, daysPerMonth: 0 },
       otherMonthlyNet: 0,
-      monthlySavingsTarget: 300,
+      monthlySavingsTarget: 250,
     },
     partner: null,
   },

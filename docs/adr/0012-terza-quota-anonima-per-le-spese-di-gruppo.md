@@ -6,9 +6,9 @@
 
 L'ADR-0007 ha fissato `shares: { me, partner }`, due quote che sommano esattamente all'importo. Regge finché si spende in due.
 
-Non regge sui dati veri. Due dei cinque tricount di vacanza hanno altre persone dentro: la Germania del 2024 con due parenti, Creta 2025 con quattro amici. Sono 51 voci su 1253, con [cifra rimossa] di quote che non sono nostre. Una cena da [cifra rimossa] divisa in sei — 36,01 suoi, 36,02 di Federica, il resto degli altri — non è rappresentabile con due quote, e la validazione la rifiuta perché 72,03 ≠ 216,10.
+Non regge sui dati veri. Due dei cinque tricount di vacanza hanno altre persone dentro: la Germania del 2024 con due parenti, Creta 2025 con quattro amici. Sono 51 voci su 1253, e in ognuna una parte del conto non era nostra. Una cena da 180,00 € divisa in sei — 30,00 suoi, 30,00 di Federica, il resto degli altri — non è rappresentabile con due quote, e la validazione la rifiuta perché 60,00 ≠ 180,00. (Le cifre di questa cena sono inventate: → ADR-0067.)
 
-Tre modi di uscirne. **Ridurre l'importo alla sola parte nostra** (72,03 €): il modello non cambia, ma l'app non sa più che quella cena è costata 216 € e i totali non riconciliano più con Tricount — che è l'unico controllo che abbiamo sulla correttezza di un import. **Lasciare che le quote sommino a meno dell'importo**: indebolisce l'invariante che ha già intercettato errori veri, per un caso che è l'1% dei dati. **Aggiungere un terzo secchio.**
+Tre modi di uscirne. **Ridurre l'importo alla sola parte nostra** (60,00 €): il modello non cambia, ma l'app non sa più che quella cena è costata 180 € e i totali non riconciliano più con Tricount — che è l'unico controllo che abbiamo sulla correttezza di un import. **Lasciare che le quote sommino a meno dell'importo**: indebolisce l'invariante che ha già intercettato errori veri, per un caso che è il 4% dei dati. **Aggiungere un terzo secchio.**
 
 Su cosa serve sapere, la richiesta è stata esplicita: interessano la spesa propria, quella di Federica e il totale del viaggio — sia del gruppo che diviso nelle tre parti. Non interessa chi c'era né come si dividevano tra loro.
 
@@ -24,7 +24,7 @@ Ne segue una regola di presentazione: **«quanto abbiamo speso» è sempre `me +
 
 ## Consequences
 
-I numeri restano veri su entrambi i piani: nel dettaglio di Creta si legge che il gruppo ha speso [cifra rimossa], che a noi due sono costati [cifra rimossa] e che [cifra rimossa] erano di altri. La riconciliazione con Tricount continua a funzionare al centesimo, perché `amount` è rimasto l'importo fatturato.
+I numeri restano veri su entrambi i piani: nel dettaglio di Creta si legge quanto ha speso il gruppo, quanto è costato a noi due e quanto era di altri. La riconciliazione con Tricount continua a funzionare al centesimo, perché `amount` è rimasto l'importo fatturato.
 
 Il prezzo è un invariante con un termine in più, quindi un modo in più di sbagliare: chi aggiunge un selettore che somma `amount` per dire «quanto abbiamo speso» introduce un errore silenzioso che si vede solo nei mesi con una vacanza di gruppo. È il motivo per cui `coupleShare` esiste come funzione invece di essere scritta a mano ogni volta.
 

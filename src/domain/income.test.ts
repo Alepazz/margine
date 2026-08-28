@@ -238,12 +238,12 @@ describe('una spesa fissa che arriva', () => {
   })
 
   it('non muove lo spendibile, se ha la spunta di ricorrente', () => {
-    const prima: MonthTotal = { month: '2026-08', total: 1100, fixed: 20, variable: 1000, count: 30 }
+    const prima: MonthTotal = { month: '2026-08', total: 1020, fixed: 20, variable: 1000, count: 30 }
     const dopo: MonthTotal = {
       month: '2026-08',
-      total: 1100 + AFFITTO,
+      total: 1020 + AFFITTO,
       fixed: 20 + AFFITTO,
-      variable: 1083,
+      variable: 1000,
       count: 31,
     }
     /* Le fisse attese non cambiano: la media le prevedeva già. */
@@ -254,17 +254,17 @@ describe('una spesa fissa che arriva', () => {
   })
 
   it('lo abbatte di tutto il suo importo, se la spunta manca', () => {
-    const prima: MonthTotal = { month: '2026-08', total: 1100, fixed: 20, variable: 1000, count: 30 }
+    const prima: MonthTotal = { month: '2026-08', total: 1020, fixed: 20, variable: 1000, count: 30 }
     const senzaSpunta: MonthTotal = {
       month: '2026-08',
-      total: 1100 + AFFITTO,
-      fixed: 17,
+      total: 1020 + AFFITTO,
+      fixed: 20,
       variable: 1000 + AFFITTO,
       count: 31,
     }
     const attese = 520
     /* In centesimi: la sottrazione fra due euro in virgola mobile darebbe
-       444,00000000000006, che è il difetto contro cui esiste `money.ts`. */
+       500,00000000000006, che è il difetto contro cui esiste `money.ts`. */
     const perso =
       toCents(computeMargin(prima, chiusura(prima, attese), PROFILE).spendable) -
       toCents(computeMargin(senzaSpunta, chiusura(senzaSpunta, attese), PROFILE).spendable)

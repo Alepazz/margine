@@ -221,10 +221,10 @@ export const EMPTY_AVERAGE: Average = { perMonth: 0, fixedPerMonth: 0, variableP
  * `until` esclude i mesi **futuri**, e non è un'ipotesi di scuola: una sola
  * spesa datata per sbaglio nel mese prossimo allunga la serie fino a lì, e
  * `fillMonthGaps` riempie il buco con mesi a zero che entrano nella media come
- * se fossero stati vissuti. Misurato sui dati veri il 27/08/2026 — un modem da
- * 5 € datato 15 settembre — la media delle fisse scendeva da [cifra rimossa] a
- * [cifra rimossa]: ventun euro di soldi che sembravano spendibili e non lo erano. Un
- * mese che non è ancora arrivato non è un mese leggero. → ADR-0055
+ * se fossero stati vissuti. Misurato sui dati veri il 27/08/2026 — un modem
+ * datato 15 settembre — la media delle fisse scendeva di ventun euro: soldi
+ * che sembravano spendibili e non lo erano. Un mese che non è ancora arrivato
+ * non è un mese leggero. → ADR-0055
  */
 export function averageMonthly(
   series: readonly MonthTotal[],
@@ -557,7 +557,7 @@ export function compareYearOverYear(
 export interface YearTotal {
   year: number
   total: number
-  /** Mesi osservati: il 2024 ne ha tre, e senza dirlo sembra un anno da [cifra rimossa]. */
+  /** Mesi osservati: il 2024 ne ha tre, e senza dirlo sembra un anno leggero invece di un quarto d'anno. */
   months: number
   /** Media al mese sui mesi osservati: è il numero con cui due anni si confrontano. */
   perMonth: number
@@ -592,7 +592,7 @@ export function yearlyTotals(series: readonly MonthTotal[]): YearTotal[] {
  * `until` per la stessa ragione, un passo più in là: `count > 0` scarta i mesi
  * riempiti a zero ma **non** un mese futuro che contiene davvero una spesa
  * datata in avanti. Sui dati veri il 27/08/2026 il mese più leggero risultava
- * «settembre 2026, 2,50 €» — un mese che non era ancora cominciato. → ADR-0055
+ * «settembre 2026» — un mese che non era ancora cominciato. → ADR-0055
  */
 export function extremeMonths(
   series: readonly MonthTotal[],
@@ -832,9 +832,11 @@ export function houseOutside(
  * 1. **Il welfare non si filtra.** `fundedByWelfare()` toglie la spesa dal
  *    *budget* di chi l'ha anticipata, ma la quota dell'altra persona è debito
  *    eccome: quella la rimborsa in contanti. Passare qui le spese già filtrate
- *    da `visibleFor()` perderebbe [cifra rimossa] di soli alberghi del Sud Italia.
+ *    da `visibleFor()` perderebbe la quota di Federica sui soli alberghi del Sud
+ *    Italia, che è un debito vero.
  * 2. **Gli anticipi di terzi restano fuori.** Se ha pagato qualcuno del gruppo,
- *    il debito è verso di lui, non fra voi due: 32 spese, [cifra rimossa] di quote vostre.
+ *    il debito è verso di lui, non fra voi due: nei dati veri sono 32 spese, e
+ *    le vostre quote su quelle non entrano nel saldo.
  * 3. **Il saldo non tocca il margine.** Le spese contano già solo la propria
  *    quota, quindi quando il rimborso arriva il conto torna esattamente a quella:
  *    contarlo come entrata sarebbe contarlo due volte. → ADR-0019

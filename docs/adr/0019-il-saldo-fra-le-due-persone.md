@@ -8,7 +8,7 @@ Tricount esiste per dire una cosa che Margine non sapeva dire: **chi deve cosa a
 
 ADR-0014 l'aveva esclusa a parole sue: *«Modellarlo richiederebbe i trasferimenti fra le due persone, cioè rifare Tricount dentro Margine — e Tricount ce l'abbiamo già»*. Quella frase però non era la decisione di ADR-0014: era il limite noto che quella decisione si annotava addosso, insieme all'altro — che i soldi rimborsati da Federica sono un'entrata reale che l'app non conta.
 
-Il vincolo che decide tutto è nei dati. Il saldo calcolato su tutta la storia farebbe **[cifra rimossa]**: [cifra rimossa] di quote di Federica anticipate da Alessio, meno [cifra rimossa] del contrario. È palesemente falso, perché in due anni si sono saldati molte volte e **nessuno di quei rimborsi esiste nei dati**. Un saldo che parte dall'inizio dei tempi non è un saldo, è la somma di tutto ciò che è mai passato per una carta.
+Il vincolo che decide tutto è nei dati. Il saldo calcolato su tutta la storia farebbe **una cifra fuori scala**: tutte le quote di Federica anticipate da Alessio, meno tutte quelle del contrario. È palesemente falso, perché in due anni si sono saldati molte volte e **nessuno di quei rimborsi esiste nei dati**. Un saldo che parte dall'inizio dei tempi non è un saldo, è la somma di tutto ciò che è mai passato per una carta.
 
 ## Decision
 
@@ -20,8 +20,8 @@ Il segno è **fisso nel calcolo**: positivo = `partner` deve a `me`. La pagina l
 
 Tre regole che sembrano dettagli e non lo sono, ognuna con il suo test:
 
-- **Il welfare non si filtra.** `fundedByWelfare()` toglie la spesa dal *budget* di chi l'ha anticipata (ADR-0014), ma la quota dell'altra persona è debito eccome: quella la rimborsa in contanti. Riusare `visibleFor()` per pigrizia perderebbe [cifra rimossa] di soli alberghi del Sud Italia.
-- **Gli anticipi di terzi restano fuori.** Se ha pagato qualcuno del gruppo, il debito è verso di lui: 32 spese, [cifra rimossa] di quote loro. Compaiono come nota, non nel saldo.
+- **Il welfare non si filtra.** `fundedByWelfare()` toglie la spesa dal *budget* di chi l'ha anticipata (ADR-0014), ma la quota dell'altra persona è debito eccome: quella la rimborsa in contanti. Riusare `visibleFor()` per pigrizia perderebbe la quota di Federica sui soli alberghi del Sud Italia, che è un debito vero.
+- **Gli anticipi di terzi restano fuori.** Se ha pagato qualcuno del gruppo, il debito è verso di lui, non fra voi due: nei dati veri sono 32 spese, e le vostre quote su quelle non entrano nel saldo. Compaiono come nota.
 - **Il saldo non tocca il margine.** Le spese contano già solo la propria quota, quindi quando il rimborso arriva il conto torna esattamente a quella. Contarlo come entrata sarebbe contarlo due volte.
 
 **ADR-0014 resta `accepted`, e non viene marcato come superato.** La sua decisione — il flag welfare, l'esclusione per persona — non cambia di una virgola. Quello che questo ADR chiude è la conseguenza che ADR-0014 aveva dichiarato come debito. Le regole di progetto dicono di cambiare lo stato del vecchio solo quando una decisione nuova ne *cambia* una vecchia, e qui non succede.

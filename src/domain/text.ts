@@ -30,8 +30,8 @@ export function nameKey(text: string): string {
  *
  * Stava dentro `Saldo.tsx`, ed è tornata a mancare appena un secondo posto ha
  * avuto bisogno di dire la stessa frase — il saldo nel Riepilogo, che diceva
- * «Devi [cifra rimossa] a Alessio». Qui perché una regola di lingua italiana non è di
- * nessuna pagina in particolare.
+ * «Devi 123 € a Alessio» (cifra d'esempio: → ADR-0067). Qui perché
+ * una regola di lingua italiana non è di nessuna pagina in particolare.
  */
 export function aTo(name: string): string {
   return /^[aeiouàèéìòù]/i.test(name.trim()) ? 'ad' : 'a'

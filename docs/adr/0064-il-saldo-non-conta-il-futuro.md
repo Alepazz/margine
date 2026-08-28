@@ -6,7 +6,7 @@
 
 Alessio, subito dopo aver visto i tre difetti che una sola data sbagliata aveva scoperto (→ ADR-0063, ADR-0055): «l'operazione di saldo non dovrebbe tenere conto anche delle spese future, ne terrà conto solo da quando il mese in cui la spesa futura è stata segnata inizia».
 
-`coupleBalance` sommava tutto ciò che trovava. Una spesa datata al 15 settembre spostava il saldo di agosto, e con un affitto anticipato di mezzo — [cifra rimossa] di quota — sposta il conto fra due persone di un quarto. Il numero era «vero» nel senso che il dato c'era; era falso nel senso che rispondeva a un'altra domanda.
+`coupleBalance` sommava tutto ciò che trovava. Una spesa datata al 15 settembre spostava il saldo di agosto, e con un affitto anticipato, di cui metà è quota dell'altra persona, sposta il conto fra due persone di un quarto. Il numero era «vero» nel senso che il dato c'era; era falso nel senso che rispondeva a un'altra domanda.
 
 La domanda a cui il saldo risponde è **«quanto ci dobbiamo adesso»**, ed è la sola cifra dell'app che descrive uno stato invece di una statistica (→ ADR-0058). Un debito che nascerà a settembre non è un debito che c'è: se ve lo saldaste oggi, uno dei due pagherebbe per una spesa che l'altro non ha ancora sostenuto.
 

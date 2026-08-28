@@ -4,13 +4,13 @@
 
 ## Context
 
-Alessio ha riferito due saldi letti su Tricount: [cifra rimossa] che Federica gli deve sul tricount delle spese di casa, e [cifra rimossa] che lui deve a lei su «Perché non sono Ric(c)a». Il primo combaciava al centesimo. Il secondo dava **−[cifra rimossa]** contro −66,04: **81 centesimi** di divario.
+Alessio ha riferito due saldi letti su Tricount: quello che Federica gli deve sul tricount delle spese di casa, e quello che lui deve a lei su «Perché non sono Ric(c)a». Il primo combaciava al centesimo. Il secondo no: **81 centesimi** di divario.
 
-Ottantuno centesimi su 624 voci non sono un errore di importo — sono un errore di *un centesimo ripetuto ottantuno volte*. In quel tricount ci sono 163 spese divise a metà con un importo di centesimi dispari: [cifra rimossa] non si divide in due, e uno dei due prende 7,48 invece di 7,47. Di quelle 163, **81 sono state pagate da Alessio** — esattamente il divario.
+Ottantuno centesimi su 624 voci non sono un errore di importo — sono un errore di *un centesimo ripetuto ottantuno volte*. In quel tricount ci sono 163 spese divise a metà con un importo di centesimi dispari: 10,01 € non si divide in due, e uno dei due prende 5,01 invece di 5,00. Di quelle 163, **81 sono state pagate da Alessio** — esattamente il divario.
 
-La causa è che **l'export di Tricount non concorda con Tricount stesso**. Nel campo `shares` dell'export il centesimo in più va sempre allo stesso membro, a prescindere da chi ha pagato; il saldo che l'app mostra a schermo si comporta invece come se andasse a **chi ha anticipato**. Ricalcolando l'export con quella regola vengono −[cifra rimossa], che più le due spese del 19 agosto fanno **−[cifra rimossa]**: il numero di Alessio, al centesimo.
+La causa è che **l'export di Tricount non concorda con Tricount stesso**. Nel campo `shares` dell'export il centesimo in più va sempre allo stesso membro, a prescindere da chi ha pagato; il saldo che l'app mostra a schermo si comporta invece come se andasse a **chi ha anticipato**. Ricalcolando l'export con quella regola, e aggiungendo le due spese del 19 agosto, viene **il saldo che Alessio ha letto su Tricount**, al centesimo.
 
-Non è distinguibile con certezza da una seconda spiegazione — che il saldo sia calcolato sulle metà *esatte* (7,475) e che le quote siano arrotondate solo per essere mostrate. Le due ipotesi differiscono di mezzo centesimo per tricount, e Margine lavora in centesimi interi per spesa (ADR-0008), quindi 7,475 non è rappresentabile. Fra le opzioni rappresentabili, «il centesimo a chi paga» è la sola che riproduce esattamente il saldo di Tricount su questi dati.
+Non è distinguibile con certezza da una seconda spiegazione — che il saldo sia calcolato sulle metà *esatte* (5,005) e che le quote siano arrotondate solo per essere mostrate. Le due ipotesi differiscono di mezzo centesimo per tricount, e Margine lavora in centesimi interi per spesa (ADR-0008), quindi 5,005 non è rappresentabile. Fra le opzioni rappresentabili, «il centesimo a chi paga» è la sola che riproduce esattamente il saldo di Tricount su questi dati.
 
 Cercando dove correggere è venuto fuori un secondo difetto, peggiore. La regola dell'app per le spese nuove era: **«la metà dispari va a chi guarda»**. Cioè la stessa spesa, inserita da Alessio o da Federica, si divideva in due modi diversi — e niente se ne sarebbe accorto, perché le quote sommano all'importo in entrambi i casi. È lo stesso genere di difetto silenzioso di `sharesFor()`, nello stesso file.
 
@@ -26,8 +26,8 @@ Se il pagante è fuori dalla coppia il centesimo va a `partner` per convenzione.
 
 ## Consequences
 
-Tutti i tricount ora si riconciliano con Tricount **al centesimo**, e il tricount condiviso non ha più bisogno di un saldo di apertura dichiarato: non essendo mai stato saldato, si calcola da tutta la storia e fa −[cifra rimossa]. Un numero che si ricava dai dati è più solido di un numero copiato a mano, che invecchia.
+Tutti i tricount ora si riconciliano con Tricount **al centesimo**, e il tricount condiviso non ha più bisogno di un saldo di apertura dichiarato: non essendo mai stato saldato, si calcola da tutta la storia e fa esattamente il numero che Tricount mostra. Un numero che si ricava dai dati è più solido di un numero copiato a mano, che invecchia.
 
-Lo spostamento su tutta la storia è di **[cifra rimossa]** distribuiti su 94 voci: la quota mensile di ciascuno cambia di qualche centesimo in mesi lontani. Le medie storiche e i confronti si spostano di un'inezia, e nessun numero raccontato finora diventa falso.
+Lo spostamento su tutta la storia è di **un centesimo su ciascuna delle 94 voci**: la quota mensile di ciascuno cambia di qualche centesimo in mesi lontani. Le medie storiche e i confronti si spostano di un'inezia, e nessun numero raccontato finora diventa falso.
 
 Resta un debito piccolo e dichiarato: **non so quale delle due spiegazioni sia quella vera** dentro Tricount, e con un solo tricount di riscontro non è distinguibile. Se un giorno un saldo si scostasse di mezzo centesimo, la spiegazione è scritta qui. Un test con le cifre vere presidia la direzione: la proprietà provata non è «il centesimo va a chi paga» — che è una convenzione — ma che la divisione **non cambi secondo chi ha l'app in mano**, che è un fatto.

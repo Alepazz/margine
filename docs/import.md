@@ -93,7 +93,7 @@ Un file per mese o per tricount, per esempio `data/incoming/2026-07.json`:
       "date": "2026-07-20",
       "title": "Cena in sei",
       "amount": 180.00,
-      "tricount": "creta-2025",
+      "tricount": "vacanza-2026",
       "category": "viaggi",
       "subcategory": "cibo",
       "paidBy": "others",
@@ -154,7 +154,7 @@ La validazione blocca l'import se: un id è duplicato, una data non è valida, *
 
 ```
 mese      voci    totale        quota me   quota partner   quota altri
-2026-07     40     [cifra rimossa]    [cifra rimossa]    [cifra rimossa]      0.00 €
+2026-07     40     1234.56 €     700.00 €     534.56 €      0.00 €
 ```
 
 La colonna «quota altri» compare solo se da qualche parte c'è una spesa di gruppo.

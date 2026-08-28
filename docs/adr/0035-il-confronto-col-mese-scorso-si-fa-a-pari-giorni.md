@@ -16,7 +16,7 @@ Le due strade erano quindi due. Confrontare la proiezione di agosto con luglio i
 
 **A pari giorni**: i primi *D* giorni del mese scelto contro i primi *D* del precedente, dove *D* sono i giorni trascorsi se il mese è quello in corso, e il mese intero altrimenti.
 
-La ragione della scelta è che non ha una stima dentro. La proiezione è un numero che l'app calcola e che può sbagliare — è una divisione lineare della parte variabile — e metterlo nel confronto più importante della pagina significa che quando il numero sorprende non si sa se è cambiata la spesa o se è la stima che tira. «Dal primo al ventuno di agosto [cifra rimossa], dal primo al ventuno di luglio [cifra rimossa]» sono invece due somme, entrambe vere.
+La ragione della scelta è che non ha una stima dentro. La proiezione è un numero che l'app calcola e che può sbagliare — è una divisione lineare della parte variabile — e metterlo nel confronto più importante della pagina significa che quando il numero sorprende non si sa se è cambiata la spesa o se è la stima che tira. Il confronto fra i primi ventuno giorni di agosto e i primi ventuno di luglio è invece fra **due somme di spese vere**, senza niente di stimato dentro.
 
 E ha una proprietà che la rende gratis: **a mese chiuso diventa da sé il confronto fra due mesi interi**, senza cambiare metodo, perché *D* arriva a coprire tutto il mese. Non esistono due modalità da tenere allineate.
 

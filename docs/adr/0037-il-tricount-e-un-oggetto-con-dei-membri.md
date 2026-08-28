@@ -34,7 +34,7 @@ In lettura non è servito niente, e vale la pena scriverlo: ogni statistica pass
 
 ## Consequences
 
-La migrazione (`scripts/migrate-tricounts.mjs`) tocca 1255 spese, e ha quattro guardie: **totale generale invariato al centesimo** ([cifra rimossa]), **conteggio per tricount** identico a quello per origine, **saldo identico** — totale e per gruppo, ricalcolato con la stessa aritmetica prima e dopo (−[cifra rimossa]) — e i dati migrati che passano `validate-core` senza errori. Se una non torna, non scrive.
+La migrazione (`scripts/migrate-tricounts.mjs`) tocca 1255 spese, e ha quattro guardie: **totale generale invariato al centesimo**, **conteggio per tricount** identico a quello per origine, **saldo identico** — totale e per gruppo, ricalcolato con la stessa aritmetica prima e dopo — e i dati migrati che passano `validate-core` senza errori. Se una non torna, non scrive.
 
 Il perimetro è stato di venti file. Il tipo `Source`, `SOURCE_LABELS`, `SourceMap`, `LedgerKey`, `ledgerParts`, `ledgerKeyOf` e `ledgerLabel` non esistono più; `houseSource` diventa `houseTricount`; le chiavi di `balance.groups` perdono il prefisso `vacanze/`.
 

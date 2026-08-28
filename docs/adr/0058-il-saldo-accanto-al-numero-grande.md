@@ -24,6 +24,6 @@ La riga che contiene numero grande e saldo **avvolge**, e non la si tiene affian
 
 La domanda «e con lei come sto?» ha una risposta senza cambiare pagina, e la pagina Saldo resta dov'è per tutto il resto — i movimenti, i tricount, registrare un rimborso.
 
-Il rischio accettato è che due numeri vicini si sommino nella testa di chi guarda: [cifra rimossa] di spendibile e 66 € di credito non fanno [cifra rimossa] di disponibilità. Non c'è modo di impedirlo dall'interfaccia, se non tenendoli lontani — che era la situazione di prima, e costava due tocchi al giorno per evitare un errore che nessuno aveva mai fatto.
+Il rischio accettato è che due numeri vicini si sommino nella testa di chi guarda: lo spendibile e il credito verso l'altra persona non fanno una disponibilità. Non c'è modo di impedirlo dall'interfaccia, se non tenendoli lontani — che era la situazione di prima, e costava due tocchi al giorno per evitare un errore che nessuno aveva mai fatto.
 
 Il criterio di ADR-0034 esce indebolito: da «tutto ciò che non cambia col mese sta altrove» a «tutte le *statistiche* che non cambiano col mese stanno altrove». Chi vorrà aggiungere un numero sempre-corrente al Riepilogo troverà qui un precedente, ed è giusto che lo trovi insieme al motivo per cui questo l'ha meritato: è uno stato, non una misura.

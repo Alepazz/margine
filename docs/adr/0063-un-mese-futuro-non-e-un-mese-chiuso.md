@@ -15,7 +15,7 @@ export function elapsedDaysInMonth(month: MonthKey, today: string): number {
 }
 ```
 
-La condizione è «se non è il mese corrente, è tutto trascorso». Vera per il passato, **falsa per il futuro** — e nessuno l'aveva notato perché finché i dati arrivano solo fino a oggi un mese futuro non esiste nella serie. Ne è bastato uno: una spesa da 5 € datata 15 settembre 2026 per sbaglio, la stessa che in ADR-0055 apriva un mese fantasma nelle medie.
+La condizione è «se non è il mese corrente, è tutto trascorso». Vera per il passato, **falsa per il futuro** — e nessuno l'aveva notato perché finché i dati arrivano solo fino a oggi un mese futuro non esiste nella serie. Ne è bastato uno: una spesa di pochi euro datata 15 settembre 2026 per sbaglio, la stessa che in ADR-0055 apriva un mese fantasma nelle medie.
 
 Da lì `projectMonth` concludeva `elapsedDays >= totalDays` e restituiva `method: 'chiuso'`, e la scheda annunciava «Mese chiuso: il numero è definitivo» di un mese non ancora cominciato.
 
@@ -35,4 +35,4 @@ La scheda di un mese futuro smette di mentire su cosa sia quel numero. Continua 
 
 Il terzo valore di `method` va gestito dovunque se ne leggano due, e i tipi **non aiutano**: `method === 'stimato'` resta valido con tre valori, quindi il compilatore non segnala i posti da rivedere. Sono due — il numero grande e la scheda della proiezione — ed è per questo che stanno scritti qui.
 
-Questa è la terza volta oggi che lo stesso refuso di data produce un difetto diverso: prima un mese fantasma nelle medie (→ ADR-0055), poi «il mese più leggero: settembre 2026, 2,50 €», ora «mese chiuso». Il dato sbagliato è uno solo e sarà corretto in un minuto, ma ogni volta ha scoperto un posto che dava per scontato che i dati finissero oggi. Vale la pena tenerlo a mente come metodo: **una data nel futuro è il caso di prova più economico che questi dati permettano**.
+Questa è la terza volta oggi che lo stesso refuso di data produce un difetto diverso: prima un mese fantasma nelle medie (→ ADR-0055), poi «il mese più leggero: settembre 2026», ora «mese chiuso». Il dato sbagliato è uno solo e sarà corretto in un minuto, ma ogni volta ha scoperto un posto che dava per scontato che i dati finissero oggi. Vale la pena tenerlo a mente come metodo: **una data nel futuro è il caso di prova più economico che questi dati permettano**.

@@ -114,9 +114,10 @@ function BalanceTag({
    * Dal segno del saldo dipendono tre cose, e nascono insieme perché non
    * possano contraddirsi: il colore, la frase a schermo e il nome accessibile.
    * Scritte come tre espressioni separate, bastava invertire una condizione per
-   * avere «Devi ricevere» sopra e «Devi [cifra rimossa] ad Alessio» nell'etichetta — due
+   * avere «Devi ricevere» sopra e «Devi 123 € ad Alessio» nell'etichetta — due
    * testi che dicono il contrario, uno letto dall'occhio e uno dal lettore di
-   * schermo, e nessun test che se ne accorga.
+   * schermo, e nessun test che se ne accorga. (Cifre d'esempio, larghe come
+   * le vere: → ADR-0067.)
    *
    * La quarta cosa che dipende dal segno — a chi appare il pulsante — **non è
    * qui**: la decide il dominio, insieme al verso del rimborso.
@@ -233,7 +234,7 @@ export function MarginMeter({
       {/*
         Due colonne, non una riga che avvolge: la griglia le tiene affiancate a
         ogni larghezza, e `minmax(0, 1fr)` sulla prima le impedisce di allargarsi
-        al suo contenuto — il suggerimento «[cifra rimossa] al giorno da qui a fine mese»
+        al suo contenuto — il suggerimento «50 € al giorno da qui a fine mese»
         ha un min-content largo, e in flex bastava a spingere il saldo a capo.
         → ADR-0059, ADR-0044
       */}

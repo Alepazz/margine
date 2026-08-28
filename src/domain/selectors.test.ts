@@ -166,7 +166,7 @@ describe('serie mensile', () => {
   /*
    * `count > 0` scarta i mesi riempiti a zero, ma non un mese futuro che
    * contiene davvero una spesa: sui dati veri il mese più leggero risultava
-   * settembre 2026 con 2,50 €. → ADR-0055
+   * settembre 2026. → ADR-0055
    */
   it('un mese futuro non vince come «il più leggero»', () => {
     const conRefuso = monthlySeries(
@@ -356,7 +356,7 @@ describe('viaggi', () => {
   })
 
   it('tiene separati il conto del gruppo e quello della coppia', () => {
-    /* Una cena da 216 € in sei: 36,01 tuoi, 36,02 di lei, il resto di altri. */
+    /* Una cena da 180 € in sei: 30 tuoi, 30 di lei, il resto di altri. */
     const gruppo = expense({
       id: 'gruppo',
       date: '2026-08-10',
@@ -368,12 +368,12 @@ describe('viaggi', () => {
       shares: { me: 30, partner: 30, others: 120 },
     })
     const [stats] = tripStats([...DATA, gruppo], [trip], 'me')
-    expect(stats?.total).toBe(256.1)
-    expect(stats?.couple).toBe(112.03)
-    expect(stats?.others).toBe(144.07)
-    expect(stats?.share).toBe(56.01)
+    expect(stats?.total).toBe(220)
+    expect(stats?.couple).toBe(100)
+    expect(stats?.others).toBe(120)
+    expect(stats?.share).toBe(50)
     /* La coppia non paga la quota degli altri: al giorno conta solo la sua parte. */
-    expect(stats?.perDayCouple).toBeCloseTo(37.34, 2)
+    expect(stats?.perDayCouple).toBeCloseTo(33.33, 2)
   })
 
   it('conta come welfare solo la quota di chi ha anticipato', () => {
@@ -738,7 +738,7 @@ describe('il saldo tricount per tricount', () => {
 })
 
 /*
- * Il difetto da cui nasce: una spesa da 5 € datata per sbaglio al 15 settembre
+ * Il difetto da cui nasce: una spesa datata per sbaglio al 15 settembre
  * muoveva il saldo di agosto. Una voce datata avanti non è un debito che c'è
  * già — è un debito che ci sarà, e finché non comincia il suo mese il conto fra
  * le due persone non la conosce. → ADR-0064

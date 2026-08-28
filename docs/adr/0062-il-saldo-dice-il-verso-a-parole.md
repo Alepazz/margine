@@ -6,13 +6,13 @@
 
 ADR-0060 aveva deciso due cose che all'uso si sono rivelate sbagliate, e le ha smentite lo stesso gesto: Alessio che apre l'app in produzione, sul suo telefono.
 
-La prima: **il segno da solo come verso**. «`+` verde vuol dire che rientrano soldi, `−` rosso che ne escono» è vero, ma è una convenzione che bisogna già avere in testa. Chi guarda `+[cifra rimossa]` non legge «devo ricevere»: legge un numero verde. La frase «te li deve» era stata tolta perché stava dentro un riquadro e si leggeva come un fumetto appiccicato al numero grande (→ ADR-0059) — ma il problema era il riquadro, non la frase. «Manca una scritta come "Devi ricevere" oppure "Devi dare" che aiuta a capire.»
+La prima: **il segno da solo come verso**. «`+` verde vuol dire che rientrano soldi, `−` rosso che ne escono» è vero, ma è una convenzione che bisogna già avere in testa. Chi guarda `+123 €` — cifre d'esempio, larghe come le vere (→ ADR-0067) — non legge «devo ricevere»: legge un numero verde. La frase «te li deve» era stata tolta perché stava dentro un riquadro e si leggeva come un fumetto appiccicato al numero grande (→ ADR-0059) — ma il problema era il riquadro, non la frase. «Manca una scritta come "Devi ricevere" oppure "Devi dare" che aiuta a capire.»
 
 La seconda: **il pulsante nei due versi**. Era stato chiesto esplicitamente, con la domanda posta e la risposta scelta fra due — «in tutti e due i versi», come nella pagina Saldo. Vedendolo in uso la risposta è cambiata: «vedo il bottone per saldare ma in realtà io devo ricevere, non dare, quindi il bottone non dovrebbe apparire a me».
 
-Ha ragione, e il motivo è nel verbo. **Saldare è un gesto che si compie pagando.** Offrirlo a chi deve incassare gli chiede di dichiarare un pagamento che non ha fatto lui. Nella pagina Saldo l'ambiguità non c'è perché sotto al pulsante una riga dice «il rimborso va da Federica ad Alessio»; nella testata del Riepilogo quella riga non c'è, e il pulsante resta da solo accanto a un `+[cifra rimossa]`.
+Ha ragione, e il motivo è nel verbo. **Saldare è un gesto che si compie pagando.** Offrirlo a chi deve incassare gli chiede di dichiarare un pagamento che non ha fatto lui. Nella pagina Saldo l'ambiguità non c'è perché sotto al pulsante una riga dice «il rimborso va da Federica ad Alessio»; nella testata del Riepilogo quella riga non c'è, e il pulsante resta da solo accanto a un `+123 €`.
 
-Il calcolo, verificato prima di toccare l'interfaccia, era giusto: `+[cifra rimossa]` sui dati veri, cioè Alessio in credito, cifra verde. Non c'era nessun difetto nel segno.
+Il calcolo, verificato prima di toccare l'interfaccia, era giusto: sui dati veri il saldo era positivo, cioè Alessio in credito, cifra verde. Non c'era nessun difetto nel segno.
 
 ## Decision
 

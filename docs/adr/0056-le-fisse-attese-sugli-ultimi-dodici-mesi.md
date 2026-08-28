@@ -6,17 +6,17 @@
 
 Lo spendibile toglie dalle entrate le **fisse attese**, che `projectMonth` calcola come `max(fisse già arrivate, media storica delle fisse)` (→ ADR-0015). Quella media era su tutta la storia disponibile, ed è l'unico ingrediente dello spendibile che non è un fatto ma una stima.
 
-Guardando i dati veri, la storia disponibile non è omogenea. I tricount partono da ottobre 2024, ma l'affitto compare da dicembre: ottobre fa **[cifra rimossa]** di fisse e novembre **[cifra rimossa]**. Due mesi in cui la vita non era diversa — era diverso cosa veniva registrato.
+Guardando i dati veri, la storia disponibile non è omogenea. I tricount partono da ottobre 2024, ma l'affitto compare da dicembre: ottobre e novembre fanno **una frazione** delle fisse di ogni mese successivo. Due mesi in cui la vita non era diversa — era diverso cosa veniva registrato.
 
 ```
-media delle fisse su tutti i 22 mesi   [cifra rimossa]
-media delle fisse sugli ultimi 12      [cifra rimossa]
-media delle fisse sugli ultimi 6       [cifra rimossa]
+scarto rispetto alla media delle fisse su tutti i 22 mesi
+sugli ultimi 12   + 51 €
+sugli ultimi 6    + 59 €
 ```
 
 Cinquantun euro di scarto, sempre nella stessa direzione: la media lunga sottostima ciò che sta per uscire dal conto. E siccome la barra nuova disegna le fisse ancora attese (→ ADR-0057), lo scarto non è più solo una cifra in una riga: è la lunghezza di un pezzo di barra.
 
-C'è anche una ragione che non dipende dai dati di partenza: **l'affitto cambia**. La quota di Alessio è oscillata fra 411 € e [cifra rimossa] in venti mesi. Una media su tutta la storia insegue un aumento con anni di ritardo.
+C'è anche una ragione che non dipende dai dati di partenza: **l'affitto cambia**. La quota di Alessio è oscillata di una sessantina di euro in venti mesi. Una media su tutta la storia insegue un aumento con anni di ritardo.
 
 ## Decision
 

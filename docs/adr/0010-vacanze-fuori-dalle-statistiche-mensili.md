@@ -4,7 +4,7 @@
 
 ## Context
 
-Il tricount delle vacanze contiene, per un solo mese, cifre che valgono quanto due mesi di spesa ordinaria: un viaggio da 3.000 € in agosto rende agosto «fuori media» e, di riflesso, rende «sotto media» tutti gli altri mesi. Se le vacanze entrano nelle medie, la domanda «questo mese sto spendendo più del solito?» non ha più una risposta utile.
+Il tricount delle vacanze contiene, per un solo mese, cifre che valgono quanto due mesi di spesa ordinaria: un viaggio in agosto rende agosto «fuori media» e, di riflesso, rende «sotto media» tutti gli altri mesi. Se le vacanze entrano nelle medie, la domanda «questo mese sto spendendo più del solito?» non ha più una risposta utile.
 
 Escluderle del tutto però nasconderebbe soldi realmente spesi, e la domanda «quanto mi costano le vacanze all'anno» è una di quelle che l'app deve saper rispondere.
 

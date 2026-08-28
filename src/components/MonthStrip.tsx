@@ -13,10 +13,10 @@
  *
  * Ogni scheda porta **lo scostamento dalla media**: una tacca al centro, e una
  * barretta che va a destra se quel mese è stato sopra la media, a sinistra se
- * sotto. Una barretta proporzionale al totale non diceva niente — i mesi veri
- * stanno tutti fra [cifra rimossa] e [cifra rimossa], quindi venivano tutte piene fra l'80 e il
- * 100% — mentre lo scostamento è esattamente la domanda che si fa guardando la
- * striscia, ed è il confronto che usa già tutto il resto dell'app.
+ * sotto. Una barretta proporzionale al totale non diceva niente — il mese più
+ * leggero è circa due terzi del più pesante, quindi venivano tutte quasi piene e
+ * indistinguibili — mentre lo scostamento è esattamente la domanda che si fa
+ * guardando la striscia, ed è il confronto che usa già tutto il resto dell'app.
  *
  * Il mese in corso non ha barretta: è parziale, e mostrarlo «molto sotto la
  * media» sarebbe una bugia il primo di ogni mese. Al suo posto ha il punto rosso
@@ -126,7 +126,7 @@ export function MonthStrip({
                * Il nome per intero e il numero: `aria-label` **sostituisce** il
                * testo dentro il pulsante, quindi senza l'importo qui un lettore
                * di schermo sentirebbe solo «Giugno 2026» da una scheda che a
-               * schermo porta anche [cifra rimossa].
+               * schermo porta anche l'importo del mese.
                */
               aria-label={`${monthLabel(item.month)}: ${said}`}
               title={`${monthLabel(item.month)} · ${said}`}

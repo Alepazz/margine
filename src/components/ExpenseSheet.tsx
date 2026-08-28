@@ -120,7 +120,7 @@ function MovePanel({ expense, onDone }: { expense: Expense; onDone: () => void }
 
   /*
    * Una spesa datata dopo questo mese nel saldo non c'è ancora (→ ADR-0064):
-   * spostarla non muove niente a schermo, e la frase qui sotto — «sposta [cifra rimossa]
+   * spostarla non muove niente a schermo, e la frase qui sotto — «sposta 200 €
    * di debito» — annuncerebbe al presente una cosa che succede il mese
    * prossimo. Dalla stessa funzione che il saldo usa per non contarla: due
    * espressioni della stessa soglia prima o poi direbbero cose diverse.

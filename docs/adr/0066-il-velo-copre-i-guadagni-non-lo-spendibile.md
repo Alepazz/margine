@@ -8,14 +8,14 @@ ADR-0016 aveva coperto tutto ciò da cui le entrate si ricavano: margine, spendi
 
 Il difetto è che il velo si attivava **proprio nel momento in cui serve** — mostrare l'app a qualcuno — e in quel momento spegneva l'app. Il numero grande diventava `•••`, la barra un rettangolo grigio, il conto una colonna di puntini: quello che restava da mostrare era un elenco di spese. Un velo che, per essere utile, va tolto prima di usarlo, resta spento.
 
-Il prezzo di toglierlo è reale ed è stato posto ad Alessio prima di scrivere una riga: il conto del Riepilogo è una sottrazione, e lasciandone visibili le ultime quattro righe la prima si ottiene sommandole.
+Il prezzo di toglierlo è reale ed è stato posto ad Alessio prima di scrivere una riga: il conto del Riepilogo è una sottrazione, e lasciandone visibili le ultime quattro righe la prima si ottiene sommandole (cifre d'esempio: → ADR-0067).
 
 ```
-Entrate del mese        •••        ← 300 + 653 + 331 + 1384
-Da mettere da parte    − 300 €
-Spese fisse attese     − [cifra rimossa]
-Variabili già spese    − [cifra rimossa]
-Puoi ancora spendere    [cifra rimossa]
+Entrate del mese        •••        ← 250 + 600 + 400 + 750
+Da mettere da parte    − 250 €
+Spese fisse attese     − 600 €
+Variabili già spese    − 400 €
+Puoi ancora spendere     750 €
 ```
 
 La sua risposta: «È ovvio che il buco si chiude sommando ma intanto deve fare la somma e poi non è detto che il totale corrisponda effettivamente alle mie entrate del mese». Il secondo argomento è il più solido, ed è un fatto del progetto: il profilo entrate è una **stima dalla RAL**, marcata come tale nel campo `note`. Chi somma non ottiene una busta paga, ottiene un modello.
@@ -30,7 +30,7 @@ Restano coperti i guadagni nudi (`income`, `breakdown`) e tutto ciò che è «en
 
 **La barra si compone senza mai nominare le entrate.** Il suo fondo erano `max(entrate, impegnato)`; ora è `impegnato + max(0, spendibile)`, che è la stessa identica misura — lo spendibile *è* entrate meno impegnato — scritta con i soli campi pubblici. Non è un aggiramento del velo: è la constatazione che quella misura non aveva mai avuto bisogno delle entrate. Un test pretende che la barra venga **identica** coperta o scoperta, perché se un giorno divergesse vorrebbe dire che una delle due strade ha smesso di essere la definizione dell'altra.
 
-Il totale della barra in euro non esce dall'albero di accessibilità: `aria-valuemax` è `100` e `aria-valuenow` la percentuale impegnata. Un lettore di schermo che annunciasse «[cifra rimossa]» direbbe ad alta voce il numero che la pagina si rifiuta di stampare.
+Il totale della barra in euro non esce dall'albero di accessibilità: `aria-valuemax` è `100` e `aria-valuenow` la percentuale impegnata. Un lettore di schermo che annunciasse «1250 su 2000» direbbe ad alta voce il numero che la pagina si rifiuta di stampare.
 
 ## Consequences
 

@@ -20,7 +20,7 @@ Il titolo di destra è **fisso** — «Il vostro saldo» — e dice cosa è il n
 
 **Le righe delle due metà si allineano fra loro**, con `subgrid`. Senza, ogni colonna impagina per conto suo, e basta che un titolo vada a capo e l'altro no — «Puoi ancora spendere» sta su due righe a 390px, «Il vostro saldo» su una — perché le due cifre finiscano a quote diverse. Due numeri che non sono alla stessa altezza non sono una coppia: si legge prima uno e poi l'altro, che è esattamente il difetto da cui questa impaginazione nasce. Le due metà hanno lo stesso numero di righe di proposito: titolo, cifra, contorno.
 
-**Il conto si chiude dalla testata**, col pulsante «Saldato tutto ([cifra rimossa])», le stesse parole della pagina Saldo. Compare **nei due versi**, come là: se è lei ad averti pagato, il rimborso va da lei a te. Registra l'importo esatto, non quello arrotondato che il pulsante mostra.
+**Il conto si chiude dalla testata**, col pulsante «Saldato tutto (123 €)», le stesse parole della pagina Saldo. Compare **nei due versi**, come là: se è lei ad averti pagato, il rimborso va da lei a te. Registra l'importo esatto, non quello arrotondato che il pulsante mostra. (Cifre d'esempio, larghe come le vere: → ADR-0067.)
 
 Il costruttore del rimborso passa in `domain/settlement.ts`, perché ora serve a due pagine. Del segno dell'importo non gli importa — il verso lo dicono `debtor` e `creditor` — e questo è voluto: chi chiama ha in mano un saldo, che un segno ce l'ha già, e far dipendere la correttezza da un `Math.abs()` ricordato a memoria in ogni chiamante è il modo di spostare un debito dalla parte sbagliata senza che se ne accorga nessuno. → ADR-0019
 
@@ -28,7 +28,7 @@ Il costruttore del rimborso passa in `domain/settlement.ts`, perché ora serve a
 
 Le due domande si leggono insieme, ed è quello che serviva.
 
-Il numero grande vive ora in **metà scheda**, quindi rimpicciolisce prima: a 390px la colonna vale 154px, e «−[cifra rimossa]» — quattro cifre col segno, il caso peggiore che i dati possano dare — a `9vw` ne misurerebbe 160. La regola è `clamp(1.5rem, 7.5vw, 3rem)`, scritta su `.hero-row .hero-value` e **non** su `.hero-value`, che la pagina Saldo usa a sua volta: là il numero ha tutta la larghezza della scheda e non ha nessun motivo di stringersi.
+Il numero grande vive ora in **metà scheda**, quindi rimpicciolisce prima: a 390px la colonna vale 154px, e «−1.234 €» — quattro cifre col segno, il caso peggiore che i dati possano dare — a `9vw` ne misurerebbe 160. La regola è `clamp(1.5rem, 7.5vw, 3rem)`, scritta su `.hero-row .hero-value` e **non** su `.hero-value`, che la pagina Saldo usa a sua volta: là il numero ha tutta la larghezza della scheda e non ha nessun motivo di stringersi.
 
 `subgrid` è la prima dipendenza da una funzionalità CSS recente in questo progetto. Safari la supporta dalla 16, quindi sui dispositivi di casa c'è; dove mancasse, la dichiarazione cade e le due colonne tornano a impaginarsi ognuna per conto suo — brutte ma leggibili, cioè il difetto di prima e non uno peggiore.
 

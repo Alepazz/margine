@@ -142,7 +142,7 @@ export function tripTitleOf(trip: { name: string; emoji?: string }): string {
  * Come si divide una spesa. `me + partner + others` fa sempre esattamente `amount`.
  *
  * `others` esiste perché in vacanza si spende anche con altre persone: una cena
- * da 216 € divisa in sei non è rappresentabile con due sole quote. È un totale
+ * da 180 € divisa in sei non è rappresentabile con due sole quote. È un totale
  * **anonimo** per scelta — di chi c'era e di come si dividevano tra loro non
  * teniamo traccia, serve solo sapere quanto di quel conto non era vostro.
  */
@@ -288,10 +288,11 @@ export interface AppConfig {
   houseCategory: string
   /**
    * Da dove parte il saldo fra le due persone. Calcolarlo da tutta la storia
-   * darebbe [cifra rimossa] — falso, perché in due anni si sono già saldati molte volte
-   * e nessuno di quei rimborsi è nei dati. Quindi si dichiara un punto di
-   * partenza: `opening` è il saldo alla data `since` (positivo = il partner deve
-   * a `me`), e da lì in avanti conta quello che è registrato. → ADR-0019
+   * darebbe migliaia di euro — falso, perché in due anni si sono già saldati
+   * molte volte e nessuno di quei rimborsi è nei dati. Quindi si dichiara un
+   * punto di partenza: `opening` è il saldo alla data `since` (positivo = il
+   * partner deve a `me`), e da lì in avanti conta quello che è registrato.
+   * → ADR-0019
    *
    * Il punto di partenza è **per tricount**, in `groups`: ci si salda un gruppo
    * alla volta — una vacanza può essere pari mentre le spese di casa non lo

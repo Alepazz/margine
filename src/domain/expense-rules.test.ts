@@ -18,11 +18,11 @@ describe('come si divide una spesa', () => {
   })
 
   it('il centesimo dispari va a chi ha pagato, come su Tricount', () => {
-    /* 14,95 non si divide in due: 7,47 a uno e 7,48 all'altro. Tricount dà il
+    /* 10,01 non si divide in due: 5,00 a uno e 5,01 all'altro. Tricount dà il
        centesimo in più a chi ha anticipato, e il saldo che mostra è calcolato
        così — 81 centesimi di divario su un tricount solo. → ADR-0023 */
-    expect(splitFor('half', 14.95, 'me', 'me')).toEqual({ me: 7.48, partner: 7.47 })
-    expect(splitFor('half', 14.95, 'partner', 'me')).toEqual({ me: 7.47, partner: 7.48 })
+    expect(splitFor('half', 10.01, 'me', 'me')).toEqual({ me: 5.01, partner: 5 })
+    expect(splitFor('half', 10.01, 'partner', 'me')).toEqual({ me: 5, partner: 5.01 })
   })
 
   it('NON dipende da chi guarda: è la proprietà che il vecchio codice rompeva', () => {

@@ -4,7 +4,7 @@
 
 ## Context
 
-Alessio: «sappi che Fede guadagna [cifra rimossa] ad oggi», e poi «obiettivo di risparmio di lei 200».
+Alessio ha riferito la RAL di Federica a oggi, e il suo obiettivo di risparmio mensile.
 
 Finora `income.partner` era `null`: l'app mostrava le spese di Federica — la sua quota di tutto ciò che è condiviso — e per il margine diceva «entrate non impostate». Con la RAL c'è tutto quello che serve per riempirlo.
 
@@ -14,7 +14,7 @@ Le due opzioni erano: lasciare `null`, e allora il numero non c'è; oppure riemp
 
 ## Decision
 
-Il profilo si riempie, con il netto **stimato** dalla RAL di [cifra rimossa] calcolato con lo stesso metodo che riproduce esattamente i [cifra rimossa] di Alessio: contributi INPS 9,19%, IRPEF a tre aliquote, detrazione da lavoro dipendente, addizionali al 2% → circa [cifra rimossa] netti l'anno, su 13 mensilità (tredicesima confermata) → **[cifra rimossa] al mese**. Obiettivo di risparmio 200 €, come riferito.
+Il profilo si riempie, con il netto **stimato** dalla RAL riferita, calcolato con lo stesso metodo che riproduce esattamente il netto di Alessio: contributi INPS 9,19%, IRPEF a tre aliquote, detrazione da lavoro dipendente, addizionali al 2%, e il netto annuo diviso su 13 mensilità (tredicesima confermata). I due valori stanno nel profilo entrate in `config.json`, cifrato (→ ADR-0067). L'obiettivo di risparmio è quello che ha riferito.
 
 Il campo `note` del profilo dice tre cose: che il netto è una stima e da dove viene, chi ha riferito i numeri e quando, e che **le spese personali di Federica non sono nei dati, quindi il suo margine è per eccesso**. La nota compare nella scheda del profilo entrate, cioè accanto al numero.
 
@@ -26,6 +26,6 @@ Guardando l'app come Federica il margine c'è, con scritto perché è ottimista.
 
 La strada per farlo diventare vero è nota e non serve codice nuovo: importare il tricount personale di Federica. Quel giorno la nota va riscritta, e sarà un fatto e non una stima.
 
-Il netto resta una **stima** anche per lei, come per lui. Il metodo è verificabile — riproduce i [cifra rimossa] al centesimo — ma non conosce detrazioni, comune di residenza né fondo pensione. Ora che le entrate si modificano dall'app (→ ADR-0024) correggerlo è questione di trenta secondi dal telefono, il giorno che una busta paga vera è sotto mano.
+Il netto resta una **stima** anche per lei, come per lui. Il metodo è verificabile — riproduce il netto di Alessio al centesimo — ma non conosce detrazioni, comune di residenza né fondo pensione. Ora che le entrate si modificano dall'app (→ ADR-0024) correggerlo è questione di trenta secondi dal telefono, il giorno che una busta paga vera è sotto mano.
 
 Vale ancora la limitazione di ADR-0016: coprire i guadagni copre anche i suoi.

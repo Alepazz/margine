@@ -16,8 +16,8 @@ describe('la chiave di un nome', () => {
 /*
  * Vive nel dominio perché una regola di lingua italiana non è di nessuna pagina
  * in particolare — e perché appena un secondo posto ha avuto bisogno della
- * stessa frase è tornata a mancare: il saldo nel Riepilogo diceva «Devi [cifra rimossa] a
- * Alessio».
+ * stessa frase è tornata a mancare: il saldo nel Riepilogo diceva «Devi 123 € a
+ * Alessio» (cifra d'esempio: → ADR-0067).
  */
 describe('la d eufonica', () => {
   it('mette «ad» davanti a vocale', () => {

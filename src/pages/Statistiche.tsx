@@ -57,8 +57,9 @@ export function Statistiche(): ReactNode {
   /*
     * Le stesse opzioni del Riepilogo, e non è una ripetizione da togliere: se
     * le due pagine divergono mostrano **numeri diversi per la stessa media**.
-    * Misurato sui dati veri con un mese fantasma in mezzo — [cifra rimossa] su 22
-    * mesi di qua, [cifra rimossa] su 23 di là. → ADR-0055
+    * Misurato sui dati veri con un mese fantasma in mezzo: la stessa media
+    * veniva una sessantina di euro più bassa dalla parte che contava 23 mesi
+    * invece di 22. → ADR-0055
     */
   const average = useMemo(
     () => averageMonthly(series, { excludeMonth: partialMonth, until: partialMonth }),

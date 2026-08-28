@@ -6,7 +6,7 @@
 
 Dando accesso a Federica serviva decidere che cosa significhi «il mio tricount personale è solo mio». Le due strade erano davvero due, e non è una sfumatura.
 
-**Cifratura per persona.** Tre file: il condiviso con la passphrase che i due hanno in comune, e un personale ciascuno con la propria chiave. Nessuno dei due può leggere quello dell'altro — non per divieto, ma perché non ha la chiave. Prezzo: se una chiave si perde quei dati sono irrecuperabili; la sessione di import di un personale la può fare solo il suo proprietario; e il margine dell'altra persona diventa non calcolabile, perché entrate meno margine dà la spesa totale — e su Alessio il personale pesa una fetta grossa della sua quota ([cifra rimossa] su [cifra rimossa]), quindi mostrare quel margine equivale a mostrare quel numero.
+**Cifratura per persona.** Tre file: il condiviso con la passphrase che i due hanno in comune, e un personale ciascuno con la propria chiave. Nessuno dei due può leggere quello dell'altro — non per divieto, ma perché non ha la chiave. Prezzo: se una chiave si perde quei dati sono irrecuperabili; la sessione di import di un personale la può fare solo il suo proprietario; e il margine dell'altra persona diventa non calcolabile, perché entrate meno margine dà la spesa totale — e su Alessio il personale è **una fetta grossa** della sua quota, quindi mostrare quel margine equivale a mostrare quanto pesa il suo compartimento personale.
 
 **Separazione nell'interfaccia.** Un file, una passphrase in due, e l'app che mostra a ognuno il suo. Chi ha la passphrase può leggere tutto con gli strumenti del browser, o con `npm run decrypt`.
 

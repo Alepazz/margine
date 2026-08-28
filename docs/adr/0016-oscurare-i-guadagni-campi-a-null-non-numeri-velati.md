@@ -6,16 +6,16 @@
 
 Alessio vuole poter coprire quanto guadagna — *«tutto quello che riguarda i miei guadagni, non le mie spese»* — perché l'app si usa in piedi, in treno, con qualcuno accanto. Le spese non gli interessa nasconderle: le entrate sì.
 
-Le entrate compaiono in due soli posti, la scheda del margine e il profilo entrate nelle impostazioni. Ma **coprire la riga «entrate» non copre le entrate**, e questo è il vincolo che decide tutto il resto. Ogni altro numero della scheda le restituisce:
+Le entrate compaiono in due soli posti, la scheda del margine e il profilo entrate nelle impostazioni. Ma **coprire la riga «entrate» non copre le entrate**, e questo è il vincolo che decide tutto il resto. Ogni altro numero della scheda le restituisce (cifre d'esempio, negli stessi rapporti di quelle vere: → ADR-0067):
 
 ```
-margine [rimosso] + speso [rimosso]            = [rimosso]
-speso [rimosso] diviso la quota spesa 17%       ≈ [rimosso]
-spendibile [rimosso] + [rim] + [rim] + [rim]    = [rimosso]
+margine 1900 + speso 400                       = 2300
+speso 400 diviso la quota spesa 17%            ≈ 2353
+spendibile 1100 + 250 + 550 + 380              = 2280
 e il riempimento della barra È la quota spesa, senza leggere nessuna cifra
 ```
 
-Quindi l'oscuramento deve coprire tutto ciò che **deriva** dalle entrate e neutralizzare la geometria della barra, altrimenti è teatro. La cosa fortunata è che si può nascondere il **livello** conservando lo **stato**: «sotto controllo · 11 giorni alla fine · speso [cifra rimossa]» non dice quanto guadagni e resta utile.
+Quindi l'oscuramento deve coprire tutto ciò che **deriva** dalle entrate e neutralizzare la geometria della barra, altrimenti è teatro. La cosa fortunata è che si può nascondere il **livello** conservando lo **stato**: «sotto controllo · 11 giorni alla fine · speso 400 €» non dice quanto guadagni e resta utile.
 
 Un secondo vincolo, tecnico: i test del progetto sono di dominio e dati, senza React Testing Library né jsdom. Una regola di sicurezza che vive dentro un componente non è presidiabile da nessun test.
 

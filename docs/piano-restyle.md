@@ -28,7 +28,7 @@ Le anteprime delle sei schede, tutte da selettori che esistono già e rispettose
 
 | Scheda | Anteprima |
 |---|---|
-| Saldo | il netto (es. −[cifra rimossa]) e in che verso |
+| Saldo | il netto e in che verso |
 | Statistiche | sparkline degli ultimi 12 mesi |
 | Casa | il totale del mese corrente |
 | Gatto | il totale del mese corrente |

@@ -223,9 +223,10 @@ button.hero-value:focus-visible {
  * Il numero grande vive in **metà scheda**, quindi rimpicciolisce prima.
  *
  * Le misure che governano questa riga, a 390px: la colonna vale 154px, e
- * «−[cifra rimossa]» — quattro cifre col segno, il caso peggiore che i dati possano
+ * «−1.234 €» — quattro cifre col segno, il caso peggiore che i dati possano
  * dare — a 9vw ne misurerebbe 160 e andrebbe a capo lasciando il simbolo
- * dell'euro da solo sulla seconda riga.
+ * dell'euro da solo sulla seconda riga. (Cifre d'esempio, larghe come le
+ * vere, perché le misure restino valide: → ADR-0067.)
  *
  * La regola sta qui e non su `.hero-value`, che la pagina Saldo usa a sua
  * volta: là il numero ha tutta la larghezza della scheda e non ha nessun motivo
@@ -305,7 +306,7 @@ button.hero-value:focus-visible {
 /*
  * Il pulsante che chiude il conto. Largo quanto il suo testo e non quanto la
  * colonna: a tutta metà scheda peserebbe più del numero che lo giustifica.
- * L'etichetta può andare a capo — su schermo stretto «Saldato tutto ([cifra rimossa])»
+ * L'etichetta può andare a capo — su schermo stretto «Saldato tutto (123 €)»
  * non ci sta su una riga sola, e un bottone alto due righe è meglio di uno che
  * sborda dalla sua colonna.
  */
@@ -393,8 +394,8 @@ button.hero-value:focus-visible {
  * Il filo chiaro sul bordo sinistro **è la riga delle entrate**, e non è una
  * rifinitura: quando si è oltre il semaforo è rosso, quindi anche le variabili
  * lo sono, e senza quel taglio i due segmenti diventavano un unico blocco rosso
- * in cui lo sforamento non si vedeva più. Misurato: [cifra rimossa] di variabili e 66 €
- * di eccedenza, indistinguibili.
+ * in cui lo sforamento non si vedeva più. Misurato su un mese vero: un'eccedenza
+ * piccola in coda a un segmento di variabili molto più lungo, indistinguibili.
  *
  * Si chiama `is-eccedenza` e non `is-oltre` perché `oltre` è già uno stato del
  * semaforo: con lo stesso nome questa regola prendeva anche le variabili, che

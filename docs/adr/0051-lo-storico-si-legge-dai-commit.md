@@ -20,7 +20,7 @@ Tre filtri: solo i commit che finiscono con `(da Margine)` — cioè quelli scri
 
 La traduzione dal messaggio al gruppo **non riscrive il vocabolario**: `OP_WORDS` è esportato da `outbox.ts` e la mappa inversa si costruisce da lì, con un test di parità sui tredici tipi. Due copie divergerebbero in silenzio — una riga senza gruppo, che nessuna spunta può accendere o spegnere.
 
-**Il dettaglio — quale spesa, quanto, in che tricount — non entra nel messaggio di commit.** Il repo è pubblico: `git log` lo legge chiunque, senza passphrase, per sempre. Scrivere «Spesa Coop · [cifra rimossa] · Spese condivise» in un messaggio pubblicherebbe in chiaro esattamente ciò che `expenses.json.enc` esiste per proteggere, e la regola del progetto è che i dati in chiaro non entrano nel repo — un messaggio di commit **è** il repo. Il messaggio resta quello che è: conteggi e verbi.
+**Il dettaglio — quale spesa, quanto, in che tricount — non entra nel messaggio di commit.** Il repo è pubblico: `git log` lo legge chiunque, senza passphrase, per sempre. Scrivere «Spesa Coop · 12,00 € · Spese condivise» in un messaggio pubblicherebbe in chiaro esattamente ciò che `expenses.json.enc` esiste per proteggere, e la regola del progetto è che i dati in chiaro non entrano nel repo — un messaggio di commit **è** il repo. Il messaggio resta quello che è: conteggi e verbi.
 
 Il dettaglio si ricava **decifrando in locale**: si scarica il file cifrato a quel commit e a quello prima (`?ref=<sha>`, col primo genitore che arriva già nella stessa risposta dell'elenco), si decifrano e si confrontano (`domain/diff.ts`). Due file da 359 KB, quindi **a richiesta** e con la cache: un commit passato non cambia, e ciò che è stato calcolato una volta resta.
 
