@@ -155,9 +155,28 @@ export function saveOutbox(state: OutboxState): void {
 
 let counter = 0
 
+/**
+ * Una voce nuova, con un'identità che due schede non si possono contendere.
+ *
+ * `entryId` è diventato **portante per la correttezza**: è la chiave con cui il
+ * salvataggio decide quali voci togliere dalla coda (→ ADR-0070) e con cui la
+ * potatura decide quali tenere (→ ADR-0069). Prima non lo era — la coda si
+ * azzerava invece di filtrarsi — e `${now}-${counter}` bastava.
+ *
+ * Non basta più: il contatore vive **per scheda**, quindi due schede dello stesso
+ * browser (che condividono `localStorage`) alla loro prima voce nello stesso
+ * millisecondo producono lo stesso id, e il salvataggio dell'una toglierebbe dalla
+ * coda la voce dell'altra senza averla scritta — cioè il difetto che ADR-0070
+ * cura, rientrato dalla finestra. Serve che due azioni umane cadano nello stesso
+ * millisecondo in due schede, quindi non è mai successo; ma il costo di
+ * escluderlo sono tre byte, e il costo di non escluderlo è una spesa persa senza
+ * un segno. Le voci vecchie restano valide: l'id non si interpreta, si confronta.
+ */
 export function newEntry(op: Op, now: number): OutboxEntry {
   counter += 1
-  return { ...op, entryId: `${now}-${counter}`, ts: now }
+  const caso = crypto.getRandomValues(new Uint8Array(3))
+  const coda = [...caso].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+  return { ...op, entryId: `${now}-${counter}-${coda}`, ts: now }
 }
 
 /** Applica le operazioni in ordine cronologico. */
@@ -335,7 +354,9 @@ function normalizeTricount(tricount: Tricount): Tricount {
 function applyPatch(expense: Expense, patch: Annotation): Expense {
   const next: Expense = { ...expense }
   if (patch.tax730 !== undefined) next.tax730 = patch.tax730
-  if (patch.notes !== undefined) next.notes = patch.notes
+  /* Ritagliato qui, perché `isAlreadyApplied` confronta col valore ritagliato:
+     salvarlo grezzo renderebbe l'operazione irriconoscibile per sempre. */
+  if (patch.notes !== undefined) next.notes = patch.notes.trim()
   if (patch.receiptLinks !== undefined) next.receiptLinks = patch.receiptLinks
   if (patch.welfare !== undefined) next.welfare = patch.welfare
   return normalize(next)
@@ -419,8 +440,17 @@ export function isAlreadyApplied(
     case 'tricount-edit': {
       const tricount = dataset.tricounts.find((t) => t.id === entry.tricountId)
       if (!tricount) return false
-      return Object.entries(entry.fields).every(
-        ([key, value]) => JSON.stringify(tricount[key as keyof Tricount]) === JSON.stringify(value),
+      /* Come per `update`: si confronta con l'**intenzione normalizzata**, non col
+         valore grezzo. `applyOps` passa da `normalizeTricount`, che cancella
+         `closed` quando è falso — quindi «riapri una vacanza» (`{ closed: false }`)
+         confrontato grezzo non è mai riconosciuto come applicato
+         (`JSON.stringify(undefined) !== 'false'`) e resta in coda quattordici
+         giorni, riapplicandosi a ogni caricamento. */
+      const wanted = normalizeTricount({ ...tricount, ...entry.fields })
+      return Object.keys(entry.fields).every(
+        (key) =>
+          JSON.stringify(tricount[key as keyof Tricount]) ===
+          JSON.stringify(wanted[key as keyof Tricount]),
       )
     }
     case 'settle':
@@ -445,16 +475,93 @@ export function isAlreadyApplied(
   }
 }
 
-/** Scarta le voci già pubblicate (o troppo vecchie per essere ancora in volo). */
+/**
+ * Il bersaglio di un'operazione: quelle sullo stesso bersaglio si potano insieme.
+ *
+ * Serve solo a `pruneSettled`, e la ragione è in quella funzione: due operazioni
+ * sulla stessa cosa possono annullarsi, e potate una per una si annullano male.
+ */
+function targetOf(entry: OutboxEntry): string {
+  switch (entry.kind) {
+    case 'patch':
+    case 'update':
+    case 'delete':
+      return `spesa:${entry.expenseId}`
+    case 'create':
+      return `spesa:${entry.expense.id}`
+    case 'tricount':
+      return `tricount:${entry.tricount.id}`
+    case 'tricount-edit':
+      return `tricount:${entry.tricountId}`
+    case 'settle':
+      return `rimborso:${entry.settlement.id}`
+    case 'unsettle':
+      return `rimborso:${entry.settlementId}`
+    case 'price':
+      return `prezzo:${entry.entry.id}`
+    case 'price-delete':
+      return `prezzo:${entry.priceId}`
+    case 'recategorize':
+      return `categoria:${entry.from}`
+    case 'categories':
+      return 'config:categorie'
+    case 'income':
+      return `config:entrate:${entry.person}`
+  }
+}
+
+/**
+ * Scarta le voci già pubblicate (o troppo vecchie per essere ancora in volo).
+ *
+ * **Si pota per bersaglio, non per voce**, e non è un dettaglio di efficienza: è
+ * la correzione di un difetto che faceva riapparire una spesa cancellata.
+ *
+ * La vecchia versione chiedeva a ogni voce, da sola, «il remoto ti riflette
+ * già?». Su due operazioni che si annullano — aggiungi una spesa, poi cancellala,
+ * entrambe committate — la logica si capovolge: il remoto non ha la spesa, quindi
+ * il `delete` risulta applicato **e viene scartato**, mentre il `create` risulta
+ * *non* applicato **e viene tenuto**. Resta in coda il solo `create`, che ogni
+ * sovrapposizione riapplica: la spesa cancellata torna a schermo, contata in
+ * margine, saldo e statistiche. E ricancellarla non serve — la nuova `delete`
+ * viene potata allo stesso modo e il fantasma ritorna, per quattordici giorni.
+ * Lo stesso vale per «registra un rimborso e annullalo» (che sposta il saldo
+ * mostrato dell'intero importo), per una spunta accesa e spenta, e per un importo
+ * corretto due volte.
+ *
+ * La cura è guardare la **catena** invece della voce: le operazioni su un
+ * bersaglio si ordinano per `ts`, e **conta solo l'ultima**, perché è l'unica che
+ * dice come quella cosa deve stare adesso. Se il remoto la riflette, tutta la
+ * catena è arrivata e si scarta insieme; se non la riflette si tiene insieme, e
+ * riapplicare le precedenti in ordine è innocuo (`applyOps` le ordina e le
+ * operazioni superate non trovano niente da fare).
+ */
 export function pruneSettled(
   state: OutboxState,
   dataset: Dataset,
   config: AppConfig | undefined,
   now: number,
 ): OutboxState {
-  const settled = state.settled.filter(
-    (entry) => now - entry.ts < SETTLED_TTL_MS && !isAlreadyApplied(dataset, config, entry),
-  )
+  const fresh = state.settled.filter((entry) => now - entry.ts < SETTLED_TTL_MS)
+
+  const chains = new Map<string, OutboxEntry[]>()
+  for (const entry of fresh) {
+    const key = targetOf(entry)
+    const chain = chains.get(key)
+    if (chain) chain.push(entry)
+    else chains.set(key, [entry])
+  }
+
+  const keep = new Set<string>()
+  for (const chain of chains.values()) {
+    /* L'ultima per `ts`, non l'ultima inserita: la coda vive in localStorage e
+       due schede possono averci scritto in ordine diverso da quello del tempo. */
+    const last = chain.reduce((a, b) => (b.ts >= a.ts ? b : a))
+    if (!isAlreadyApplied(dataset, config, last)) {
+      for (const entry of chain) keep.add(entry.entryId)
+    }
+  }
+
+  const settled = state.settled.filter((entry) => keep.has(entry.entryId))
   if (settled.length === state.settled.length) return state
   return { ...state, settled }
 }

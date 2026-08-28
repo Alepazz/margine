@@ -302,10 +302,44 @@ export async function viewerLogin(token: string): Promise<string | null> {
  * Il verso opposto — un file solo — passa da qui ugualmente: due strade per
  * scrivere sarebbero due comportamenti da tenere allineati.
  */
+/**
+ * La testa del branch, risolta **una volta**.
+ *
+ * Esiste perché `commitFiles` non se la risolva da sé, e non è pignoleria: chi
+ * scrive deve leggere i file **alla stessa versione** su cui poi committa. Con
+ * due risoluzioni separate — una implicita nel `?ref=<branch>` della lettura, una
+ * dentro il commit — fra le due c'è una finestra, e un commit dell'altra persona
+ * che ci finisca dentro viene **sovrascritto in silenzio**: l'albero costruito
+ * sulla versione vecchia diventa figlio di quella nuova, il `PATCH` con
+ * `force: false` è un avanzamento legittimo e GitHub non protesta. Nessun 422,
+ * nessun tentativo di unione, le sue spese svanite. → ADR-0071
+ */
+export async function headSha(cfg: GithubConfig, token: string): Promise<string> {
+  const response = await fetch(`${repoUrl(cfg)}/git/ref/heads/${encodeURIComponent(cfg.branch)}`, {
+    headers: apiHeaders(token),
+    cache: 'no-store',
+  })
+  if (!response.ok) throw await failure(response)
+  const ref = (await response.json()) as { object?: { sha?: string } }
+  const sha = ref.object?.sha
+  if (!sha) throw new GithubError(500, `Il branch ${cfg.branch} non ha una testa leggibile.`)
+  return sha
+}
+
 export async function commitFiles(
   cfg: GithubConfig,
   token: string,
-  args: { files: readonly { path: string; text: string }[]; message: string },
+  args: {
+    files: readonly { path: string; text: string }[]
+    message: string
+    /**
+     * Il commit su cui poggia questo, cioè la versione da cui i file sono stati
+     * letti. È **obbligatorio** apposta: un ripiego che lo risolvesse qui
+     * riaprirebbe la finestra che `headSha` esiste per chiudere, e lo farebbe in
+     * silenzio, a chi se ne fosse dimenticato. → ADR-0071
+     */
+    parent: string
+  },
 ): Promise<{ sha: string }> {
   if (args.files.length === 0) throw new GithubError(400, 'Nessun file da scrivere.')
 
@@ -320,16 +354,6 @@ export async function commitFiles(
     return (await response.json()) as T
   }
 
-  const refPath = `/git/ref/heads/${encodeURIComponent(cfg.branch)}`
-  const refResponse = await fetch(`${repoUrl(cfg)}${refPath}`, {
-    headers: apiHeaders(token),
-    cache: 'no-store',
-  })
-  if (!refResponse.ok) throw await failure(refResponse)
-  const ref = (await refResponse.json()) as { object?: { sha?: string } }
-  const head = ref.object?.sha
-  if (!head) throw new GithubError(500, `Il branch ${cfg.branch} non ha una testa leggibile.`)
-
   const blobs = await Promise.all(
     args.files.map((file) =>
       post<{ sha: string }>('/git/blobs', { content: file.text, encoding: 'utf-8' }),
@@ -337,7 +361,7 @@ export async function commitFiles(
   )
 
   const tree = await post<{ sha: string }>('/git/trees', {
-    base_tree: head,
+    base_tree: args.parent,
     tree: args.files.map((file, index) => ({
       path: file.path,
       mode: '100644',
@@ -349,7 +373,7 @@ export async function commitFiles(
   const commit = await post<{ sha: string }>('/git/commits', {
     message: args.message,
     tree: tree.sha,
-    parents: [head],
+    parents: [args.parent],
   })
 
   /*

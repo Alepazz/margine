@@ -49,6 +49,7 @@ import {
   GithubError,
   commitFiles,
   getFile,
+  headSha,
   listCommits,
   loadLogin,
   loadToken,
@@ -449,6 +450,9 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
   const configRef = useRef<AppConfig | undefined>(undefined)
   const outboxRef = useRef<OutboxState>(EMPTY_OUTBOX)
   const flushTimer = useRef<number | undefined>(undefined)
+  /* Un giro alla volta: `flush` è esposto come `syncNow`, quindi il pulsante
+     delle impostazioni e il timer del debounce possono partire insieme. */
+  const flushing = useRef(false)
 
   const persistOutbox = useCallback((next: OutboxState) => {
     outboxRef.current = next
@@ -457,7 +461,28 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
   }, [])
 
   // ── Sincronizzazione verso il repo ──────────────────────────────────────
-  const flush = useCallback(async (): Promise<void> => {
+
+  /**
+   * Un giro di sincronizzazione: legge il remoto, ci applica la coda, committa.
+   *
+   * Due cose qui sono la correzione di altrettanti modi di perdere dati in
+   * silenzio, e vale la pena che stiano scritte accanto al codice che le evita.
+   *
+   * **La testa si risolve prima di leggere.** I file si leggono `?ref=<sha>` su
+   * quella testa esatta, e la stessa testa va a `commitFiles` come genitore.
+   * Prima la lettura usava `?ref=<branch>` e il commit si ririsolveva la testa da
+   * sé: fra i due momenti c'era una finestra, e un commit dell'altra persona che
+   * ci finisse dentro veniva sovrascritto senza un 422 e senza un tentativo di
+   * unione. Ora un commit interposto rende il nostro genitore vecchio, GitHub
+   * rifiuta con 422, e il tentativo qui sotto rilegge tutto da capo. → ADR-0071
+   *
+   * **Si toglie dalla coda solo ciò che è stato committato.** Prima si azzerava
+   * la coda intera (`pending: []`), e tutto ciò che entrava mentre il commit era
+   * in volo — una finestra di secondi, che il modulo dei prezzi rende normale
+   * perché non si chiude quando salva — spariva senza essere mai stato scritto.
+   * → ADR-0070
+   */
+  const flushOnce = useCallback(async (): Promise<void> => {
     const pending = outboxRef.current.pending
     if (pending.length === 0) {
       setSync((s) => ({ ...s, phase: 'idle', pending: 0 }))
@@ -507,11 +532,14 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
           )
         }
 
+        /* La versione su cui si legge **e** su cui si committa: una sola. */
+        const parent = await headSha(github, token)
+
         const files: { path: string; text: string }[] = []
         let merged: Dataset | undefined
 
         if (withData) {
-          const remote = await getFile(github, token)
+          const remote = await getFile(github, token, github.dataPath, parent)
           if (!remote) {
             throw new GithubError(404, `Nel repo non c'è ${github.dataPath}: fai un primo push dei dati.`)
           }
@@ -527,7 +555,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
 
         let mergedConfig: AppConfig | undefined
         if (withConfig && github.configPath) {
-          const remoteConfig = await getFile(github, token, github.configPath)
+          const remoteConfig = await getFile(github, token, github.configPath, parent)
           if (!remoteConfig) {
             throw new GithubError(404, `Nel repo non c'è ${github.configPath}.`)
           }
@@ -543,7 +571,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
         }
 
         try {
-          await commitFiles(github, token, { files, message: commitMessage(entries) })
+          await commitFiles(github, token, { files, message: commitMessage(entries), parent })
         } catch (putError) {
           const conflict =
             putError instanceof GithubError && (putError.status === 409 || putError.status === 422)
@@ -551,13 +579,29 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
           throw putError
         }
 
-        persistOutbox({ pending: [], settled: [...outboxRef.current.settled, ...entries] })
-        if (merged) setDataset(merged)
+        /*
+         * Escono dalla coda **le voci committate**, non la coda. Ciò che è
+         * arrivato mentre il commit era in volo resta in attesa e va al giro
+         * dopo; e va riapplicato sopra `merged`, altrimenti la spesa appena
+         * inserita sparirebbe da sotto gli occhi di chi l'ha scritta.
+         */
+        const committed = new Set(entries.map((entry) => entry.entryId))
+        const remaining = outboxRef.current.pending.filter((entry) => !committed.has(entry.entryId))
+        persistOutbox({
+          pending: remaining,
+          settled: [...outboxRef.current.settled, ...entries],
+        })
+        if (merged) setDataset(applyOps(merged, remaining))
         if (mergedConfig) {
-          configRef.current = mergedConfig
-          setConfig(mergedConfig)
+          const withLocal = applyConfigOps(mergedConfig, remaining)
+          configRef.current = withLocal
+          setConfig(withLocal)
         }
-        setSync({ phase: 'idle', pending: 0, lastSyncAt: Date.now() })
+        setSync(
+          remaining.length === 0
+            ? { phase: 'idle', pending: 0, lastSyncAt: Date.now() }
+            : { phase: 'syncing', pending: remaining.length, lastSyncAt: Date.now() },
+        )
         return
       }
     } catch (syncError) {
@@ -568,6 +612,59 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       })
     }
   }, [persistOutbox])
+
+  /**
+   * Un giro alla volta, e si ripete finché la coda si svuota.
+   *
+   * Il guard esiste perché `flush` è esposto **direttamente** come `syncNow`: il
+   * pulsante in Impostazioni e il timer del debounce possono partire insieme, e
+   * due giri in parallelo leggono la stessa testa, costruiscono lo stesso commit
+   * e uno dei due si prende un 422 per il proprio conflitto.
+   *
+   * Il ciclo esiste per la coda che cresce durante il volo: quelle voci restano
+   * in attesa (vedi `flushOnce`) e senza un secondo giro aspetterebbero
+   * l'inserimento successivo per partire. Si ferma appena la coda è vuota o
+   * appena un giro non la accorcia — un errore lascia la coda intatta, e senza
+   * quel confronto girerebbe per sempre.
+   */
+  const flush = useCallback(async (): Promise<void> => {
+    if (flushing.current) {
+      /* Il secondo chiamante non accoda niente — le sue operazioni sono già in
+         coda e il ciclo qui sotto le troverà — ma non esce **muto**: chi ha
+         premuto «Salva adesso» deve vedere che qualcosa sta succedendo, o legge
+         un pulsante che non fa niente. È l'invariante di ADR-0043. */
+      setSync((state) => ({ ...state, phase: 'syncing' }))
+      return
+    }
+    flushing.current = true
+    try {
+      for (;;) {
+        /*
+         * Il progresso si misura sulle **identità**, non sul numero.
+         *
+         * Contare era sbagliato e in modo insidioso: `after >= before` legge
+         * «la coda non si è accorciata» come «non è stato fatto niente», e le
+         * due cose divergono proprio nel caso normale. Il debounce scatta 1,2 s
+         * dopo il **primo** salvataggio, quindi il commit in volo porta di
+         * solito **una** operazione: ne arriva una mentre vola, il commit
+         * riesce, la coda resta lunga uno — e il ciclo si fermava lasciandola
+         * lì, con `syncing` acceso e nessun timer armato. Bastava un salvataggio
+         * in mezzo, che è il flusso che ADR-0070 dice di voler proteggere.
+         *
+         * Sulle identità la domanda è quella giusta: è uscita almeno una delle
+         * voci che c'erano prima? Se no, non si è mosso niente — un errore
+         * lascia tutte le identità al loro posto — e si esce.
+         */
+        const before = outboxRef.current.pending.map((entry) => entry.entryId)
+        if (before.length === 0) break
+        await flushOnce()
+        const ancora = new Set(outboxRef.current.pending.map((entry) => entry.entryId))
+        if (before.every((id) => ancora.has(id))) break
+      }
+    } finally {
+      flushing.current = false
+    }
+  }, [flushOnce])
 
   const scheduleFlush = useCallback(() => {
     if (flushTimer.current !== undefined) window.clearTimeout(flushTimer.current)
@@ -612,11 +709,10 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       try {
         const dataKey = await deriveKeyCached(passphrase, envs.data.kdf)
         const rawDataset = normaliseDataset(await decryptEnvelope<Dataset>(envs.data, dataKey))
-        const configKey =
-          envs.config.kdf.salt === envs.data.kdf.salt && envs.config.kdf.iterations === envs.data.kdf.iterations
-            ? dataKey
-            : await deriveKeyCached(passphrase, envs.config.kdf)
-        const nextConfig = await decryptEnvelope<AppConfig>(envs.config, configKey)
+        const nextConfig = await decryptEnvelope<AppConfig>(
+          envs.config,
+          await deriveKeyCached(passphrase, envs.config.kdf),
+        )
 
         passphraseRef.current = passphrase
         if (remember) {
@@ -685,9 +781,19 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
 
       const key = await deriveKeyCached(passphrase, data.kdf)
       const rawDataset = normaliseDataset(await decryptEnvelope<Dataset>(data, key))
-      const configKey =
-        cfg.kdf.salt === data.kdf.salt ? key : await deriveKeyCached(passphrase, cfg.kdf)
-      const nextConfig = await decryptEnvelope<AppConfig>(cfg, configKey)
+      /* Nessuna scorciatoia scritta a mano: `deriveKeyCached` è memoizzata su
+         salt, iterazioni e digest, quindi con la stessa `kdf` non deriva due
+         volte. La scorciatoia che c'era confrontava **solo il salt**, mentre
+         `doUnlock` confrontava anche le iterazioni: con due file a iterazioni
+         diverse questa rilettura decifrava la configurazione con la chiave del
+         dataset, falliva con un `WrongPassphraseError`, e il `catch` qui sotto
+         lo ingoiava — campanella e aggiornamento in sottofondo muti, senza un
+         segno. Due espressioni della stessa condizione prima o poi dicono cose
+         diverse: qui non ce n'è nessuna. */
+      const nextConfig = await decryptEnvelope<AppConfig>(
+        cfg,
+        await deriveKeyCached(passphrase, cfg.kdf),
+      )
 
       /*
        * La versione remota **pura**, prima dell'overlay locale: è il termine di

@@ -201,13 +201,89 @@ describe('coda già pubblicata', () => {
     expect(isAlreadyApplied(applyOps(DATASET, [elimina]), undefined, elimina)).toBe(true)
   })
 
-  it('scarta dalla coda le voci già pubblicate', () => {
-    const applied = applyOps(DATASET, [patch({ tax730: true })])
+  it('scarta dalla coda le catene già pubblicate per intero', () => {
+    const applied = applyOps(DATASET, [patch({ tax730: true }), patch({ notes: 'altro' }, 2)])
     const state = { pending: [], settled: [patch({ tax730: true }), patch({ notes: 'altro' }, 2)] }
     // `now` vicino ai timestamp delle voci: nessuna è ancora scaduta per tempo
-    const pruned = pruneSettled(state, applied, undefined, 1000)
-    expect(pruned.settled.map((e) => e.entryId)).toEqual(['e2'])
+    expect(pruneSettled(state, applied, undefined, 1000).settled).toHaveLength(0)
   })
+
+  it('tiene la catena intera se l’ultima non è ancora arrivata', () => {
+    /* Le due toccano la **stessa** spesa, quindi si potano insieme: `e1` è
+       arrivata ma `e2` no, e tenere anche `e1` è innocuo (riapplicarla non
+       cambia niente) mentre scartarla a metà catena è il difetto che il test
+       qui sotto descrive. */
+    const applied = applyOps(DATASET, [patch({ tax730: true })])
+    const state = { pending: [], settled: [patch({ tax730: true }), patch({ notes: 'altro' }, 2)] }
+    const pruned = pruneSettled(state, applied, undefined, 1000)
+    expect(pruned.settled.map((e) => e.entryId)).toEqual(['e1', 'e2'])
+  })
+
+  /*
+   * ─────────────────────────────────────────────────────────────────────────
+   * Il fantasma: due operazioni committate che si annullano.
+   *
+   * Potate una per una, la logica si capovolge — il remoto non ha la spesa,
+   * quindi il `delete` risulta applicato e viene scartato mentre il `create`
+   * risulta non applicato e viene tenuto. Resta in coda il solo `create`, e
+   * ogni sovrapposizione lo riapplica: la spesa cancellata torna a schermo.
+   * Ricancellarla non serviva, perché la nuova `delete` veniva potata allo
+   * stesso modo. → ADR-0069
+   * ─────────────────────────────────────────────────────────────────────────
+   */
+  describe('due operazioni che si annullano', () => {
+    const crea: OutboxEntry = { kind: 'create', expense: NUOVA, entryId: 'c', ts: 1 }
+    const elimina: OutboxEntry = { kind: 'delete', expenseId: NUOVA.id, entryId: 'd', ts: 2 }
+
+    it('una spesa aggiunta e cancellata non torna', () => {
+      /* Il remoto dopo che entrambe sono state committate: la spesa non c'è. */
+      /* `DATASET` è il remoto dopo che entrambe sono state committate: la spesa
+         non c'è. */
+      const pruned = pruneSettled({ pending: [], settled: [crea, elimina] }, DATASET, undefined, 1000)
+      expect(pruned.settled).toHaveLength(0)
+      expect(applyOps(DATASET, pruned.settled).expenses.map((e) => e.id)).not.toContain(NUOVA.id)
+    })
+
+    it('e non torna nemmeno al giro dopo', () => {
+      /* Il difetto vero era qui: ricancellarla produceva un commit a vuoto, la
+         nuova `delete` veniva potata come «già applicata» e il `create` restava. */
+      const primo = pruneSettled({ pending: [], settled: [crea, elimina] }, DATASET, undefined, 1000)
+      const ancora: OutboxEntry = { kind: 'delete', expenseId: NUOVA.id, entryId: 'd2', ts: 3 }
+      const secondo = pruneSettled(
+        { pending: [], settled: [...primo.settled, ancora] },
+        DATASET,
+        undefined,
+        1000,
+      )
+      expect(applyOps(DATASET, secondo.settled).expenses.map((e) => e.id)).not.toContain(NUOVA.id)
+    })
+
+    it('un rimborso registrato e annullato non sposta il saldo mostrato', () => {
+      const rimborso = { id: 'r1', date: '2026-08-28', from: 'partner' as const, to: 'me' as const, amount: 40 }
+      const registra: OutboxEntry = { kind: 'settle', settlement: rimborso, entryId: 's', ts: 1 }
+      const annulla: OutboxEntry = { kind: 'unsettle', settlementId: 'r1', entryId: 'u', ts: 2 }
+      const pruned = pruneSettled({ pending: [], settled: [registra, annulla] }, DATASET, undefined, 1000)
+      expect(applyOps(DATASET, pruned.settled).settlements ?? []).toHaveLength(0)
+    })
+
+    it('una spunta accesa e spenta resta spenta', () => {
+      const accendi = patch({ tax730: true })
+      const spegni = patch({ tax730: false }, 2)
+      /* Il remoto con entrambe applicate: `normalize` cancella il flag falso. */
+      const remoto = applyOps(DATASET, [accendi, spegni])
+      const pruned = pruneSettled({ pending: [], settled: [accendi, spegni] }, remoto, undefined, 1000)
+      expect(applyOps(remoto, pruned.settled).expenses[0]).not.toHaveProperty('tax730')
+    })
+
+    it('un importo corretto due volte mostra la correzione buona', () => {
+      const dieci: OutboxEntry = { kind: 'update', expenseId: 'a', fields: { amount: 10, shares: { me: 5, partner: 5 } }, entryId: 'u1', ts: 1 }
+      const dodici: OutboxEntry = { kind: 'update', expenseId: 'a', fields: { amount: 12, shares: { me: 6, partner: 6 } }, entryId: 'u2', ts: 2 }
+      const remoto = applyOps(DATASET, [dieci, dodici])
+      const pruned = pruneSettled({ pending: [], settled: [dieci, dodici] }, remoto, undefined, 1000)
+      expect(applyOps(remoto, pruned.settled).expenses[0]?.amount).toBe(12)
+    })
+  })
+
 
   it('dimentica le voci troppo vecchie per essere ancora in volo', () => {
     const old = patch({ notes: 'vecchia' }, 1)
@@ -385,16 +461,16 @@ describe('il flag «concluso» di un tricount', () => {
     ...DATASET,
     tricounts: [
       {
-        id: 'creta-2025',
-        name: 'Creta',
+        id: 'vacanza-2025',
+        name: 'Vacanza',
         members: ['me', 'partner'],
-        trip: { place: 'Creta', year: 2025, start: '2025-08-17', end: '2025-08-25' },
+        trip: { place: 'Vacanza', year: 2025, start: '2025-08-17', end: '2025-08-25' },
       },
     ],
   }
   const chiudi: OutboxEntry = {
     kind: 'tricount-edit',
-    tricountId: 'creta-2025',
+    tricountId: 'vacanza-2025',
     fields: { closed: true },
     entryId: 'te',
     ts: 1,
@@ -420,6 +496,21 @@ describe('il flag «concluso» di un tricount', () => {
     const chiuso = applyOps(VIAGGI, [chiudi])
     const riapri: OutboxEntry = { ...chiudi, fields: { closed: false }, entryId: 'r', ts: 2 }
     expect(applyOps(chiuso, [riapri]).tricounts[0]).not.toHaveProperty('closed')
+  })
+
+  it('e «riapri» si riconosce come pubblicata, invece di restare in coda due settimane', () => {
+    /* `applyOps` passa da `normalizeTricount`, che cancella `closed` quando è
+       falso. Confrontato **grezzo**, `{ closed: false }` non era mai riconosciuto
+       come applicato — `JSON.stringify(undefined) !== 'false'` — quindi restava
+       fra le `settled` per quattordici giorni, riapplicandosi a ogni caricamento.
+       È lo stesso difetto che `update` aveva già risolto confrontando con
+       l'intenzione normalizzata. → ADR-0069 */
+    const riapri: OutboxEntry = { ...chiudi, fields: { closed: false }, entryId: 'r2', ts: 2 }
+    const riaperto = applyOps(applyOps(VIAGGI, [chiudi]), [riapri])
+    expect(isAlreadyApplied(riaperto, undefined, riapri)).toBe(true)
+    expect(
+      pruneSettled({ pending: [], settled: [riapri] }, riaperto, undefined, 1000).settled,
+    ).toHaveLength(0)
   })
 })
 

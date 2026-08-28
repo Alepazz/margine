@@ -6,7 +6,7 @@
  * Sovrascrive `data/` solo con `--yes`.
  */
 
-import { decryptEnvelope, deriveKey } from './lib/crypto-node.mjs'
+import { assertEnvelope, decryptEnvelope, deriveKey } from './lib/crypto-node.mjs'
 import { PATHS, exists, fail, log, readJson, readPassphrase, writeJson } from './lib/io.mjs'
 
 const force = process.argv.includes('--yes')
@@ -21,14 +21,14 @@ try {
     process.exitCode = 1
   } else {
     const passphrase = readPassphrase()
-    const datasetEnvelope = readJson(PATHS.expensesEnc)
+    const datasetEnvelope = assertEnvelope(readJson(PATHS.expensesEnc), PATHS.expensesEnc)
     const key = await deriveKey(passphrase, datasetEnvelope.kdf)
     const dataset = await decryptEnvelope(datasetEnvelope, key)
     writeJson(PATHS.expenses, dataset)
     log(`✓ data/expenses.json — ${dataset.expenses.length} spese, ${dataset.trips.length} viaggi`)
 
     if (exists(PATHS.configEnc)) {
-      const configEnvelope = readJson(PATHS.configEnc)
+      const configEnvelope = assertEnvelope(readJson(PATHS.configEnc), PATHS.configEnc)
       const configKey =
         configEnvelope.kdf.salt === datasetEnvelope.kdf.salt &&
         configEnvelope.kdf.iterations === datasetEnvelope.kdf.iterations
