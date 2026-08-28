@@ -170,21 +170,37 @@ export function computeMargin(
 /*
  * ─────────────────────── oscurare i guadagni ───────────────────────
  *
- * Nascondere la riga «entrate» non nasconde le entrate: ogni altro numero
- * della scheda le restituisce per sottrazione (margine + speso, speso / quota
- * spesa, spendibile + risparmio + fisse + variabili), e il riempimento della
- * barra **è** la quota spesa, senza bisogno di leggere una cifra.
+ * Il velo copre **quanto guadagni**, non **quanto puoi spendere**: sono due
+ * domande diverse, e la seconda è tutta l'app. Coprire anche quella rendeva
+ * l'oscuramento inservibile proprio nel momento per cui esiste — mostrare
+ * l'app a qualcuno — e quindi lo teneva spento. → ADR-0066
  *
- * Quindi non si vela il numero nella vista: non si dà il numero alla vista.
- * Qui si azzerano i campi, e il componente disegna «•••» dove trova `null` —
- * così la regola vive in una funzione pura che un test può presidiare, senza
- * dover montare l'interfaccia.
+ * Il limite è dichiarato e non è un difetto da tappare: le righe visibili sono
+ * una sottrazione a cui manca la prima, quindi chi le somma ricava il totale.
+ * Deve però sommarle, e ciò che ottiene è un profilo **stimato dalla RAL**, non
+ * una busta paga. Protegge dallo sguardo, non dall'aritmetica, com'è già per la
+ * separazione dei compartimenti personali (→ ADR-0039).
+ *
+ * Non si vela il numero nella vista: non si dà il numero alla vista. Qui si
+ * azzerano i campi, e il componente disegna «•••» dove trova `null` — così la
+ * regola vive in una funzione pura che un test può presidiare, senza dover
+ * montare l'interfaccia.
  */
 
 /**
- * Gli unici campi che restano leggibili a guadagni oscurati: parlano di spese
- * (`spent`, `projectedSpent`) o di soldi già impegnati che si ricavano dalla
- * storia delle spese, non dalle entrate (`expectedFixed`, `fixedStillDue`).
+ * I campi che restano leggibili a guadagni oscurati. Due famiglie:
+ *
+ * - le **spese** e i soldi già impegnati, che si ricavano dalla storia delle
+ *   spese e non dalle entrate (`spent`, `projectedSpent`, `expectedFixed`,
+ *   `variableSpent`, `fixedSpent`, `fixedStillDue`);
+ * - ciò che **resta da spendere** (`spendable`, `spendablePerDay`) e ciò che è
+ *   messo da parte (`savingsTarget`), che sono la risposta dell'app e non un
+ *   guadagno. → ADR-0066
+ *
+ * Restano coperti `income` e `breakdown` — i guadagni nudi — e tutto ciò che è
+ * «entrate meno qualcosa» (`margin`, `marginAfterSavings`, `projectedMargin`,
+ * `projectedMarginAfterSavings`, `discretionaryBudget`, `usedPct`): quelli non
+ * chiedono una somma, basta leggerli.
  *
  * È una lista di **ciò che si vede**, non di ciò che si nasconde: un campo
  * nuovo in `MarginResult` risulta segreto per difetto. Al contrario, prima o
@@ -199,6 +215,9 @@ const PUBLIC_MARGIN_FIELDS = [
   'variableSpent',
   'fixedSpent',
   'fixedStillDue',
+  'savingsTarget',
+  'spendable',
+  'spendablePerDay',
 ] as const
 
 type PublicField = (typeof PUBLIC_MARGIN_FIELDS)[number]
@@ -293,38 +312,39 @@ export function marginBar(
   view: MarginView,
   opts: { projectedVariable: number | null },
 ): MarginBar | null {
-  const { income, savingsTarget, discretionaryBudget, spendable } = view
+  const { savingsTarget, spendable } = view
   if (!view.known) return null
-  if (income === null || savingsTarget === null || discretionaryBudget === null) return null
-  if (spendable === null) return null
-
-  const entrate = toCents(income)
-  if (entrate <= 0) return null
+  if (savingsTarget === null || spendable === null) return null
 
   const risparmio = Math.max(0, toCents(savingsTarget))
   const fisse = Math.max(0, toCents(view.fixedSpent))
   const attese = Math.max(0, toCents(view.fixedStillDue))
   const variabili = Math.max(0, toCents(view.variableSpent))
+  const spendibile = toCents(spendable)
 
   const impegnato = risparmio + fisse + attese + variabili
   /*
-   * Il fondo della barra sono le entrate, tranne quando si è speso di più: là
-   * diventa l'impegnato, così la barra resta piena invece di sfondare, e
-   * l'eccedenza ha il suo pezzo rosso in coda.
+   * Il fondo della barra **erano** le entrate, e adesso è l'impegnato più ciò
+   * che avanza: è la stessa identica misura — lo spendibile è per definizione
+   * entrate meno impegnato — scritta senza mai nominare le entrate, che a
+   * guadagni oscurati non arrivano fin qui. Quando si è speso più di quanto si
+   * aveva lo spendibile è negativo, il resto sparisce e la barra resta piena
+   * invece di sfondare. → ADR-0066
    */
-  const totale = Math.max(entrate, impegnato)
+  const resto = Math.max(0, spendibile)
+  const totale = impegnato + resto
+  if (totale <= 0) return null
 
   /*
-   * L'eccedenza si stacca dalle **variabili**, che è da dove arriva sempre nella
-   * pratica. Nel caso patologico in cui risparmio e fisse da soli superino le
-   * entrate — cioè non ti puoi permettere l'affitto — il pezzo rosso vale tutte
-   * le variabili invece che la sola parte oltre la riga: dice comunque «sei
-   * oltre», che è l'unica cosa che conta a quel punto.
+   * L'eccedenza è esattamente quanto lo spendibile è finito **sotto zero**, e si
+   * stacca dalle **variabili**, che è da dove arriva sempre nella pratica. Il
+   * `min` è per il caso patologico in cui risparmio e fisse da soli superino le
+   * entrate — cioè non ti puoi permettere l'affitto: là il pezzo rosso vale
+   * tutte le variabili invece della sola parte oltre la riga, e dice comunque
+   * «sei oltre», che è l'unica cosa che conta a quel punto.
    */
-  const fondo = Math.max(0, toCents(discretionaryBudget))
-  const eccedenza = Math.max(0, variabili - fondo)
+  const eccedenza = Math.min(variabili, Math.max(0, -spendibile))
   const dentro = variabili - eccedenza
-  const resto = Math.max(0, totale - impegnato)
 
   const quota = (cents: number): number => (cents / totale) * 100
   const segments: MarginSegment[] = []

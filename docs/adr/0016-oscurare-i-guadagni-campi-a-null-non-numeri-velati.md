@@ -1,6 +1,6 @@
 # ADR-0016: Oscurare i guadagni azzerando i campi, non velando i numeri
 
-**Status:** accepted · **Date:** 2026-08-20
+**Status:** accepted — la portata del velo e la conseguenza sulla barra sono superate da ADR-0066 · **Date:** 2026-08-20
 
 ## Context
 

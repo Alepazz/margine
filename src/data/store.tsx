@@ -326,11 +326,19 @@ function readNewsGroups(): ChangeGroup[] {
   }
 }
 
+/**
+ * All'apertura i guadagni partono **coperti**, finché non si dice il contrario.
+ *
+ * Il difetto ha due versi e non si equivalgono: partire in chiaro mostra lo
+ * stipendio a chi ti guarda lo schermo prima che tu ci pensi, partire coperti
+ * costa un tocco. Perciò l'assenza della chiave vale «coperti», e anche il
+ * ripiego quando `localStorage` non risponde. → ADR-0066
+ */
 function readHideIncomeDefault(): boolean {
   try {
-    return localStorage.getItem(HIDE_INCOME_KEY) === 'on'
+    return localStorage.getItem(HIDE_INCOME_KEY) !== 'off'
   } catch {
-    return false
+    return true
   }
 }
 
