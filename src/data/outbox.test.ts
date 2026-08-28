@@ -236,7 +236,6 @@ describe('coda già pubblicata', () => {
     const elimina: OutboxEntry = { kind: 'delete', expenseId: NUOVA.id, entryId: 'd', ts: 2 }
 
     it('una spesa aggiunta e cancellata non torna', () => {
-      /* Il remoto dopo che entrambe sono state committate: la spesa non c'è. */
       /* `DATASET` è il remoto dopo che entrambe sono state committate: la spesa
          non c'è. */
       const pruned = pruneSettled({ pending: [], settled: [crea, elimina] }, DATASET, undefined, 1000)
@@ -283,7 +282,6 @@ describe('coda già pubblicata', () => {
       expect(applyOps(remoto, pruned.settled).expenses[0]?.amount).toBe(12)
     })
   })
-
 
   it('dimentica le voci troppo vecchie per essere ancora in volo', () => {
     const old = patch({ notes: 'vecchia' }, 1)

@@ -16,6 +16,7 @@
  * Le voci `settled` si eliminano da sole quando il dato scaricato le contiene già.
  */
 
+import { randomHex } from '../domain/ids'
 import { toCents } from '../domain/money'
 import type {
   Annotation,
@@ -174,9 +175,7 @@ let counter = 0
  */
 export function newEntry(op: Op, now: number): OutboxEntry {
   counter += 1
-  const caso = crypto.getRandomValues(new Uint8Array(3))
-  const coda = [...caso].map((byte) => byte.toString(16).padStart(2, '0')).join('')
-  return { ...op, entryId: `${now}-${counter}-${coda}`, ts: now }
+  return { ...op, entryId: `${now}-${counter}-${randomHex(3)}`, ts: now }
 }
 
 /** Applica le operazioni in ordine cronologico. */

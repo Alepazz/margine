@@ -46,7 +46,14 @@ export const MAX_ITERATIONS = 5_000_000
 export const SALT_BYTES = 16
 export const IV_BYTES = 12
 
-/** Quanti byte codifica una stringa base64, senza decodificarla per intero. */
+/**
+ * Quanti byte codifica una stringa base64, o **-1** se non è base64 valido —
+ * `atob` lancia sui caratteri fuori alfabeto, ed è quel rifiuto che tiene fuori
+ * un salt con della spazzatura in coda.
+ *
+ * Decodifica **per intero**: va chiamata solo su salt e IV (24 e 16 caratteri),
+ * mai sul ciphertext, che è mezzo mega.
+ */
 function base64Bytes(text: string): number {
   try {
     return fromBase64(text).length
@@ -75,6 +82,10 @@ export function isEnvelope(value: unknown): value is Envelope {
   return (
     v.v === 1 &&
     typeof v.ct === 'string' &&
+    /* Il lato Node lo pretendeva già: senza, un file con `ct: ''` arrivava
+       alla decifratura e l'utente leggeva «passphrase errata» di un file che
+       non è un envelope. Le due devono rifiutare le stesse cose. */
+    v.ct !== '' &&
     typeof v.kdf === 'object' &&
     v.kdf !== null &&
     v.kdf.name === 'PBKDF2' &&

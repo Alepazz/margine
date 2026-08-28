@@ -18,6 +18,30 @@ export const MAX_ITERATIONS = 5_000_000
 export const SALT_BYTES = 16
 export const IV_BYTES = 12
 
+/*
+ * Quanti byte codifica una stringa base64, o -1 se non è base64 valido.
+ *
+ * Usa **`atob`, lo stesso della piattaforma web** invece di `Buffer.from`, e non
+ * per gusto: `Buffer.from(x, 'base64')` **scarta** i caratteri fuori alfabeto
+ * invece di lanciare, quindi un salt di 16 byte con della spazzatura in coda
+ * passava qui e veniva respinto nel browser — e le due implementazioni devono
+ * rifiutare le stesse cose (→ ADR-0073).
+ *
+ * La prima versione di questa funzione riscriveva a mano la regola di `atob` con
+ * una regexp, e ne sbagliava un pezzo: `atob` accetta il base64 **senza il
+ * riempimento** (22 caratteri danno 16 byte come 24), quindi il controllo
+ * `length % 4 === 0` creava una quarta divergenza al posto delle tre che
+ * chiudeva. Riscrivere la regola di una funzione è un modo di divergere da lei;
+ * chiamarla no. Sta in `node:buffer` come globale dal 16.
+ */
+function base64Bytes(text) {
+  try {
+    return atob(text.replace(/\s+/g, '')).length
+  } catch {
+    return -1
+  }
+}
+
 /**
  * Lancia se questo non è un envelope che Margine potrebbe aver scritto.
  *
@@ -36,7 +60,7 @@ export function assertEnvelope(value, dove) {
   if (typeof kdf !== 'object' || kdf === null) dice('manca `kdf`')
   if (kdf.name !== 'PBKDF2') dice(`derivazione inattesa (${String(kdf.name)})`)
   if (kdf.hash !== 'SHA-256') dice(`digest inatteso (${String(kdf.hash)})`)
-  if (typeof kdf.salt !== 'string' || fromBase64(kdf.salt).length !== SALT_BYTES) {
+  if (typeof kdf.salt !== 'string' || base64Bytes(kdf.salt) !== SALT_BYTES) {
     dice(`il salt non è di ${String(SALT_BYTES)} byte`)
   }
   if (!Number.isInteger(kdf.iterations) || kdf.iterations < MIN_ITERATIONS || kdf.iterations > MAX_ITERATIONS) {
@@ -48,7 +72,7 @@ export function assertEnvelope(value, dove) {
   const cipher = value.cipher
   if (typeof cipher !== 'object' || cipher === null) dice('manca `cipher`')
   if (cipher.name !== 'AES-GCM') dice(`cifratura inattesa (${String(cipher.name)})`)
-  if (typeof cipher.iv !== 'string' || fromBase64(cipher.iv).length !== IV_BYTES) {
+  if (typeof cipher.iv !== 'string' || base64Bytes(cipher.iv) !== IV_BYTES) {
     dice(`l'IV non è di ${String(IV_BYTES)} byte`)
   }
   if (typeof value.ct !== 'string' || value.ct === '') dice('manca il ciphertext')

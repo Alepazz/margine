@@ -7,7 +7,8 @@
  * sopravvive a tutti i reimport successivi senza bisogno di essere marcata.
  */
 
-function randomHex(bytes: number): string {
+/** Esportata perché la usa anche `data/outbox.ts` per la coda dell'`entryId`. */
+export function randomHex(bytes: number): string {
   const buffer = new Uint8Array(bytes)
   crypto.getRandomValues(buffer)
   return [...buffer].map((byte) => byte.toString(16).padStart(2, '0')).join('')

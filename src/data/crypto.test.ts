@@ -75,9 +75,11 @@ describe('cifratura', () => {
     })
 
     it('e accetta ogni envelope che il progetto ha pubblicato finora', () => {
-      /* Tutte e trentanove le versioni storiche: PBKDF2/SHA-256, 600.000
-         iterazioni, salt da 16 byte, IV da 12. Il controllo non chiude nessuno
-         fuori dai propri dati, e questo test è la ragione per cui si può dire. */
+      /* Ogni versione pubblicata finora sta qui: PBKDF2/SHA-256, 600.000
+         iterazioni, salt da 16 byte, IV da 12 — contate una per una il
+         28/08/2026, trentanove allora, e il numero cresce a ogni salvataggio
+         dall'app. Il controllo non chiude nessuno fuori dai propri dati, e
+         questo test è la ragione per cui si può dire. */
       expect(isEnvelope({ ...buono, kdf: { ...KDF, iterations: 600_000 } })).toBe(true)
     })
   })
@@ -112,5 +114,68 @@ describe('compatibilità con gli script Node', () => {
 
     const fromBrowser = await encryptEnvelope(PAYLOAD, browserKey, KDF)
     expect(await nodeCrypto.decryptEnvelope(fromBrowser, nodeKey)).toEqual(PAYLOAD)
+  })
+
+  /**
+   * ADR-0073 dichiara che le due implementazioni «devono rifiutare le stesse
+   * cose: una divergenza nella severità è una divergenza». Era una promessa
+   * senza presidio, e infatti la review del 28/08/2026 ne ha trovate **tre**:
+   * `ct: ''` lo accettava il browser e lo rifiutava Node, un salt e un IV con
+   * spazzatura fuori dall'alfabeto base64 li accettava Node e li rifiutava il
+   * browser (`Buffer.from` scarta i caratteri illegali, `atob` lancia).
+   *
+   * Questo test è il presidio: una tabella di mutazioni, e per ciascuna il
+   * verdetto dei due lati deve **coincidere**. Non pretende che una mutazione
+   * sia rifiutata — pretende che le due siano d'accordo, che è l'invariante
+   * vero e quello che nessuno dei due controlli sa dire da solo.
+   */
+  it('rifiuta esattamente le stesse cose del browser', async () => {
+    const path = '../../scripts/lib/crypto-node.mjs'
+    const nodeCrypto = await import(path)
+
+    const buono = { v: 1 as const, kdf: KDF, cipher: { name: 'AES-GCM' as const, iv: 'MTIzNDU2Nzg5MGFi' }, ct: 'AAAA' }
+    const mutazioni: readonly [string, unknown][] = [
+      ['come è', buono],
+      ['senza ciphertext', { ...buono, ct: '' }],
+      ['ciphertext non stringa', { ...buono, ct: 42 }],
+      ['versione sbagliata', { ...buono, v: 2 }],
+      ['non è un oggetto', 'MTIz'],
+      ['nullo', null],
+      ['manca kdf', { ...buono, kdf: undefined }],
+      ['derivazione altra', { ...buono, kdf: { ...KDF, name: 'scrypt' } }],
+      ['digest debole', { ...buono, kdf: { ...KDF, hash: 'SHA-1' } }],
+      ['un giro solo', { ...buono, kdf: { ...KDF, iterations: 1 } }],
+      ['pavimento esatto', { ...buono, kdf: { ...KDF, iterations: MIN_ITERATIONS } }],
+      ['un giro sotto il pavimento', { ...buono, kdf: { ...KDF, iterations: MIN_ITERATIONS - 1 } }],
+      ['iterazioni con la virgola', { ...buono, kdf: { ...KDF, iterations: 600_000.5 } }],
+      ['iterazioni non numero', { ...buono, kdf: { ...KDF, iterations: '600000' } }],
+      ['salt corto', { ...buono, kdf: { ...KDF, salt: 'MTIz' } }],
+      ['salt con spazzatura in coda', { ...buono, kdf: { ...KDF, salt: `${KDF.salt}!!!` } }],
+      /* `atob` accetta il base64 senza riempimento: 22 caratteri danno gli
+         stessi 16 byte di 24. Il primo tentativo di allineare Node lo
+         rifiutava, cioè apriva una divergenza nuova chiudendone tre. */
+      ['salt senza riempimento', { ...buono, kdf: { ...KDF, salt: KDF.salt.replace(/=+$/, '') } }],
+      ['IV senza riempimento', { ...buono, cipher: { name: 'AES-GCM', iv: 'MTIzNDU2Nzg5MGFi'.replace(/=+$/, '') } }],
+      ['cifratura altra', { ...buono, cipher: { name: 'AES-CBC', iv: 'MTIzNDU2Nzg5MGFi' } }],
+      ['IV corto', { ...buono, cipher: { name: 'AES-GCM', iv: 'MTIz' } }],
+      ['IV con spazzatura in coda', { ...buono, cipher: { name: 'AES-GCM', iv: 'MTIzNDU2Nzg5MGFi@@@' } }],
+    ]
+
+    const disaccordi: string[] = []
+    for (const [nome, valore] of mutazioni) {
+      const browser = isEnvelope(valore)
+      let node = true
+      try {
+        nodeCrypto.assertEnvelope(valore, 'il file di prova')
+      } catch {
+        node = false
+      }
+      if (browser !== node) disaccordi.push(`${nome}: browser ${String(browser)}, node ${String(node)}`)
+    }
+
+    expect(disaccordi).toEqual([])
+    /* E la tabella deve contenere sia dei sì sia dei no, o passerebbe anche se
+       uno dei due controlli sparisse del tutto. */
+    expect(mutazioni.filter(([, v]) => isEnvelope(v))).toHaveLength(4)
   })
 })

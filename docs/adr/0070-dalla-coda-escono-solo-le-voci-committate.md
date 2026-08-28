@@ -25,7 +25,7 @@ const remaining = outboxRef.current.pending.filter((entry) => !committed.has(ent
 
 Ciò che resta va **riapplicato sopra il dataset committato** (`applyOps(merged, remaining)`, e l'equivalente per la configurazione), altrimenti la spesa appena inserita sparirebbe da sotto gli occhi di chi l'ha scritta: `merged` è il remoto più le voci del commit, e non contiene quelle nuove.
 
-`flush` diventa **un giro alla volta** — un `flushing` ref respinge il secondo chiamante — **e si ripete** finché la coda si svuota. Il ciclo si ferma appena la coda è vuota o appena un giro non l'ha accorciata: senza quel confronto un errore, che lascia la coda intatta, girerebbe per sempre.
+`flush` diventa **un giro alla volta** — un `flushing` ref respinge il secondo chiamante — **e si ripete** finché la coda si svuota. Il ciclo si ferma appena la coda è vuota o appena un giro non ne fa uscire **nessuna delle voci che c'erano**: senza quel confronto un errore, che lascia ogni identità al suo posto, girerebbe per sempre. Il confronto è sulle **identità** e non sul numero, per la ragione che sta fra le conseguenze. (Questa frase diceva «appena un giro non l'ha accorciata», cioè esattamente la formulazione che le conseguenze qui sotto chiamano il difetto: corretta il 28/08/2026 senza cambiare la decisione, perché una sezione `Decision` che descrive l'alternativa scartata è un invito a rimetterla.)
 
 L'alternativa scartata è bloccare gli inserimenti durante un flush. Sarebbe corretta e sbagliata: l'app si usa in piedi al supermercato, e un modulo che rifiuta di salvare per tre secondi mentre l'altro salvataggio vola è peggio del difetto che cura.
 

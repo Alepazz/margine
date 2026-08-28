@@ -624,8 +624,10 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
    * Il ciclo esiste per la coda che cresce durante il volo: quelle voci restano
    * in attesa (vedi `flushOnce`) e senza un secondo giro aspetterebbero
    * l'inserimento successivo per partire. Si ferma appena la coda è vuota o
-   * appena un giro non la accorcia — un errore lascia la coda intatta, e senza
-   * quel confronto girerebbe per sempre.
+   * appena un giro non ne fa uscire **nessuna di quelle che c'erano** — un
+   * errore lascia ogni identità al suo posto, e senza quel confronto girerebbe
+   * per sempre. Sul **numero** non funziona, e il perché sta nel commento
+   * dentro il ciclo: non riscriverlo come «se la coda non si è accorciata».
    */
   const flush = useCallback(async (): Promise<void> => {
     if (flushing.current) {

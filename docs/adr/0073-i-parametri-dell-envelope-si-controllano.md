@@ -28,6 +28,6 @@ Scartata l'idea di un messaggio d'errore dedicato («è un envelope, ma con para
 
 **Il test della parità fra le due implementazioni usa il pavimento**, non più mille iterazioni: è più lento di prima di poco (la suite resta sotto il secondo) e ha smesso di provare il formato con un valore che l'app rifiuterebbe. Chi alzasse il pavimento senza pensarci lo trova rosso.
 
-**Otto test descrivono i rifiuti**, uno per parametro, e uno pretende che un envelope a 600.000 iterazioni resti valido: è la riga che garantisce che il controllo non chiuda nessuno fuori dai propri dati.
+**Sei test descrivono i rifiuti**, uno per parametro; uno parte da un envelope buono, e uno pretende che un envelope a 600.000 iterazioni resti valido: è la riga che garantisce che il controllo non chiuda nessuno fuori dai propri dati.
 
 **Non copre l'altro verso.** Se un giorno il valore di produzione dovesse salire oltre 5.000.000, il tetto va alzato insieme — ed è un tetto scritto in due file, che devono cambiare insieme come già fanno le altre costanti del formato.

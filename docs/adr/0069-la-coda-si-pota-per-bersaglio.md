@@ -13,7 +13,7 @@ Su due operazioni che si annullano a vicenda quella domanda dà la risposta sbag
 
 Resta in coda il solo `create`, e ogni sovrapposizione della coda sul remoto (`applyUnlocked`, `refreshData`) lo riapplica: **la spesa cancellata torna a schermo**, contata nel margine, nel saldo e nelle statistiche. Riprodotto eseguendo il codice, non dedotto.
 
-La parte cattiva è la seconda. Ricancellarla non serve: la nuova `delete` va in coda, il flush la applica a un remoto dove la spesa già non c'è (nessun effetto), committa un file identico nel contenuto, la sposta fra le `settled`, e al caricamento dopo viene scartata come «già applicata» mentre il `create` resta. **Il fantasma torna**, per quattordici giorni, e dall'interfaccia non c'è modo di togliierlo.
+La parte cattiva è la seconda. Ricancellarla non serve: la nuova `delete` va in coda, il flush la applica a un remoto dove la spesa già non c'è (nessun effetto), committa un file identico nel contenuto, la sposta fra le `settled`, e al caricamento dopo viene scartata come «già applicata» mentre il `create` resta. **Il fantasma torna**, per quattordici giorni, e dall'interfaccia non c'è modo di toglierlo.
 
 Le altre coppie si comportano uguale: registra un rimborso e annullalo → un rimborso fantasma sposta il saldo mostrato dell'intero importo; accendi e spegni la spunta 730 → si riaccende; correggi un importo due volte → si vede la prima correzione mentre il repo ha la seconda. Sono gesti quotidiani, non casi limite. Il repo resta **corretto** — il flush manda solo `pending` — quindi è la vista locale a mentire, che in un'app dove il numero grande è la cosa che si guarda ogni giorno è quasi peggio.
 
@@ -25,7 +25,7 @@ Si pota per **bersaglio**. Le operazioni si raggruppano per la cosa che toccano 
 
 L'alternativa scartata era «potare il prefisso già applicato», cioè scartare le voci più vecchie dell'ultima riconosciuta. Non funziona proprio nel caso che conta: il `create` di una spesa poi cancellata risulta *non* applicato, quindi nessun prefisso lo comprende.
 
-`isAlreadyApplied` resta la predicato per voce e non viene sostituita da un «applica e guarda se cambia qualcosa»: è ben provata, ed è chiamata su **una** voce sola per catena, che è il punto. Per `tricount-edit` ora confronta con l'intenzione normalizzata, come `update`; e `applyPatch` ritaglia `notes` dove lo scrive, perché il confronto lo ritaglia. Non era raggiungibile — l'unico chiamante che porta `notes` ritaglia già — quindi è difesa in profondità per il secondo chiamante che arriverà, non la chiusura di un difetto vivo.
+`isAlreadyApplied` resta il predicato per voce e non viene sostituita da un «applica e guarda se cambia qualcosa»: è ben provata, ed è chiamata su **una** voce sola per catena, che è il punto. Per `tricount-edit` ora confronta con l'intenzione normalizzata, come `update`; e `applyPatch` ritaglia `notes` dove lo scrive, perché il confronto lo ritaglia. Non era raggiungibile — l'unico chiamante che porta `notes` ritaglia già — quindi è difesa in profondità per il secondo chiamante che arriverà, non la chiusura di un difetto vivo.
 
 ## Consequences
 
