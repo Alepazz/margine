@@ -15,14 +15,16 @@ import type { Expense } from '../domain/types'
 import { usePageData } from './usePageData'
 
 export function Gatto(): ReactNode {
-  const { config, dataset, view, lookup, chart, month } = usePageData()
+  const { config, view, lookup, chart, month, today, everyday } = usePageData()
   const person = view.person
   const [selected, setSelected] = useState<Expense | null>(null)
 
   const catCategory = config.catCategory
   const stats = useMemo(
-    () => catStats(dataset.expenses, person, catCategory),
-    [catCategory, dataset.expenses, person],
+    /* `everyday` e non tutte: come per la pagina Casa, un progetto porterebbe
+       via da solo la media al mese di una raccolta. → ADR-0074 */
+    () => catStats(everyday, person, catCategory),
+    [catCategory, everyday, person],
   )
 
   const slices = useMemo<DonutSlice[]>(
@@ -130,6 +132,7 @@ export function Gatto(): ReactNode {
 
         <Card title="Tutte le spese del gatto">
           <ExpenseList
+            today={today}
             expenses={stats.expenses}
             person={person}
             lookup={lookup}

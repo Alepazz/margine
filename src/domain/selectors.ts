@@ -20,6 +20,7 @@ import {
 } from './dates'
 import { round2, sumBy, toCents } from './money'
 import { nameKey } from './text'
+import { PERSON_IDS } from './types'
 import type { Expense, PersonId, Settlement, Tricount, Trip } from './types'
 
 export interface ViewOptions {
@@ -46,6 +47,31 @@ export const DEFAULT_VIEW: ViewOptions = { person: 'me', includeVacations: false
  */
 export function vacationIdsOf(tricounts: readonly Tricount[]): Set<string> {
   return new Set(tricounts.filter((t) => t.trip).map((t) => t.id))
+}
+
+/** Gli id dei tricount che sono progetti: la spesa che sta fuori dai conti del mese. */
+export function offBudgetIdsOf(tricounts: readonly Tricount[]): Set<string> {
+  return new Set(tricounts.filter((t) => t.offBudget === true).map((t) => t.id))
+}
+
+/**
+ * Quali tricount contano nelle statistiche mensili e quali no.
+ *
+ * È un oggetto solo e non due parametri di proposito: sono la **stessa
+ * domanda** — «cosa sta dentro il perimetro di questo mese?» — e tenerli
+ * separati vorrebbe dire che il giorno che ne nasce un terzo tipo, metà dei
+ * chiamanti lo riceve e metà no. Si costruisce con `perimeterOf()`, una volta,
+ * dai tricount.
+ */
+export interface Perimeter {
+  /** I tricount che sono viaggi: dentro o fuori a scelta di chi guarda. */
+  vacations: ReadonlySet<string>
+  /** I tricount che sono progetti: sempre fuori. → ADR-0074 */
+  offBudget: ReadonlySet<string>
+}
+
+export function perimeterOf(tricounts: readonly Tricount[]): Perimeter {
+  return { vacations: vacationIdsOf(tricounts), offBudget: offBudgetIdsOf(tricounts) }
 }
 
 export function shareOf(expense: Expense, person: PersonId): number {
@@ -89,16 +115,21 @@ export function welfareShare(expense: Expense): number {
  * È il filtro delle **statistiche mensili**: margine, medie, andamento, categorie,
  * confronti. Le pagine che raccontano un fatto invece di misurare un budget — Spese,
  * Vacanze, 730, Gatto — hanno il loro perimetro e non passano da qui.
+ *
+ * I progetti restano fuori **sempre**, senza un interruttore che li riporti
+ * dentro: le vacanze sono la vita di ogni anno e ha senso chiedersi quanto
+ * pesano, una casa comprata no. → ADR-0074
  */
 export function visibleFor(
   expenses: readonly Expense[],
   view: ViewOptions,
-  vacationIds: ReadonlySet<string>,
+  perimeter: Perimeter,
 ): Expense[] {
   return expenses.filter(
     (e) =>
       toCents(shareOf(e, view.person)) > 0 &&
-      (view.includeVacations || !vacationIds.has(e.tricount)) &&
+      !perimeter.offBudget.has(e.tricount) &&
+      (view.includeVacations || !perimeter.vacations.has(e.tricount)) &&
       !fundedByWelfare(e, view.person),
   )
 }
@@ -984,9 +1015,23 @@ export function coupleBalance(
      */
     today: string
     groups?: Record<string, BalanceStart>
+    /**
+     * I tricount che sono progetti: le loro spese e i loro rimborsi **non
+     * entrano qui**, perché un progetto ha un debito suo con i suoi tempi e
+     * sommarlo a quello della spesa quotidiana renderebbe illeggibili tutti e
+     * due. Li conta `projectStats()`, uno alla volta. → ADR-0074
+     *
+     * Facoltativo, e non è un ripiego silenzioso come quello che ADR-0064 ha
+     * tolto a `today`: assente vuol dire «non ci sono progetti», che è la verità
+     * finché nessuno ne crea uno. E il chiamante in produzione è **uno solo**,
+     * `useCoupleBalance()`, che esiste apposta perché le opzioni non possano
+     * divergere fra le tre pagine che mostrano il saldo.
+     */
+    offBudget?: ReadonlySet<string>
   },
 ): CoupleBalance {
   const movements: BalanceMovement[] = []
+  const offBudget = opts.offBudget ?? new Set<string>()
   const buckets = new Map<string, Bucket>()
   let settled = 0
   let outsideCouple = 0
@@ -1027,6 +1072,10 @@ export function coupleBalance(
   for (const key of Object.keys(opts.groups ?? {})) bucketOf(key)
 
   for (const expense of allExpenses) {
+    /* Un progetto ha un saldo suo: esce prima di tutto, compreso il conteggio
+       delle voci rinviate — che serve a spiegare una divergenza da Tricount, e
+       un progetto con Tricount non si confronta. → ADR-0074 */
+    if (offBudget.has(expense.tricount)) continue
     /* Datata dopo questo mese: non è ancora un debito. Esce **prima** di
        `bucketOf`, quindi non conta nemmeno nella storia del tricount: uno che
        esiste solo nel futuro non ha niente da dire oggi. → ADR-0064 */
@@ -1071,6 +1120,9 @@ export function coupleBalance(
 
   let settlementDelta = 0
   for (const settlement of settlements) {
+    /* Un rimborso di progetto salda il progetto, non il rapporto di ogni
+       giorno: sta nel suo `projectStats()`. → ADR-0075 */
+    if (settlement.tricount !== undefined && offBudget.has(settlement.tricount)) continue
     /* La stessa regola delle spese, e non per simmetria: un rimborso datato
        avanti abbasserebbe un debito che ancora non esiste. → ADR-0064 */
     if (notYet(settlement.date)) {
@@ -1139,6 +1191,139 @@ export function coupleBalance(
     deferred,
     movements: movements.sort((a, b) => (a.date === b.date ? 0 : a.date < b.date ? 1 : -1)),
   }
+}
+
+// ─────────────────────────────── progetti ───────────────────────────────
+
+/** Cosa ha messo una persona in un progetto, e cosa le spetta. */
+export interface ProjectShare {
+  /** Quanto ha materialmente anticipato: soldi usciti dal suo conto. */
+  paid: number
+  /** Quanto le spetta di quel progetto: la sua quota. */
+  share: number
+}
+
+/**
+ * Il conto di un progetto: quanto è costato, chi ha messo cosa, chi deve a chi.
+ *
+ * È il saldo di ogni giorno riscritto per un perimetro solo, e non è una
+ * duplicazione: il verso lo dà **`balanceDeltaOf()`**, la stessa funzione, e
+ * quindi la regola che decide da che parte pende il conto sta in un posto solo.
+ * Quello che cambia è cosa si guarda — un tricount invece di tutti — e il fatto
+ * che un progetto non ha un punto di partenza dichiarato, perché comincia
+ * quando lo crei. → ADR-0074
+ */
+export interface ProjectStats {
+  tricount: Tricount
+  /** Il conto intero, quote di terzi comprese. */
+  total: number
+  /** Quanto è uscito dalle vostre tasche in due. */
+  couple: number
+  count: number
+  firstDate?: string
+  lastDate?: string
+  people: Record<PersonId, ProjectShare>
+  /** Rimborsi già registrati per questo progetto, in valore assoluto. */
+  settled: number
+  /** Positivo = `partner` deve a `me`: lo stesso segno fisso del saldo di ogni giorno. */
+  balance: number
+  /** Quante voci sono datate dopo il mese corrente, e quindi non contate qui. → ADR-0064 */
+  deferred: number
+  /** Le spese del progetto, dalla più recente. */
+  expenses: Expense[]
+  /** I rimborsi del progetto, dal più recente. */
+  settlements: Settlement[]
+}
+
+export function projectStats(
+  allExpenses: readonly Expense[],
+  allSettlements: readonly Settlement[],
+  tricount: Tricount,
+  /**
+   * Oggi, con lo stesso obbligo del saldo di ogni giorno e per la stessa
+   * ragione: ciò che è datato dopo questo mese non è ancora successo, e Alessio
+   * ha scelto che questa pagina racconti **solo quello che è successo**.
+   * → ADR-0064
+   */
+  today: string,
+): ProjectStats {
+  const expenses = allExpenses.filter((e) => e.tricount === tricount.id)
+  const settlements = allSettlements.filter((s) => s.tricount === tricount.id)
+
+  let deferred = 0
+  let cents = 0
+  const paid: Record<PersonId, number> = { me: 0, partner: 0 }
+  const share: Record<PersonId, number> = { me: 0, partner: 0 }
+  const counted: Expense[] = []
+
+  for (const expense of expenses) {
+    if (notYetInBalance(expense.date, today)) {
+      deferred += 1
+      continue
+    }
+    counted.push(expense)
+    if (expense.paidBy !== 'others') paid[expense.paidBy] += toCents(expense.amount)
+    for (const person of PERSON_IDS) share[person] += toCents(shareOf(expense, person))
+    cents += toCents(balanceDeltaOf(expense))
+  }
+
+  let settled = 0
+  const countedSettlements: Settlement[] = []
+  for (const settlement of settlements) {
+    if (notYetInBalance(settlement.date, today)) {
+      deferred += 1
+      continue
+    }
+    countedSettlements.push(settlement)
+    const amount = toCents(settlement.amount)
+    settled += amount
+    /* Se `partner` rimborsa `me`, il suo debito scende: identico al saldo di
+       ogni giorno, perché è lo stesso fatto in un perimetro più stretto. */
+    cents += settlement.from === 'partner' ? -amount : amount
+  }
+
+  /* Un ordinamento solo: l'elenco che serve alla pagina porta già gli estremi
+     alle sue due punte. */
+  const sorted = [...counted].sort(byDateDesc)
+  const first = sorted[sorted.length - 1]
+  const last = sorted[0]
+
+  return {
+    tricount,
+    total: sumBy(counted, (e) => e.amount),
+    couple: sumBy(counted, coupleShare),
+    count: counted.length,
+    ...(first !== undefined ? { firstDate: first.date } : {}),
+    ...(last !== undefined ? { lastDate: last.date } : {}),
+    people: {
+      me: { paid: paid.me / 100, share: share.me / 100 },
+      partner: { paid: paid.partner / 100, share: share.partner / 100 },
+    },
+    settled: settled / 100,
+    balance: cents / 100,
+    deferred,
+    expenses: sorted,
+    settlements: [...countedSettlements].sort((a, b) => (a.date === b.date ? 0 : a.date < b.date ? 1 : -1)),
+  }
+}
+
+/**
+ * Le spese in cui il progetto **continua a costare** dentro i conti di ogni
+ * giorno: la rata del mutuo di una casa comprata.
+ *
+ * Il filtro esclude il tricount del progetto, e non è una precauzione teorica:
+ * senza, una spesa che stesse in tutti e due gli insiemi verrebbe contata due
+ * volte da chi li somma. È la lezione della pagina Casa, dove le 46 voci
+ * nell'intersezione fra tricount e categoria sono il motivo per cui i due
+ * elenchi non si fondono. → ADR-0074, ADR-0017
+ */
+export function projectRecurring(
+  allExpenses: readonly Expense[],
+  tricount: Tricount,
+): Expense[] {
+  const category = tricount.recurringCategory
+  if (category === undefined || category === '') return []
+  return allExpenses.filter((e) => e.category === category && e.tricount !== tricount.id)
 }
 
 // ─────────────────────────────── vacanze ───────────────────────────────

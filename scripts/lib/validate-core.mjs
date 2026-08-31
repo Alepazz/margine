@@ -104,6 +104,30 @@ export function validateDataset(dataset, config) {
         warnings.push(`${where}: l'anno (${trip.year}) non coincide con la data di inizio (${trip.start}).`)
       }
     }
+
+    /*
+     * Un progetto: la sua spesa sta fuori dai conti del mese. Le stesse tre
+     * regole che l'app applica in `validateTricount` — un booleano, mai insieme
+     * a un viaggio, e la categoria ricorrente solo su un progetto — più una che
+     * l'app non può sbagliare perché il menù offre solo categorie esistenti, e
+     * qui invece si guarda il dato. → ADR-0074
+     */
+    if (tricount.offBudget !== undefined && typeof tricount.offBudget !== 'boolean') {
+      errors.push(`${where}: «offBudget» non è un booleano.`)
+    }
+    if (trip && tricount.offBudget === true) {
+      errors.push(`${where}: una vacanza non può essere anche un progetto.`)
+    }
+    if (tricount.recurringCategory !== undefined) {
+      if (tricount.offBudget !== true) {
+        errors.push(`${where}: «recurringCategory» vale solo su un progetto.`)
+      }
+      if (!categoryIds.has(tricount.recurringCategory)) {
+        errors.push(
+          `${where}: «recurringCategory» punta a «${tricount.recurringCategory}», che non è una categoria che esiste.`,
+        )
+      }
+    }
   }
 
   /*
@@ -127,6 +151,21 @@ export function validateDataset(dataset, config) {
       errors.push(`${where}: importo non valido.`)
     } else if (settlement.amount <= 0) {
       errors.push(`${where}: importo non positivo (${settlement.amount}).`)
+    }
+
+    /*
+     * Il progetto a cui il rimborso appartiene. Assente è il caso normale — il
+     * rapporto di ogni giorno — e **valorizzato vale solo per un progetto**: su
+     * un tricount qualunque non lo guarderebbe nessuno, quindi quel rimborso
+     * sparirebbe da tutte e due le viste invece che da una. → ADR-0075
+     */
+    if (settlement.tricount !== undefined) {
+      const home = tricountById.get(settlement.tricount)
+      if (!home) {
+        errors.push(`${where}: tricount inesistente (${settlement.tricount}).`)
+      } else if (home.offBudget !== true) {
+        errors.push(`${where}: «${settlement.tricount}» non è un progetto, quindi non ha rimborsi suoi.`)
+      }
     }
   }
 

@@ -244,3 +244,68 @@ describe('prezzi', () => {
     expect(report.expenses).toBe(0)
   })
 })
+
+/*
+ * I progetti. Le stesse tre regole di `validateTricount` nell'app, più il
+ * riferimento alla categoria — che l'app non può sbagliare perché il menù offre
+ * solo categorie esistenti, e qui invece si guarda il dato. → ADR-0074, ADR-0075
+ */
+describe('progetti', () => {
+  const PROGETTO = { id: 'casa-nuova', name: 'Casa nuova', members: ['me', 'partner'], offBudget: true }
+
+  it('un progetto è un tricount valido', () => {
+    const { errors } = validateDataset(dataset([], [CONDIVISE, PROGETTO]), CONFIG)
+    expect(errors).toEqual([])
+  })
+
+  it('una vacanza non può essere anche un progetto', () => {
+    const { errors } = validateDataset(
+      dataset([], [CONDIVISE, { ...TRIP, offBudget: true }]),
+      CONFIG,
+    )
+    expect(errors.join(' ')).toContain('progetto')
+  })
+
+  it('la categoria ricorrente vuole un progetto e una categoria che esiste', () => {
+    const suQualunque = validateDataset(
+      dataset([], [{ ...CONDIVISE, recurringCategory: 'spesa' }]),
+      CONFIG,
+    )
+    expect(suQualunque.errors.join(' ')).toContain('recurringCategory')
+
+    const inesistente = validateDataset(
+      dataset([], [CONDIVISE, { ...PROGETTO, recurringCategory: 'mutuo' }]),
+      CONFIG,
+    )
+    expect(inesistente.errors.join(' ')).toContain('mutuo')
+
+    const buona = validateDataset(
+      dataset([], [CONDIVISE, { ...PROGETTO, recurringCategory: 'spesa' }]),
+      CONFIG,
+    )
+    expect(buona.errors).toEqual([])
+  })
+
+  it('un rimborso può appartenere a un progetto, e solo a un progetto', () => {
+    const rimborso = (tricount) => ({
+      id: 's1',
+      date: '2026-08-20',
+      from: 'partner',
+      to: 'me',
+      amount: 5000,
+      ...(tricount === undefined ? {} : { tricount }),
+    })
+    const base = dataset([], [CONDIVISE, PROGETTO])
+
+    expect(validateDataset({ ...base, settlements: [rimborso()] }, CONFIG).errors).toEqual([])
+    expect(
+      validateDataset({ ...base, settlements: [rimborso('casa-nuova')] }, CONFIG).errors,
+    ).toEqual([])
+    expect(
+      validateDataset({ ...base, settlements: [rimborso('condivise')] }, CONFIG).errors.join(' '),
+    ).toContain('non è un progetto')
+    expect(
+      validateDataset({ ...base, settlements: [rimborso('fantasma')] }, CONFIG).errors.join(' '),
+    ).toContain('inesistente')
+  })
+})

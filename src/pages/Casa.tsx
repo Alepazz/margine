@@ -36,12 +36,15 @@ import { usePageData } from './usePageData'
 const LIST_PAGE = 12
 
 export function Casa(): ReactNode {
-  const { config, dataset, view, lookup, chart, month } = usePageData()
+  const { config, view, lookup, chart, month, today, everyday } = usePageData()
   const person = view.person
   const [selected, setSelected] = useState<Expense | null>(null)
 
   const { houseTricount, houseCategory } = config
-  const expenses = dataset.expenses
+  /* Senza i progetti: una casa comprata ha spese di categoria «casa» e
+     comparirebbe qui sotto «spese di casa fuori dal tricount», portandosi via
+     da sola la media al mese di una pagina che parla di bollette. → ADR-0074 */
+  const expenses = everyday
 
   const ledger = useMemo(() => houseLedger(expenses, houseTricount), [expenses, houseTricount])
   const outside = useMemo(
@@ -79,6 +82,13 @@ export function Casa(): ReactNode {
   )
   const average = useMemo(() => averageMonthly(stats.series), [stats.series])
 
+  /*
+   * Il nome della pagina viene **dai dati**, non dal codice: da quando esiste un
+   * secondo posto che si chiama casa (→ ADR-0074) «Casa» da sola è ambigua, e
+   * scrivere qui il nome della città la metterebbe in chiaro in un repo pubblico
+   * — che è ciò da cui `expenses.json.enc` protegge. Rinominare il tricount
+   * rinomina la pagina, la voce in colonna e la scheda nell'hub. → ADR-0026, ADR-0067
+   */
   const ledgerLabel = lookup.tricountLabel(houseTricount)
   const houseCategoryLabel = lookup.label(houseCategory)
 
@@ -87,7 +97,7 @@ export function Casa(): ReactNode {
       <>
         <div className="page-head">
           <div className="page-head-text">
-            <h1>🏠 Casa</h1>
+            <h1>🏠 {ledgerLabel}</h1>
           </div>
         </div>
         <Notice>
@@ -102,7 +112,7 @@ export function Casa(): ReactNode {
     <>
       <div className="page-head">
         <div className="page-head-text">
-          <h1>🏠 Casa</h1>
+          <h1>🏠 {ledgerLabel}</h1>
           <p className="page-sub">
             {stats.count} voci nel tricount
             {outsideStats.count > 0 ? ` · ${outsideStats.count} fuori` : ''}
@@ -175,6 +185,7 @@ export function Casa(): ReactNode {
 
         <Card title={`Le spese di «${ledgerLabel}»`} note={`${stats.count} voci`}>
           <ExpenseList
+            today={today}
             expenses={stats.expenses}
             person={person}
             lookup={lookup}
@@ -207,6 +218,7 @@ export function Casa(): ReactNode {
                 centerCaption="quota tua"
               />
               <ExpenseList
+                today={today}
                 expenses={outsideStats.expenses}
                 person={person}
                 lookup={lookup}

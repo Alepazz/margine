@@ -648,16 +648,6 @@ button.hero-value:focus-visible {
 
 /* ── il foglio delle novità ── */
 
-.news-day {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1.2px;
-  color: var(--ink-3);
-  margin-bottom: 6px;
-}
-
 .news-row {
   display: flex;
   align-items: baseline;
@@ -684,7 +674,7 @@ button.hero-value:focus-visible {
 
 
 /* Il testo è l'unica parte comprimibile: senza questo, una frase lunga spinge
-   l'ora fuori dal foglio invece di andare a capo. */
+   l'importo fuori dal foglio invece di andare a capo. */
 .news-text {
   flex: 1 1 auto;
   min-width: 0;
@@ -695,7 +685,7 @@ button.hero-value:focus-visible {
   line-height: 1.35;
 }
 
-/* Il contorno: importo, categoria, tricount. Sotto la frase, non dentro. */
+/* Il contorno: quando, categoria, tricount. Sotto la frase, non dentro. */
 .news-sub {
   font-size: 0.8rem;
   color: var(--ink-3);
@@ -707,33 +697,22 @@ button.hero-value:focus-visible {
   color: var(--ink-3);
 }
 
-.news-new {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--surface-sunken);
-  border: 1px solid var(--line-strong);
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  color: var(--ink-2);
-  vertical-align: 1px;
-}
-
-
-
-
-
-
-
-
-.news-time {
+/*
+ * L'importo, dove prima stava l'ora e nel corpo del numero — non del mono da
+ * 0,78rem che l'ora aveva. È la cosa che si cerca aprendo la campanella
+ * («Bolletta luce» senza la cifra non dice niente), e stava in fondo a una fila
+ * di attributi grigi. Ora l'ora è scesa nel contorno e l'importo ha la colonna
+ * tutta per sé. → ADR-0076
+ *
+ * `flex: none` come per l'ora: la riga si comprime dalla parte del testo.
+ */
+.news-amount {
   flex: none;
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  color: var(--ink-3);
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.05rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 /* Controllo segmentato: persona, vacanze sì/no, ordinamento. */
@@ -1157,6 +1136,51 @@ button.hero-value:focus-visible {
   font-size: 0.72rem;
   color: var(--ink-3);
   font-weight: 400;
+}
+
+/*
+ * L'intestazione di un giorno, quando l'elenco è un calendario. Non è una riga
+ * dell'elenco: non si tocca, non ha il bordo sotto, e il suo colore è quello
+ * della cornice — separa, non si legge come un dato. → ADR-0077
+ */
+.list-day {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 4px 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: var(--ink-3);
+}
+
+/* Il totale del giorno: tabulare, perché incolonnato con gli importi sotto. */
+.list-day-total {
+  flex: none;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/*
+ * Una spesa già inserita ma datata avanti. Spenta, non nascosta: è un fatto
+ * registrato — a volte un refuso di data, ed è guardandola che ci si accorge
+ * (→ ADR-0055) — ma non ha ancora eroso niente.
+ *
+ * `opacity` e non un colore: deve valere per tutto quello che la riga contiene,
+ * pallino della categoria e chip compresi, senza doverli spegnere uno a uno.
+ * Non scende sotto 0,55, che è dove il testo secondario smetterebbe di
+ * raggiungere il contrasto minimo.
+ */
+.list-row.is-future,
+.list-day.is-future {
+  opacity: 0.55;
+}
+
+.list-row.is-future:hover {
+  opacity: 0.8;
 }
 
 .table-wrap {

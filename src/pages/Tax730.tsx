@@ -34,7 +34,7 @@ const EMPTY_YEAR = (year: number): Tax730Year => ({
 })
 
 export function Tax730(): ReactNode {
-  const { config, dataset, view, lookup, all } = usePageData()
+  const { config, dataset, view, lookup, all, today } = usePageData()
   const person = view.person
   const toast = useToast()
   const [selected, setSelected] = useState<Expense | null>(null)
@@ -153,6 +153,7 @@ export function Tax730(): ReactNode {
           }
         >
           <ExpenseList
+            today={today}
             expenses={current.items}
             person={person}
             lookup={lookup}
@@ -173,6 +174,7 @@ export function Tax730(): ReactNode {
             note="Spese in categorie tipicamente detraibili che non hai ancora segnato"
           >
             <ExpenseList
+              today={today}
               expenses={suggestions}
               person={person}
               lookup={lookup}

@@ -46,7 +46,7 @@ const STACK_MONTHS = 12
 const TOP_EXPENSES = 10
 
 export function Statistiche(): ReactNode {
-  const { config, view, lookup, visible, series } = usePageData()
+  const { config, view, lookup, visible, series, today } = usePageData()
   const person = view.person
   const [selected, setSelected] = useState<Expense | null>(null)
 
@@ -388,6 +388,7 @@ export function Statistiche(): ReactNode {
             note="Quota tua, fisse escluse: l'affitto vincerebbe dieci volte su dieci"
           >
             <ExpenseList
+              today={today}
               expenses={top}
               person={person}
               lookup={lookup}

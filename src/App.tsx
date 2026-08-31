@@ -11,6 +11,7 @@ import { Gatto } from './pages/Gatto'
 import { Home } from './pages/Home'
 import { Impostazioni } from './pages/Impostazioni'
 import { Prezzi } from './pages/Prezzi'
+import { Progetto } from './pages/Progetto'
 import { Saldo } from './pages/Saldo'
 import { Spese } from './pages/Spese'
 import { Statistiche } from './pages/Statistiche'
@@ -37,6 +38,9 @@ export function App(): ReactNode {
           <Route path="/casa" element={<Casa />} />
           <Route path="/gatto" element={<Gatto />} />
           <Route path="/vacanze" element={<Vacanze />} />
+          {/* Generica, e il nome del progetto sta nei dati: il repo è pubblico.
+              → ADR-0074, ADR-0067 */}
+          <Route path="/progetto/:id" element={<Progetto />} />
           <Route path="/statistiche" element={<Statistiche />} />
           <Route path="/prezzi" element={<Prezzi />} />
           <Route path="/730" element={<Tax730 />} />

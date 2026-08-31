@@ -53,6 +53,15 @@ export function TricountForm({
   const [members, setMembers] = useState<PersonId[]>(
     vacation ? [...PERSON_IDS] : [view.person],
   )
+  /*
+   * Un progetto: una cosa che si compra una volta. La spunta si mette **qui e
+   * solo qui**, alla creazione, e non si cambia dopo: cambiarla su un tricount
+   * che ha già delle spese sposterebbe di colpo mesi di storia dentro o fuori
+   * dalle medie, e nessuno se ne accorgerebbe guardando il Riepilogo. Un
+   * tricount nato sbagliato si rifà; una media che cambia da sola no.
+   * → ADR-0074
+   */
+  const [offBudget, setOffBudget] = useState(false)
 
   /** Spegnere l'unica casella accesa non fa niente: un tricount è di qualcuno. */
   const toggleMember = (who: PersonId): void => {
@@ -86,6 +95,7 @@ export function TricountForm({
             },
           }
         : {}),
+      ...(offBudget ? { offBudget: true } : {}),
     }
     const problems = validateTricount(draft, takenIds)
     if (problems.length > 0) {
@@ -146,6 +156,27 @@ export function TricountForm({
             : 'Tricount condiviso: le spese si dividono fra voi due.'}
         </p>
       </div>
+
+      {/* Non su una vacanza: quella è la vita di ogni anno e si sceglie se
+          contarla, un progetto sta fuori sempre — e il dominio le rifiuta
+          insieme. → ADR-0074 */}
+      {vacation ? null : (
+        <div className="field">
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={offBudget}
+              onChange={(event) => setOffBudget(event.target.checked)}
+            />
+            È un progetto
+          </label>
+          <p className="hint">
+            {offBudget
+              ? 'Le sue spese restano negli elenchi e nel 730, ma non entrano in margine, medie e confronti, e il suo debito ha una pagina sua. Per una casa comprata, non per la spesa di ogni mese.'
+              : 'Da spuntare per una cosa che si compra una volta — una casa — e che non è la vita di ogni mese. Non si cambia dopo.'}
+          </p>
+        </div>
+      )}
 
       {vacation ? (
         <>

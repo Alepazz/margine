@@ -15,7 +15,7 @@
  * come titolo — «1 spesa aggiunta» — obbligava a decifrare invece di leggere.
  */
 
-import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, type ReactNode } from 'react'
 
 import { useReadyStore } from '../data/store'
 import { phraseOf, type NoticeItem } from '../domain/changes'
@@ -45,8 +45,17 @@ function timeLabel(at: string): string {
   return new Date(at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
 }
 
+/** «Oggi · 14:32»: quando è successo, in fondo alla riga di contorno. */
+function whenLabel(at: string, today: string): string {
+  return `${dayLabel(at.slice(0, 10), today)} · ${timeLabel(at)}`
+}
+
 /**
- * Il contorno di una spesa: importo, categoria, tricount, e i campi mossi.
+ * Il contorno di una spesa: categoria, tricount, e i campi mossi.
+ *
+ * **Senza l'importo**, che è passato a destra da solo: era la prima voce di
+ * questa fila e si leggeva come uno degli attributi, mentre è la cosa che si
+ * cerca quando arriva una notifica. → ADR-0076
  *
  * Legge da `config.categories` e `dataset.tricounts` invece di passare da
  * `usePageData`: quello prepara serie mensili e insiemi filtrati per le pagine,
@@ -60,7 +69,7 @@ function detailOf(
 ): string {
   const category = categories.find((c) => c.id === delta.expense.category)
   const tricount = tricounts.find((t) => t.id === delta.expense.tricount)
-  const parts = [formatEuro(delta.expense.amount)]
+  const parts: string[] = []
   if (category) parts.push(category.emoji ? `${category.emoji} ${category.label}` : category.label)
   parts.push(tricount ? tricountTitleOf(tricount) : delta.expense.tricount)
   const fields = delta.kind === 'changed' ? changedFields(delta) : []
@@ -97,17 +106,6 @@ export function NewsSheet({ onClose }: { onClose: () => void }): ReactNode {
 
   const other = config.people[view.person === 'me' ? 'partner' : 'me']
   const today = todayIso()
-
-  const days = useMemo(() => {
-    const grouped = new Map<string, NoticeItem[]>()
-    for (const notice of news.notices) {
-      const key = notice.at.slice(0, 10)
-      const list = grouped.get(key)
-      if (list) list.push(notice)
-      else grouped.set(key, [notice])
-    }
-    return [...grouped.entries()]
-  }, [news.notices])
 
   /** Il testo di una riga: qui, perché serve sapere come si chiamano le persone. */
   const testoDi = (notice: NoticeItem): string => {
@@ -174,53 +172,65 @@ export function NewsSheet({ onClose }: { onClose: () => void }): ReactNode {
                 </p>
               )
             ) : (
-              <div className="stack" style={{ gap: 14 }}>
-                {days.map(([day, list]) => (
-                  <div key={day}>
-                    <div className="news-day">{dayLabel(day, today)}</div>
-                    {list.map((notice) => {
-                      const sotto =
-                        notice.kind === 'delta'
-                          ? detailOf(notice.delta, config.categories, dataset.tricounts)
-                          : notice.failed
-                            ? 'non sono riuscito a leggerne il contenuto · tocca per riprovare'
-                            : undefined
-                      /* Una riga fallita si riprova toccandola: il ciclo
-                         automatico salta ciò che ha già uno stato, quindi senza
-                         questo una rete caduta per un istante lascerebbe la riga
-                         vaga per tutta la sessione. */
-                      const riprova = notice.kind === 'summary' && notice.failed === true
-                      const change = news.changes.find((c) => c.sha === notice.sha)
-                      return (
-                        <div
-                          className={`news-row${riprova ? ' is-retry' : ''}`}
-                          key={notice.key}
-                          onClick={riprova && change ? () => void loadNewsDetail(change) : undefined}
-                          role={riprova ? 'button' : undefined}
-                          tabIndex={riprova ? 0 : undefined}
-                          onKeyDown={
-                            riprova && change
-                              ? (event) => {
-                                  if (event.key === 'Enter' || event.key === ' ') {
-                                    event.preventDefault()
-                                    void loadNewsDetail(change)
-                                  }
-                                }
-                              : undefined
-                          }
-                        >
-                          <div className="news-text">
-                            <span className={notice.kind === 'summary' && notice.pending ? 'news-pending' : undefined}>
-                              {testoDi(notice)}
-                            </span>
-                            {sotto ? <span className="news-sub">{sotto}</span> : null}
-                          </div>
-                          <span className="news-time">{timeLabel(notice.at)}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                ))}
+              /*
+                Elenco piatto, senza intestazioni di giorno: questa è una
+                casella di posta, e quello che ci sta dentro è **solo** ciò che
+                non è stato svuotato (→ ADR-0052) — poche righe, non un
+                archivio. Il giorno sta in ogni riga, accanto all'ora, dove
+                prima stava l'importo. → ADR-0076
+              */
+              <div className="list">
+                {news.notices.map((notice) => {
+                  const dettaglio =
+                    notice.kind === 'delta'
+                      ? detailOf(notice.delta, config.categories, dataset.tricounts)
+                      : notice.failed
+                        ? 'non sono riuscito a leggerne il contenuto · tocca per riprovare'
+                        : undefined
+                  /* Una riga fallita si riprova toccandola: il ciclo automatico
+                     salta ciò che ha già uno stato, quindi senza questo una rete
+                     caduta per un istante lascerebbe la riga vaga per tutta la
+                     sessione. */
+                  const riprova = notice.kind === 'summary' && notice.failed === true
+                  const change = news.changes.find((c) => c.sha === notice.sha)
+                  const quando = whenLabel(notice.at, today)
+                  return (
+                    <div
+                      className={`news-row${riprova ? ' is-retry' : ''}`}
+                      key={notice.key}
+                      onClick={riprova && change ? () => void loadNewsDetail(change) : undefined}
+                      role={riprova ? 'button' : undefined}
+                      tabIndex={riprova ? 0 : undefined}
+                      onKeyDown={
+                        riprova && change
+                          ? (event) => {
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault()
+                                void loadNewsDetail(change)
+                              }
+                            }
+                          : undefined
+                      }
+                    >
+                      <div className="news-text">
+                        <span className={notice.kind === 'summary' && notice.pending ? 'news-pending' : undefined}>
+                          {testoDi(notice)}
+                        </span>
+                        <span className="news-sub">
+                          {dettaglio === undefined ? quando : `${quando} · ${dettaglio}`}
+                        </span>
+                      </div>
+                      {/* L'importo dove prima stava l'ora, e più grande di
+                          quanto l'ora sia mai stata: è la cosa per cui si apre
+                          la campanella. Le righe che non sono una spesa non ne
+                          hanno uno, e la colonna resta vuota invece di
+                          ospitare un'altra cosa nello stesso posto. */}
+                      {notice.kind === 'delta' ? (
+                        <span className="news-amount">{formatEuro(notice.delta.expense.amount)}</span>
+                      ) : null}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>

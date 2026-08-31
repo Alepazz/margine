@@ -69,6 +69,45 @@ export interface Tricount {
   closed?: boolean
   /** Presente = questo tricount è una vacanza. */
   trip?: TripInfo
+  /**
+   * Vero quando il tricount è un **progetto**: una cosa che si compra una volta
+   * — una casa — e che non è la vita di tutti i mesi.
+   *
+   * Le sue spese restano spese a tutti gli effetti: stanno negli elenchi, nel
+   * 730, nel saldo del progetto. Ma **non passano da `visibleFor()`**, quindi
+   * non entrano in margine, medie, proiezioni e confronti: trentaseimila euro
+   * di rogito in un mese renderebbero quel mese incomparabile con ogni altro, e
+   * la media di un anno la porterebbero via da sola. → ADR-0074
+   *
+   * E non entrano nemmeno nel saldo di ogni giorno: il debito di un progetto si
+   * salda per conto suo, con i suoi tempi, e sommarlo a quello della spesa
+   * quotidiana renderebbe illeggibili tutti e due.
+   */
+  offBudget?: boolean
+  /**
+   * La categoria in cui il progetto **continua a costare** dentro i conti di
+   * ogni giorno: per una casa comprata, la rata del mutuo.
+   *
+   * Quelle spese vivono altrove — nel tricount delle fisse, con la spunta
+   * ricorrente, divise a metà — perché sono la vita di tutti i mesi e devono
+   * erodere il margine come l'affitto che sostituiscono. La pagina del progetto
+   * le mostra come un **secondo insieme, mai sommato al primo**: è la stessa
+   * regola della pagina Casa, dove il tricount e la categoria non coincidono e
+   * fonderli conterebbe due volte l'intersezione. → ADR-0074, ADR-0017
+   *
+   * Ha senso solo su un tricount `offBudget`, e la validazione lo pretende.
+   */
+  recurringCategory?: string
+}
+
+/** Vero se il tricount è un progetto: la sua spesa sta fuori dai conti del mese. */
+export function isProject(tricount: Tricount): boolean {
+  return tricount.offBudget === true
+}
+
+/** I tricount che sono progetti, nell'ordine dei dati. */
+export function projectsOf(tricounts: readonly Tricount[]): Tricount[] {
+  return tricounts.filter(isProject)
 }
 
 /** Vero se la persona partecipa al tricount: è il filtro dei menù di inserimento. */
@@ -345,6 +384,19 @@ export interface Settlement {
   to: PersonId
   amount: number
   note?: string
+  /**
+   * Il **progetto** a cui il rimborso appartiene, quando ce n'è uno.
+   *
+   * Assente vuol dire «il rapporto di ogni giorno», ed è il caso normale:
+   * ADR-0019 dice che un rimborso non appartiene a nessun tricount, e per la
+   * spesa quotidiana resta vero — si salda il rapporto per intero, non un
+   * gruppo alla volta. Un progetto però ha un debito suo, con i suoi tempi
+   * (diciottomila euro che rientrano in tre anni), e mescolarlo al saldo del
+   * pane e delle bollette renderebbe illeggibili tutti e due. Quindi il verso
+   * di questo campo è: **valorizzato solo per un tricount `offBudget`**, e la
+   * validazione lo pretende. → ADR-0075, ADR-0019
+   */
+  tricount?: string
 }
 
 /** In che cosa è misurato un prezzo. L'etichetta a scaffale usa queste tre. */

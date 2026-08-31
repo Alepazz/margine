@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { presetOf, sharesFor, splitFor, tricountOptions, validateExpense } from './expense-rules'
+import {
+  presetOf,
+  sharesFor,
+  splitFor,
+  tricountOptions,
+  validateExpense,
+  validateTricount,
+} from './expense-rules'
 import { toCents } from './money'
 import type { Expense, Payer, PersonId, Tricount } from './types'
 
@@ -219,5 +226,40 @@ describe('le quote appartengono ai membri', () => {
 
   it('una spesa in un tricount che non esiste non si salva', () => {
     expect(validateExpense(base({ tricount: 'fantasma' }), ctx).join(' ')).toContain('tricount')
+  })
+})
+
+/*
+ * Un progetto: le due combinazioni che non vogliono dire niente. Non sono
+ * raggiungibili dall'interfaccia — la spunta non compare su una vacanza, e il
+ * selettore della categoria sta solo nella pagina di un progetto — ma le regole
+ * stanno nel dominio, dove le vede anche chi scriverà la prossima pagina.
+ * → ADR-0074
+ */
+describe('un progetto', () => {
+  const base = { id: 'casa-nuova', name: 'Casa nuova', members: ['me' as const, 'partner' as const] }
+  const vuoto = new Set<string>()
+
+  it('si crea come un tricount qualunque, con la spunta', () => {
+    expect(validateTricount({ ...base, offBudget: true }, vuoto)).toEqual([])
+    expect(validateTricount({ ...base, offBudget: true, recurringCategory: 'mutuo' }, vuoto)).toEqual([])
+  })
+
+  it('non può essere anche una vacanza', () => {
+    const problemi = validateTricount(
+      {
+        ...base,
+        offBudget: true,
+        trip: { place: 'Senigallia', year: 2026, start: '2026-08-01', end: '2026-08-02' },
+      },
+      vuoto,
+    )
+    expect(problemi.join(' ')).toContain('progetto')
+  })
+
+  it('la categoria ricorrente non ha senso su un tricount qualunque', () => {
+    expect(validateTricount({ ...base, recurringCategory: 'mutuo' }, vuoto).join(' ')).toContain(
+      'progetto',
+    )
   })
 })

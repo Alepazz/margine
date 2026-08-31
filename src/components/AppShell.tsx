@@ -19,6 +19,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 
 import { useReadyStore } from '../data/store'
 import { badgeLabel } from '../domain/changes'
+import { projectsOf, type Tricount } from '../domain/types'
 import { SyncBadge, ThemeButton } from './Controls'
 import { ExpenseForm } from './ExpenseForm'
 import { NewsSheet } from './NewsSheet'
@@ -52,6 +53,28 @@ type NavItem =
 const PRICE_ROUTE = '/prezzi'
 /** L'hub: il `+` non la guarda, ma la barra e il link di ritorno sì. */
 const HUB_ROUTE = '/esplora'
+/**
+ * Le rotte dei progetti. Sono l'unica famiglia di viste **dell'hub che non sta
+ * in `NAV`**, e non poteva starci: i progetti nascono dai dati, e `NAV` è una
+ * lista scritta a mano. Il prezzo è che le due cose che `NAV` garantisce vanno
+ * rifatte qui a mano — la voce accesa nella barra e la presenza in colonna — ed
+ * è per questo che stanno tutte e due in questo file e non nelle pagine.
+ * → ADR-0074, ADR-0044
+ */
+const PROJECT_PREFIX = '/progetto/'
+/** La raccolta della casa: il suo nome viene dai dati, non da `NAV`. */
+const HOUSE_ROUTE = '/casa'
+
+/** La voce di colonna e di hub di un progetto, dal tricount. */
+function projectItem(tricount: Tricount): NavItem {
+  return {
+    to: `${PROJECT_PREFIX}${tricount.id}`,
+    label: tricount.name,
+    glyph: tricount.emoji ?? '🏗️',
+    slot: 'hub',
+    group: 'raccolte',
+  }
+}
 
 const NAV: NavItem[] = [
   /* Emoji come tutte le altre voci: `◧` e `≡` erano glifi tipografici, e in una
@@ -75,6 +98,11 @@ const TABBAR = NAV.filter((item) => item.slot === 'tabbar')
 const HUB = NAV.filter((item) => item.slot === 'hub')
 /** Le rotte dentro l'hub: su di esse la voce «Esplora» resta accesa. */
 const HUB_ROUTES = new Set(HUB.map((item) => item.to))
+
+/** Sei dentro «Esplora»? I progetti ci stanno, anche se non sono in `NAV`. */
+function inHub(pathname: string): boolean {
+  return HUB_ROUTES.has(pathname) || pathname.startsWith(PROJECT_PREFIX)
+}
 
 /* L'ordine dei gruppi vive qui e solo qui: la colonna li scorre da questo
    oggetto invece di riscriverne i nomi in JSX. */
@@ -143,6 +171,18 @@ export function AppShell(): ReactNode {
   const [adding, setAdding] = useState<'expense' | 'price' | null>(null)
   const [newsOpen, setNewsOpen] = useState(false)
   const { pathname } = useLocation()
+  const { config, dataset } = useReadyStore()
+  const projects = projectsOf(dataset.tricounts)
+  /*
+   * «Casa» in `NAV` è l'unica etichetta scritta a mano che due tricount possono
+   * contendersi: da quando esiste un progetto che si chiama anche lui «Casa …»
+   * (→ ADR-0074) la voce prende il nome dal tricount di casa, come fanno la sua
+   * pagina e la sua scheda nell'hub. Il nome sta nei dati e non qui perché il
+   * repo è pubblico. → ADR-0026, ADR-0067
+   */
+  const houseName = dataset.tricounts.find((t) => t.id === config.houseTricount)?.name
+  const named = (item: NavItem): NavItem =>
+    item.to === HOUSE_ROUTE && houseName ? { ...item, label: houseName } : item
 
   const addsPrice = pathname === PRICE_ROUTE
   const addLabel = addsPrice ? 'Registra un prezzo' : 'Aggiungi una spesa'
@@ -150,7 +190,7 @@ export function AppShell(): ReactNode {
   const tab = (item: NavItem): ReactNode => {
     /* «Esplora» resta acceso anche dentro le sue sei viste: sei lì dentro, e una
        barra che si spegne tutta non dice più dove sei. */
-    const litByHub = item.to === HUB_ROUTE && HUB_ROUTES.has(pathname)
+    const litByHub = item.to === HUB_ROUTE && inHub(pathname)
     const body = (
       <>
         <span className="tabbar-glyph" aria-hidden="true">
@@ -223,7 +263,12 @@ export function AppShell(): ReactNode {
           {GROUPS.map(([group, label]) => (
             <div className="nav-group" key={group}>
               <div className="nav-group-title">{label}</div>
-              {HUB.filter((item) => item.group === group).map(sideLink)}
+              {HUB.filter((item) => item.group === group).map(named).map(sideLink)}
+              {/* I progetti, che nascono dai dati e non da `NAV`. Sono qui e non
+                  in un gruppo loro perché sono raccolte come Casa e il gatto: un
+                  gruppo che compare solo quando c'è un progetto sposterebbe le
+                  altre voci sotto il pollice a ogni creazione. → ADR-0074 */}
+              {group === 'raccolte' ? projects.map(projectItem).map(sideLink) : null}
             </div>
           ))}
           {NAV.filter((item) => item.slot === 'header').map(sideLink)}
@@ -261,7 +306,7 @@ export function AppShell(): ReactNode {
             si arriva dalla colonna, e un «indietro» punterebbe a una pagina che
             non si è attraversata.
           */}
-          {HUB_ROUTES.has(pathname) ? (
+          {inHub(pathname) ? (
             <NavLink to={HUB_ROUTE} className="hub-back">
               <span aria-hidden="true">‹</span> Esplora
             </NavLink>

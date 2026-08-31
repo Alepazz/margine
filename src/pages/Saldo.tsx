@@ -9,6 +9,7 @@
  */
 
 import { useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 
 import { Card, Notice, ShowMore, StatTile, useToast } from '../components/ui'
 import { formatDate, monthKeyOf, monthLabel } from '../domain/dates'
@@ -16,7 +17,7 @@ import { formatEuro, toCents } from '../domain/money'
 import { newSettlement, settlementDirection } from '../domain/settlement'
 import { aTo } from '../domain/text'
 import { tricountLabel } from '../domain/expense-rules'
-import { useCoupleBalance, usePageData } from './usePageData'
+import { useCoupleBalance, usePageData, useProjects } from './usePageData'
 
 const MOVEMENTS_SHOWN = 25
 
@@ -89,6 +90,15 @@ export function Saldo(): ReactNode {
    * una didascalia che descrive un altro insieme è peggio di nessuna didascalia.
    */
   const rimborsiContati = balance.movements.filter((m) => m.kind === 'settlement').length
+
+  /*
+   * I progetti hanno un debito loro, e questo totale non lo comprende. Dirlo è
+   * la stessa regola di `deferred`: un saldo che tace su una parte dei dati è
+   * indistinguibile da un saldo completo, e questa è l'unica pagina che può
+   * accorgersene. Solo quelli che pendono davvero: un progetto in pari non è
+   * una cosa da sapere. → ADR-0074, ADR-0064
+   */
+  const progetti = useProjects().filter((stats) => toCents(stats.balance) !== 0)
 
   const shown = balance.movements.slice(0, limit)
   const rest = balance.movements.length - shown.length
@@ -219,6 +229,27 @@ export function Saldo(): ReactNode {
           <Notice tone="warn">
             {rinviate} questo totale non coincide con quello di Tricount: se è un errore di data, si
             corregge dal foglio della spesa.
+          </Notice>
+        ) : null}
+
+        {progetti.length > 0 ? (
+          <Notice icon="↗">
+            Oltre a questo, {progetti.length === 1 ? 'un progetto ha' : `${progetti.length} progetti hanno`} un
+            debito aperto, contato a parte:{' '}
+            {progetti.map((stats, index) => {
+              const owed = person === 'me' ? stats.balance : -stats.balance
+              return (
+                <span key={stats.tricount.id}>
+                  {index > 0 ? ', ' : ''}
+                  <Link to={`/progetto/${stats.tricount.id}`}>
+                    {stats.tricount.name} ({formatEuro(Math.abs(owed), { decimals: 0 })}{' '}
+                    {toCents(owed) > 0 ? 'a tuo favore' : 'a tuo carico'})
+                  </Link>
+                </span>
+              )
+            })}
+            . Un capitale che rientra in anni sommato al conto della spesa renderebbe illeggibili
+            tutti e due.
           </Notice>
         ) : null}
 

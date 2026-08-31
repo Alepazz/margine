@@ -1257,15 +1257,6 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
     setView((v) => ({ ...v, includeVacations }))
   }, [])
 
-  /*
-   * Il tocco non si ricorda: se si ricordasse, la prima volta che scopri il
-   * numero resteresti scoperto per sempre, che è l'opposto di quello che serve.
-   * Quello che resta è il default, deciso nelle impostazioni.
-   */
-  const toggleHideIncome = useCallback(() => {
-    setHideIncome((hidden) => !hidden)
-  }, [])
-
   const setHideIncomeByDefault = useCallback((hidden: boolean) => {
     setDefaultHidden(hidden)
     setHideIncome(hidden)
@@ -1275,6 +1266,25 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       /* niente storage: la scelta vale per questa sessione */
     }
   }, [])
+
+  /**
+   * Il velo si accende **per sempre** e si spegne **per un momento**.
+   *
+   * I due gesti non sono l'uno il contrario dell'altro, e trattarli uguali era
+   * il difetto: **nascondere è una decisione**, scoprire è un atto momentaneo —
+   * giri lo schermo verso qualcuno, poi vuoi che si richiuda da sé. Ricordare
+   * anche lo scoprire lascerebbe l'app in chiaro per sempre dopo la prima
+   * occhiata, che è l'opposto di quello che serve; non ricordare **nemmeno** il
+   * nascondere obbligava a ripremerlo a ogni apertura, ed è quello che Alessio
+   * ha chiesto di togliere.
+   *
+   * Per restare scoperti c'è la scelta esplicita in Impostazioni → Privacy: il
+   * gesto raro sta in un posto raro. → ADR-0078, ADR-0066
+   */
+  const toggleHideIncome = useCallback(() => {
+    if (hideIncome) setHideIncome(false)
+    else setHideIncomeByDefault(true)
+  }, [hideIncome, setHideIncomeByDefault])
 
   const reload = useCallback(() => {
     setReloadToken((n) => n + 1)

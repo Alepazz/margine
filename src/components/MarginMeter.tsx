@@ -250,11 +250,15 @@ export function MarginMeter({
             className={`hero-value is-${view.status}`}
             onClick={onToggleHidden}
             aria-pressed={hidden}
-            title={hidden ? 'Mostra i guadagni' : 'Nascondi i guadagni'}
+            /* Le due etichette non sono simmetriche perché non lo sono i due
+               gesti: nascondere resta, scoprire dura una sessione. → ADR-0078 */
+            title={hidden ? 'Mostra i guadagni, per questa sessione' : 'Nascondi i guadagni, anche alle prossime aperture'}
           >
             <Money value={view.spendable} whole />
             <span className="sr-only">
-              {hidden ? ' — tocca per mostrare i guadagni' : ' — tocca per nascondere i guadagni'}
+              {hidden
+                ? ' — tocca per mostrare i guadagni, solo per questa sessione'
+                : ' — tocca per nascondere i guadagni, anche alle prossime aperture'}
             </span>
           </button>
           <span className="hero-hint">

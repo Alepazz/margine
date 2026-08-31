@@ -97,4 +97,17 @@ describe('il verso, da solo', () => {
       expect(s.to).toBe(verso.creditor)
     }
   })
+
+  /*
+   * Il progetto viaggia col rimborso, e la chiave non si scrive mai vuota: un
+   * `tricount: ''` non è un progetto e non è nemmeno l'assenza — sarebbe una
+   * terza cosa che `coupleBalance` non gestisce, e quel rimborso sparirebbe da
+   * tutte e due le viste invece che da una. → ADR-0075
+   */
+  it('il rimborso di un progetto porta il tricount, e quello di ogni giorno no', () => {
+    const opts = { owedToViewer: 100, viewer: 'me' as const, other: 'partner' as const, amount: 100, date: '2026-08-31' }
+    expect(newSettlement(opts)).not.toHaveProperty('tricount')
+    expect(newSettlement({ ...opts, tricount: '' })).not.toHaveProperty('tricount')
+    expect(newSettlement({ ...opts, tricount: 'casa-nuova' })?.tricount).toBe('casa-nuova')
+  })
 })

@@ -343,6 +343,14 @@ function normalizePrice(entry: PriceEntry): PriceEntry {
 function normalizeTricount(tricount: Tricount): Tricount {
   const next: Tricount = { ...tricount }
   if (next.closed !== true) delete next.closed
+  if (next.offBudget !== true) delete next.offBudget
+  /* La stringa vuota è come per `subcategory`: un `tricount-edit` si applica
+     come `{ ...tricount, ...campi }`, quindi per **togliere** la categoria del
+     mutuo bisogna dire qualcosa, e `undefined` non sopravvive a
+     `JSON.stringify` nella coda in localStorage. */
+  if (next.recurringCategory !== undefined && next.recurringCategory.trim() === '') {
+    delete next.recurringCategory
+  }
   if (next.trip?.country !== undefined && next.trip.country.trim() === '') {
     const { country: _drop, ...rest } = next.trip
     next.trip = rest

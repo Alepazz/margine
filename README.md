@@ -55,7 +55,7 @@ src/
   data/         cifratura, coda delle annotazioni, API GitHub, stato dell'app
   components/   guscio, grafici, foglio di dettaglio
   pages/        Riepilogo · Spese · Prezzi · Esplora · Casa · Gatto · Vacanze ·
-                Statistiche · 730 · Saldo · Impostazioni
+                Progetto · Statistiche · 730 · Saldo · Impostazioni
   styles/       tokens.css (colori, raggi, vetro) · base.css · components.css
 scripts/       seed, validazione, cifratura, import mensile
 data/          master in chiaro — MAI nel repo (.gitignore)
@@ -67,6 +67,7 @@ Regole che tengono insieme il tutto (e che è meglio non rompere per distrazione
 - **Il denaro si somma solo con `domain/money.ts`**, che lavora in centesimi interi. Un `reduce((a, b) => a + b)` su importi reintroduce l'errore in virgola mobile, in silenzio. [ADR-0008](docs/adr/0008-euro-nel-file-centesimi-nei-calcoli.md)
 - **Ogni categoria ha uno `slot` di colore fisso** in `config`, validato per contrasto e daltonismo. Non si riordinano le tinte a occhio. [ADR-0009](docs/adr/0009-colori-dei-grafici-slot-fisso-per-categoria.md)
 - **Le vacanze stanno fuori dalle medie mensili** per impostazione predefinita. [ADR-0010](docs/adr/0010-vacanze-fuori-dalle-statistiche-mensili.md)
+- **Un progetto sta fuori dai conti del mese, sempre.** Un tricount marcato come progetto — una casa comprata — non entra in margine, medie, confronti e saldo di ogni giorno: un capitale in un mese renderebbe quel mese incomparabile con ogni altro e porterebbe via da solo ogni media. Ha una pagina sua, dove quei numeri significano qualcosa. [ADR-0074](docs/adr/0074-un-progetto-sta-fuori-dai-conti-del-mese.md)
 - **Il mese in corso si confronta con la sua proiezione**, non col parziale. [ADR-0011](docs/adr/0011-proiezione-e-confronto-del-mese-in-corso.md)
 - I colori, i raggi e i font si usano **solo** attraverso i token di `styles/tokens.css`.
 
@@ -97,7 +98,7 @@ Senza token l'app funziona comunque: le modifiche restano su quel dispositivo, e
 
 ## Le novità
 
-La campanella nella testata dice cosa ha cambiato l'altra persona: una riga per spesa — «Federica ha aggiunto Aperitivo · 11,00 € · 🍔 Bar e ristoranti · Spese condivise» — e non una per salvataggio. Le legge dai **commit** che l'app stessa scrive, e il dettaglio non sta nel messaggio: il repo è pubblico, quindi titolo e importo si ricavano decifrando in locale il file a quel commit e a quello prima. Si vede solo ciò che sta nei tricount di cui sei membro; il resto non lascia traccia, né riga né numero. → [ADR-0051](docs/adr/0051-lo-storico-si-legge-dai-commit.md), [ADR-0052](docs/adr/0052-la-campanella-e-una-casella-di-posta.md)
+La campanella nella testata dice cosa ha cambiato l'altra persona: una riga per spesa — «Federica ha aggiunto Aperitivo», con **11,00 €** in grande a destra e sotto «Oggi · 14:32 · 🍔 Bar e ristoranti · Spese condivise» — e non una per salvataggio. Le legge dai **commit** che l'app stessa scrive, e il dettaglio non sta nel messaggio: il repo è pubblico, quindi titolo e importo si ricavano decifrando in locale il file a quel commit e a quello prima. Si vede solo ciò che sta nei tricount di cui sei membro; il resto non lascia traccia, né riga né numero. → [ADR-0051](docs/adr/0051-lo-storico-si-legge-dai-commit.md), [ADR-0052](docs/adr/0052-la-campanella-e-una-casella-di-posta.md)
 
 È una casella di posta, con **due segni distinti**: chiudere il foglio — con la X, con Esc, o toccando fuori — spegne il numero sul pallino, ma l'elenco resta; a svuotarlo davvero è il pulsante in fondo al foglio. Così aprire per sbaglio non fa perdere niente, e un elenco già letto non tiene acceso il pallino per giorni. → [ADR-0061](docs/adr/0061-il-pallino-e-l-elenco-sono-due-segni.md)
 

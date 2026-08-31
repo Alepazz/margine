@@ -201,9 +201,12 @@ export function Impostazioni(): ReactNode {
             visibile <strong>quanto puoi spendere</strong> — il numero grande, quanto al giorno,
             l'obiettivo di risparmio e la barra: è la risposta dell'app, e coprirla vorrebbe dire
             spegnerla proprio mentre la mostri a qualcuno. Le spese si vedono sempre: sono uscite,
-            non guadagni. Per scoprire un numero un momento basta toccarlo, e quel tocco vale solo
-            per questa sessione. Vive in questo browser come la persona scelta e il token, quindi
-            non finisce nei dati e non segue gli altri dispositivi.
+            non guadagni. I due gesti non sono simmetrici: <strong>nascondere resta</strong> — il
+            pulsante «Nascondi» qui sopra e il tocco sul numero grande spostano anche questo
+            selettore — mentre <strong>scoprire dura una sessione</strong>, perché è quello che si
+            fa per far vedere un numero a qualcuno. Per restare in chiaro, la scelta è qui. Vive in
+            questo browser come la persona scelta e il token, quindi non finisce nei dati e non
+            segue gli altri dispositivi.
           </div>
           <div className="card-foot">
             Due limiti dichiarati. Il conto del Riepilogo è una sottrazione a cui manca la prima

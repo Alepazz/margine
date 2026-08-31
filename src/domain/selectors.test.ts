@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { elapsedDaysInMonth } from './dates'
+import { addDays, dayHeading, elapsedDaysInMonth } from './dates'
 
 import {
   EMPTY_FILTER,
@@ -23,6 +23,8 @@ import {
   notYetInBalance,
   owedOf,
   projectMonth,
+  projectRecurring,
+  projectStats,
   recurringProfile,
   subsetStats,
   tax730ByYear,
@@ -30,8 +32,9 @@ import {
   tripStats,
   visibleFor,
   yearlyTotals,
+  type Perimeter,
 } from './selectors'
-import type { Expense, Settlement, Trip } from './types'
+import type { Expense, Settlement, Tricount, Trip } from './types'
 
 function expense(partial: Partial<Expense> & { id: string; date: string; amount: number }): Expense {
   const half = Math.round((partial.amount * 100) / 2) / 100
@@ -47,7 +50,7 @@ function expense(partial: Partial<Expense> & { id: string; date: string; amount:
 }
 
 /* I tricount della fixture: due condivisi, un personale, un viaggio. */
-const VACANZE = new Set(['viaggio'])
+const PERIMETRO: Perimeter = { vacations: new Set(['viaggio']), offBudget: new Set() }
 
 const DATA: Expense[] = [
   expense({ id: 'a', date: '2026-06-03', amount: 100, recurring: true, category: 'casa' }),
@@ -75,17 +78,17 @@ const DATA: Expense[] = [
 
 describe('filtro di vista', () => {
   it('tiene fuori le vacanze per impostazione predefinita', () => {
-    const visible = visibleFor(DATA, { person: 'me', includeVacations: false }, VACANZE)
+    const visible = visibleFor(DATA, { person: 'me', includeVacations: false }, PERIMETRO)
     expect(visible.map((e) => e.id)).toEqual(['a', 'b', 'c', 'e'])
   })
 
   it('le include quando richiesto', () => {
-    const visible = visibleFor(DATA, { person: 'me', includeVacations: true }, VACANZE)
+    const visible = visibleFor(DATA, { person: 'me', includeVacations: true }, PERIMETRO)
     expect(visible.map((e) => e.id)).toEqual(['a', 'b', 'c', 'd', 'e'])
   })
 
   it('esclude le spese in cui la persona non ha quota', () => {
-    const visible = visibleFor(DATA, { person: 'partner', includeVacations: true }, VACANZE)
+    const visible = visibleFor(DATA, { person: 'partner', includeVacations: true }, PERIMETRO)
     expect(visible.map((e) => e.id)).toEqual(['a', 'b', 'c', 'd'])
   })
 
@@ -100,12 +103,12 @@ describe('filtro di vista', () => {
     })
 
     it('non erode il budget di chi l’ha pagata col welfare', () => {
-      const visible = visibleFor([...DATA, cena], { person: 'me', includeVacations: false }, VACANZE)
+      const visible = visibleFor([...DATA, cena], { person: 'me', includeVacations: false }, PERIMETRO)
       expect(visible.map((e) => e.id)).not.toContain('welfare')
     })
 
     it('resta una spesa normale per l’altra persona, che la rimborsa in contanti', () => {
-      const visible = visibleFor([...DATA, cena], { person: 'partner', includeVacations: false }, VACANZE)
+      const visible = visibleFor([...DATA, cena], { person: 'partner', includeVacations: false }, PERIMETRO)
       expect(visible.map((e) => e.id)).toContain('welfare')
     })
 
@@ -116,7 +119,7 @@ describe('filtro di vista', () => {
 })
 
 describe('serie mensile', () => {
-  const visible = visibleFor(DATA, { person: 'me', includeVacations: false }, VACANZE)
+  const visible = visibleFor(DATA, { person: 'me', includeVacations: false }, PERIMETRO)
   const series = monthlySeries(visible, 'me')
 
   it('separa fisse e variabili', () => {
@@ -147,7 +150,7 @@ describe('serie mensile', () => {
       visibleFor(
         [...DATA, expense({ id: 'refuso', date: '2026-11-15', amount: 10 })],
         { person: 'me', includeVacations: false },
-        VACANZE,
+        PERIMETRO,
       ),
       'me',
     )
@@ -173,7 +176,7 @@ describe('serie mensile', () => {
       visibleFor(
         [...DATA, expense({ id: 'refuso', date: '2026-11-15', amount: 4 })],
         { person: 'me', includeVacations: false },
-        VACANZE,
+        PERIMETRO,
       ),
       'me',
     )
@@ -188,7 +191,7 @@ describe('serie mensile', () => {
       visibleFor(
         [...DATA, expense({ id: 'refuso', date: '2026-11-15', amount: 10 })],
         { person: 'me', includeVacations: false },
-        VACANZE,
+        PERIMETRO,
       ),
       'me',
     )
@@ -283,7 +286,7 @@ describe('quanti giorni di un mese sono passati', () => {
 
 describe('confronto fra periodi', () => {
   it('parte dal mese precedente a quello selezionato', () => {
-    const series = monthlySeries(visibleFor(DATA, { person: 'me', includeVacations: false }, VACANZE), 'me')
+    const series = monthlySeries(visibleFor(DATA, { person: 'me', includeVacations: false }, PERIMETRO), 'me')
     const comparison = comparePeriods(series, '2026-09', 3)
     expect(comparison.currentMonths).toEqual(['2026-06', '2026-07', '2026-08'])
     expect(comparison.previousMonths).toEqual(['2026-03', '2026-04', '2026-05'])
@@ -295,7 +298,7 @@ describe('confronto fra periodi', () => {
 
 describe('categorie', () => {
   it('ordina le fette e calcola le percentuali', () => {
-    const visible = visibleFor(DATA, { person: 'me', includeVacations: false }, VACANZE)
+    const visible = visibleFor(DATA, { person: 'me', includeVacations: false }, PERIMETRO)
     const slices = categoryBreakdown(visible, 'me')
     expect(slices[0]?.key).toBe('salute')
     expect(slices[0]?.total).toBe(200)
@@ -946,7 +949,7 @@ describe('confronto col mese scorso a pari giorni', () => {
 })
 
 describe('statistiche di lungo periodo', () => {
-  const serie = monthlySeries(visibleFor(DATA, { person: 'me', includeVacations: false }, VACANZE), 'me')
+  const serie = monthlySeries(visibleFor(DATA, { person: 'me', includeVacations: false }, PERIMETRO), 'me')
 
   it('l’anno per anno conta i mesi osservati, non dodici', () => {
     const anni = yearlyTotals(serie)
@@ -998,5 +1001,190 @@ describe('statistiche di lungo periodo', () => {
     expect(rows[1]?.months).toBe(1)
     expect(rows[1]?.perMonth).toBe(15)
     expect(monthlyBase).toBe(490)
+  })
+})
+
+/*
+ * ─────────────────────────────── progetti ───────────────────────────────
+ *
+ * Un progetto è un tricount con `offBudget: true`: una casa comprata, non la
+ * vita di ogni mese. Le sue spese restano spese — negli elenchi, nel 730 — ma
+ * escono dalle statistiche mensili e dal saldo di ogni giorno. → ADR-0074
+ */
+describe('progetti', () => {
+  const CASA: Tricount = {
+    id: 'casa-nuova',
+    name: 'Casa nuova',
+    members: ['me', 'partner'],
+    offBudget: true,
+  }
+  const PERIMETRO_CON_PROGETTO: Perimeter = {
+    vacations: new Set(['viaggio']),
+    offBudget: new Set(['casa-nuova']),
+  }
+  /* Cifre inventate, come vuole ADR-0067: un anticipo grosso pagato da lui e
+     diviso a metà, che è la forma di ogni spesa di un progetto in due. */
+  const anticipo = expense({
+    id: 'anticipo',
+    date: '2026-08-05',
+    amount: 20_000,
+    tricount: 'casa-nuova',
+    category: 'casa',
+    paidBy: 'me',
+    shares: { me: 10_000, partner: 10_000 },
+  })
+  const OGGI_PROGETTO = '2026-08-31'
+
+  it('sta fuori dalle statistiche mensili, e non c’è un interruttore che ce lo rimetta', () => {
+    const conProgetto = [...DATA, anticipo]
+    for (const includeVacations of [false, true]) {
+      const visible = visibleFor(conProgetto, { person: 'me', includeVacations }, PERIMETRO_CON_PROGETTO)
+      expect(visible.map((e) => e.id)).not.toContain('anticipo')
+    }
+    /* Ma resta una spesa: l'elenco completo la conta, come il welfare. */
+    expect(allFor(conProgetto, 'me').map((e) => e.id)).toContain('anticipo')
+  })
+
+  it('senza il perimetro giusto il progetto entrerebbe nelle medie', () => {
+    /* Il presidio è il perimetro, non un campo della spesa: è ciò che rende
+       necessario passare da `perimeterOf()` invece di costruire i due insiemi
+       a mano nelle pagine. */
+    const visible = visibleFor([...DATA, anticipo], { person: 'me', includeVacations: false }, PERIMETRO)
+    expect(visible.map((e) => e.id)).toContain('anticipo')
+  })
+
+  it('non entra nel saldo di ogni giorno', () => {
+    const opts = { since: '2026-01-01', opening: 0, today: OGGI_PROGETTO }
+    const senza = coupleBalance(DATA, [], opts)
+    const con = coupleBalance([...DATA, anticipo], [], {
+      ...opts,
+      offBudget: new Set(['casa-nuova']),
+    })
+    expect(con.balance).toBe(senza.balance)
+    /* Nemmeno come tricount da dichiarare: un progetto non si riconcilia con
+       Tricount, quindi non compare fra i gruppi né fra gli indichiarati. */
+    expect(con.groups.map((g) => g.key)).not.toContain('casa-nuova')
+    expect(con.undeclared).not.toContain('casa-nuova')
+  })
+
+  it('un rimborso di progetto non tocca il saldo di ogni giorno', () => {
+    const opts = {
+      since: '2026-01-01',
+      opening: 0,
+      today: OGGI_PROGETTO,
+      offBudget: new Set(['casa-nuova']),
+    }
+    const rimborso: Settlement = {
+      id: 's-casa',
+      date: '2026-08-20',
+      from: 'partner',
+      to: 'me',
+      amount: 5000,
+      tricount: 'casa-nuova',
+    }
+    const senza = coupleBalance(DATA, [], opts)
+    const con = coupleBalance(DATA, [rimborso], opts)
+    expect(con.balance).toBe(senza.balance)
+    expect(con.settled).toBe(0)
+  })
+
+  it('conta chi ha messo cosa, e da che parte pende il conto', () => {
+    const stats = projectStats([...DATA, anticipo], [], CASA, OGGI_PROGETTO)
+    expect(stats.count).toBe(1)
+    expect(stats.total).toBe(20_000)
+    expect(stats.couple).toBe(20_000)
+    /* Ha anticipato tutto lui, ma gli spetta la metà: la differenza è il debito. */
+    expect(stats.people.me).toEqual({ paid: 20_000, share: 10_000 })
+    expect(stats.people.partner).toEqual({ paid: 0, share: 10_000 })
+    expect(stats.balance).toBe(10_000)
+  })
+
+  it('il rimborso del progetto abbassa il debito del progetto', () => {
+    const rimborso: Settlement = {
+      id: 's-casa',
+      date: '2026-08-20',
+      from: 'partner',
+      to: 'me',
+      amount: 4000,
+      tricount: 'casa-nuova',
+    }
+    /* Un rimborso di ogni giorno, senza tricount, non c'entra niente: se
+       finisse qui dentro, saldare la spesa quotidiana sembrerebbe aver pagato
+       un pezzo di casa. */
+    const quotidiano: Settlement = {
+      id: 's-normale',
+      date: '2026-08-21',
+      from: 'partner',
+      to: 'me',
+      amount: 50,
+    }
+    const stats = projectStats([anticipo], [rimborso, quotidiano], CASA, OGGI_PROGETTO)
+    expect(stats.settled).toBe(4000)
+    expect(stats.balance).toBe(6000)
+    expect(stats.settlements.map((s) => s.id)).toEqual(['s-casa'])
+  })
+
+  it('ciò che è datato dopo questo mese non è ancora successo', () => {
+    const rogito = expense({
+      ...anticipo,
+      id: 'rogito',
+      date: '2026-10-15',
+      amount: 16_000,
+      shares: { me: 8000, partner: 8000 },
+    })
+    const stats = projectStats([anticipo, rogito], [], CASA, OGGI_PROGETTO)
+    expect(stats.count).toBe(1)
+    expect(stats.deferred).toBe(1)
+    expect(stats.balance).toBe(10_000)
+    /* Dal primo giorno del suo mese entra, e il debito sale. → ADR-0064 */
+    expect(projectStats([anticipo, rogito], [], CASA, '2026-10-01').balance).toBe(18_000)
+  })
+
+  it('la rata del mutuo è un secondo insieme, e non si somma al primo', () => {
+    const conMutuo: Tricount = { ...CASA, recurringCategory: 'mutuo' }
+    const rata = expense({
+      id: 'rata',
+      date: '2026-08-10',
+      amount: 613,
+      tricount: 'fisse',
+      category: 'mutuo',
+      recurring: true,
+    })
+    /* Una spesa che stesse in tutti e due gli insiemi verrebbe contata due
+       volte da chi li somma: il filtro esclude il tricount del progetto. */
+    const dentro = expense({ ...anticipo, id: 'dentro', category: 'mutuo' })
+    const trovate = projectRecurring([anticipo, rata, dentro], conMutuo)
+    expect(trovate.map((e) => e.id)).toEqual(['rata'])
+    /* Senza categoria dichiarata non c'è nessun secondo insieme. */
+    expect(projectRecurring([anticipo, rata], CASA)).toEqual([])
+  })
+})
+
+/*
+ * ─────────────────────────────── calendario ───────────────────────────────
+ *
+ * Le intestazioni dei giorni nella pagina Spese. Il caso che conta è il salto
+ * di mese e di anno: `addDays` non fa aritmetica sulla stringa, la fa su una
+ * data UTC, e senza quello «Ieri» del primo marzo sarebbe il 28 febbraio solo
+ * negli anni giusti. → ADR-0077
+ */
+describe('intestazioni dei giorni', () => {
+  it('oggi, ieri e domani si chiamano per nome', () => {
+    expect(dayHeading('2026-08-31', '2026-08-31')).toBe('Oggi')
+    expect(dayHeading('2026-08-30', '2026-08-31')).toBe('Ieri')
+    expect(dayHeading('2026-09-01', '2026-08-31')).toBe('Domani')
+  })
+
+  it('gli altri portano giorno della settimana, data e anno', () => {
+    /* 25 agosto 2026 è un martedì; l'anno c'è perché la pagina Spese scorre
+       indietro di due anni e due agosti si somigliano troppo. */
+    expect(dayHeading('2026-08-25', '2026-08-31')).toBe('Martedì 25 agosto 2026')
+  })
+
+  it('il giorno prima attraversa mesi, anni e febbraio', () => {
+    expect(addDays('2026-03-01', -1)).toBe('2026-02-28')
+    expect(addDays('2024-03-01', -1)).toBe('2024-02-29')
+    expect(addDays('2026-01-01', -1)).toBe('2025-12-31')
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01')
   })
 })

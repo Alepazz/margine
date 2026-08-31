@@ -25,7 +25,13 @@ try {
     const key = await deriveKey(passphrase, datasetEnvelope.kdf)
     const dataset = await decryptEnvelope(datasetEnvelope, key)
     writeJson(PATHS.expenses, dataset)
-    log(`✓ data/expenses.json — ${dataset.expenses.length} spese, ${dataset.trips.length} viaggi`)
+    /* `dataset.trips` non esiste più da ADR-0037: i viaggi sono i tricount che
+       hanno un `trip`. La riga vecchia lanciava **dopo** aver scritto le spese e
+       **prima** della configurazione, quindi `npm run decrypt` lasciava `data/`
+       a metà e sembrava un guasto della cifratura. Rotto dal 21/08/2026 e visto
+       solo il 31, la prima volta che qualcuno l'ha rilanciato. */
+    const viaggi = dataset.tricounts.filter((tricount) => tricount.trip).length
+    log(`✓ data/expenses.json — ${dataset.expenses.length} spese, ${viaggi} viaggi`)
 
     if (exists(PATHS.configEnc)) {
       const configEnvelope = assertEnvelope(readJson(PATHS.configEnc), PATHS.configEnc)

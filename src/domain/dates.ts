@@ -58,6 +58,43 @@ export function formatDate(isoDate: string): string {
   return `${dayOf(isoDate)} ${MONTHS_SHORT[m - 1] ?? '?'} ${yearOf(isoDate)}`
 }
 
+const WEEKDAYS_LONG = [
+  'domenica',
+  'lunedì',
+  'martedì',
+  'mercoledì',
+  'giovedì',
+  'venerdì',
+  'sabato',
+]
+
+/** Il giorno ISO spostato di `delta` giorni: `addDays('2026-03-01', -1)` è `2026-02-28`. */
+export function addDays(isoDate: string, delta: number): string {
+  const { month } = parseMonthKey(monthKeyOf(isoDate))
+  return new Date(Date.UTC(yearOf(isoDate), month - 1, dayOf(isoDate) + delta))
+    .toISOString()
+    .slice(0, 10)
+}
+
+/**
+ * L'intestazione di un giorno in un elenco: «Oggi», «Ieri», «Domani», oppure
+ * «Lunedì 31 agosto 2026».
+ *
+ * L'anno c'è sempre nella forma lunga, e non è ridondanza: nella pagina Spese si
+ * scorre indietro di due anni, e «lunedì 31 agosto» senza anno è ambiguo appena
+ * i dati coprono più di un agosto. → ADR-0077
+ */
+export function dayHeading(isoDate: string, today: string): string {
+  if (isoDate === today) return 'Oggi'
+  if (isoDate === addDays(today, -1)) return 'Ieri'
+  if (isoDate === addDays(today, 1)) return 'Domani'
+  const { month } = parseMonthKey(monthKeyOf(isoDate))
+  const weekday = new Date(Date.UTC(yearOf(isoDate), month - 1, dayOf(isoDate))).getUTCDay()
+  return capitalize(
+    `${WEEKDAYS_LONG[weekday] ?? '?'} ${dayOf(isoDate)} ${MONTHS_LONG[month - 1] ?? '?'} ${yearOf(isoDate)}`,
+  )
+}
+
 export function addMonths(month: MonthKey, delta: number): MonthKey {
   const { year, month: m } = parseMonthKey(month)
   const total = year * 12 + (m - 1) + delta

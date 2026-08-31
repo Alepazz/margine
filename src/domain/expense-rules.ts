@@ -149,6 +149,10 @@ export interface TricountDraft {
     start: string
     end: string
   }
+  /** Un progetto: la sua spesa sta fuori dai conti del mese. → ADR-0074 */
+  offBudget?: boolean
+  /** La categoria in cui il progetto continua a costare (il mutuo). → ADR-0074 */
+  recurringCategory?: string
 }
 
 export function validateTricount(draft: TricountDraft, takenIds: ReadonlySet<string>): string[] {
@@ -173,6 +177,18 @@ export function validateTricount(draft: TricountDraft, takenIds: ReadonlySet<str
     if (isRealDate(trip.start) && trip.year !== Number(trip.start.slice(0, 4))) {
       errors.push('L’anno non coincide con la data di partenza.')
     }
+  }
+
+  /* Una vacanza è la vita di ogni anno e si può scegliere se contarla; un
+     progetto sta fuori sempre. Le due cose insieme non vogliono dire niente, e
+     l'interfaccia non le offre insieme: qui si presidia il dato. → ADR-0074 */
+  if (draft.trip && draft.offBudget === true) {
+    errors.push('Una vacanza non può essere anche un progetto.')
+  }
+  /* La categoria in cui un progetto continua a costare non ha senso su un
+     tricount che non è un progetto: sarebbe un campo che non guarda nessuno. */
+  if (draft.recurringCategory && draft.offBudget !== true) {
+    errors.push('La categoria ricorrente vale solo per un progetto.')
   }
   return errors
 }

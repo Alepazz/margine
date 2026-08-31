@@ -30,7 +30,7 @@ import {
   totalShare,
 } from '../domain/selectors'
 import { tripTitleOf, tripsOf } from '../domain/types'
-import { useCoupleBalance, usePageData } from './usePageData'
+import { useCoupleBalance, usePageData, useProjects } from './usePageData'
 
 interface HubEntry {
   to: string
@@ -70,7 +70,7 @@ function HubGroup({ title, entries }: { title: string; entries: HubEntry[] }): R
 }
 
 export function Esplora(): ReactNode {
-  const { config, dataset, view, month, series, all } = usePageData()
+  const { config, dataset, view, lookup, month, series, all, everyday } = usePageData()
   const person = view.person
   const other = person === 'me' ? 'partner' : 'me'
   const { houseTricount, houseCategory, catCategory } = config
@@ -102,21 +102,23 @@ export function Esplora(): ReactNode {
    * separati, perché là si guarda **cosa** è casa e non quanto. → ADR-0017
    */
   const houseMonth = useMemo(() => {
-    const ledger = houseLedger(dataset.expenses, houseTricount)
-    const outside = houseOutside(dataset.expenses, houseTricount, houseCategory)
+    /* `everyday`, come la pagina che apre: un'anteprima che comprendesse il
+       progetto direbbe un numero che là dentro non si ritrova. → ADR-0074 */
+    const ledger = houseLedger(everyday, houseTricount)
+    const outside = houseOutside(everyday, houseTricount, houseCategory)
     return (
       totalShare(expensesOfMonth(ledger, month), person) +
       totalShare(expensesOfMonth(outside, month), person)
     )
-  }, [dataset.expenses, houseCategory, houseTricount, month, person])
+  }, [everyday, houseCategory, houseTricount, month, person])
 
   /* Un filtro e una somma, non `catStats`: quello costruisce serie mensile e
      ripartizione per sottocategoria — tutta roba della pagina del gatto — e qui
      servono due numeri. */
   const cat = useMemo(() => {
-    const scope = dataset.expenses.filter((expense) => expense.category === catCategory)
+    const scope = everyday.filter((expense) => expense.category === catCategory)
     return { count: scope.length, month: totalShare(expensesOfMonth(scope, month), person) }
-  }, [catCategory, dataset.expenses, month, person])
+  }, [catCategory, everyday, month, person])
 
   /* Il viaggio più recente: `tripStats` ordina per data di inizio, ma qui basta
      l'elenco dei viaggi — un viaggio senza spese è un viaggio. → ADR-0036 */
@@ -130,13 +132,19 @@ export function Esplora(): ReactNode {
     return years[0]
   }, [dataset.expenses, person])
 
+  /* Dallo stesso posto da cui lo prende la pagina che apre: è ciò che rende
+     l'anteprima una promessa mantenuta invece di un secondo calcolo. → ADR-0044 */
+  const progetti = useProjects()
+
   const monthName = monthLabelShort(month)
 
   const raccolte: HubEntry[] = [
     {
       to: '/casa',
       glyph: '🏠',
-      name: 'Casa',
+      /* Il nome dai dati, come nella pagina che apre: accanto a un progetto che
+         si chiama anch'esso «Casa …», «Casa» da sola non distingue. → ADR-0074 */
+      name: lookup.tricountLabel(houseTricount),
       value: formatEuro(houseMonth, { decimals: 0 }),
       hint: `la tua quota a ${monthName}`,
     },
@@ -156,6 +164,13 @@ export function Esplora(): ReactNode {
         ? `l'ultima: ${tripTitleOf(lastTrip)}, ${formatDate(lastTrip.start)}`
         : 'nessun viaggio registrato',
     },
+    ...progetti.map((stats) => ({
+      to: `/progetto/${stats.tricount.id}`,
+      glyph: stats.tricount.emoji ?? '🏗️',
+      name: stats.tricount.name,
+      value: stats.count === 0 ? '—' : formatEuro(stats.total, { decimals: 0 }),
+      hint: stats.count === 0 ? 'nessuna spesa ancora' : 'speso finora, fuori dai conti del mese',
+    })),
   ]
 
   const analisi: HubEntry[] = [

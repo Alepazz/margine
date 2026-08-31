@@ -20,7 +20,7 @@ import { tripTitleOf, tripsOf, type Expense } from '../domain/types'
 import { usePageData } from './usePageData'
 
 export function Vacanze(): ReactNode {
-  const { config, dataset, view, lookup, chart, addTricount, updateTricount } = usePageData()
+  const { config, dataset, view, lookup, chart, today, addTricount, updateTricount } = usePageData()
   const toast = useToast()
   const person = view.person
   const [selectedTrip, setSelectedTrip] = useState<string | null>(null)
@@ -440,6 +440,7 @@ export function Vacanze(): ReactNode {
               <div className="scroll-pane">
                 <h3 style={{ marginBottom: 8 }}>Le voci del viaggio</h3>
                 <ExpenseList
+                  today={today}
                   expenses={trip.expenses}
                   person={person}
                   lookup={lookup}

@@ -37,7 +37,7 @@ const SORT_LABELS: Record<SortKey, string> = {
 }
 
 export function Spese(): ReactNode {
-  const { config, dataset, view, lookup, all } = usePageData()
+  const { config, dataset, view, lookup, all, today } = usePageData()
   const person = view.person
   const [filter, setFilter] = useState<ExpenseFilter>(EMPTY_FILTER)
   const [sort, setSort] = useState<SortKey>('date-desc')
@@ -59,6 +59,15 @@ export function Spese(): ReactNode {
 
   const months = useMemo(() => monthsOf(all).reverse(), [all])
   const filtered = useMemo(() => sortExpenses(applyFilter(all, filter), sort, person), [all, filter, person, sort])
+
+  /*
+   * Il calendario vale solo dove l'ordinamento è il tempo. Ordinando per
+   * importo i giorni tornerebbero sparsi — «31 agosto» tre volte in mezzo alla
+   * pagina — e un'intestazione che si ripete non separa niente: sarebbe un
+   * calendario mescolato. Lo decide questa pagina, che è l'unica a sapere come
+   * ha ordinato. → ADR-0077
+   */
+  const byDay = sort === 'date-desc' || sort === 'date-asc'
 
   /* L'impaginazione la fa `ExpenseList`, che riparte da sola quando l'insieme cambia. */
   const update = (patch: Partial<ExpenseFilter>) => {
@@ -251,6 +260,8 @@ export function Spese(): ReactNode {
         </div>
 
         <ExpenseList
+          today={today}
+          byDay={byDay}
           expenses={filtered}
           person={person}
           lookup={lookup}

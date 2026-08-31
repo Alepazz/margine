@@ -24,6 +24,7 @@ import { donutSlices } from '../domain/categories'
 import { currentMonthKey, monthLabel, monthLabelShort } from '../domain/dates'
 import { EMPTY_INCOME, computeMargin, marginView } from '../domain/income'
 import { newSettlement, settlementDirection } from '../domain/settlement'
+import { aTo } from '../domain/text'
 import { formatEuro, relativeChange, toCents } from '../domain/money'
 import {
   averageByCategory,
@@ -38,14 +39,16 @@ import {
   findMonth,
   projectMonth,
   topExpenses,
+  totalShare,
 } from '../domain/selectors'
-import type { Expense, PersonId } from '../domain/types'
+import { projectsOf, type Expense, type PersonId } from '../domain/types'
 import { useCoupleBalance, usePageData } from './usePageData'
 
 export function Home(): ReactNode {
   const {
     chart,
     config,
+    dataset,
     view,
     month,
     setMonth,
@@ -177,6 +180,32 @@ export function Home(): ReactNode {
   const top = useMemo(() => topExpenses(monthExpenses, person, 5), [monthExpenses, person])
 
   /*
+   * Quello che in questo mese è stato speso **fuori** da questi conti: i
+   * progetti. Il numero grande resta lo spendibile della vita di ogni giorno —
+   * sommarci un capitale lo renderebbe una cosa che non risponde a nessuna
+   * domanda — ma un mese in cui sono usciti trentaseimila euro non può tacerlo:
+   * un totale che nasconde vuol dire un totale di cui non ci si fida più.
+   * → ADR-0074
+   */
+  const fuoriDaiConti = useMemo(
+    () =>
+      projectsOf(dataset.tricounts)
+        .map((tricount) => ({
+          tricount,
+          /* La quota di chi guarda, come ogni altro numero di questa pagina. */
+          share: totalShare(
+            expensesOfMonth(
+              dataset.expenses.filter((e) => e.tricount === tricount.id),
+              month,
+            ),
+            person,
+          ),
+        }))
+        .filter((row) => toCents(row.share) !== 0),
+    [dataset.expenses, dataset.tricounts, month, person],
+  )
+
+  /*
    * A metà mese si è per definizione sotto la media: confrontare il parziale
    * con un mese intero direbbe «vai benissimo» il 5 di ogni mese. Per il mese in
    * corso si confronta quindi la proiezione, e l'etichetta lo dice.
@@ -242,6 +271,25 @@ export function Home(): ReactNode {
             onToggleHidden={toggleHideIncome}
           />
         </Card>
+
+        {/* Una riga, non una scheda: dichiara che c'è dell'altro e dove
+            guardarlo, senza pretendere spazio dal numero che conta. */}
+        {fuoriDaiConti.length > 0 ? (
+          <Notice icon="↗">
+            {/* «a agosto» è sbagliato: la d eufonica la sa `aTo()`, che è nata
+                per i nomi delle persone e vale per qualunque parola. */}
+            Fuori da questi conti, {aTo(monthLabel(month))} {monthLabel(month).toLowerCase()}:{' '}
+            {fuoriDaiConti.map((row, index) => (
+              <span key={row.tricount.id}>
+                {index > 0 ? ', ' : ''}
+                <Link to={`/progetto/${row.tricount.id}`}>
+                  {formatEuro(row.share, { decimals: 0 })} per {row.tricount.name}
+                </Link>
+              </span>
+            ))}
+            . Le spese di un progetto non entrano in margine, medie e confronti.
+          </Notice>
+        ) : null}
 
         {/*
           Il confronto col mese scorso sta in alto perché è la statistica che si
@@ -378,6 +426,7 @@ export function Home(): ReactNode {
         <div className="grid-2">
           <Card title="Le voci più pesanti del mese">
             <ExpenseList
+              today={today}
               expenses={top}
               person={person}
               lookup={lookup}

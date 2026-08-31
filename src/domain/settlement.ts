@@ -65,6 +65,14 @@ export function newSettlement(opts: {
   /** Quanto si rimborsa: tutto, o una parte. Il segno non conta. */
   amount: number
   date: string
+  /**
+   * Il progetto che si sta saldando, quando non è il rapporto di ogni giorno.
+   *
+   * Sta qui e non appeso dal chiamante per la stessa ragione per cui ci sta il
+   * verso: un rimborso costruito bene in una pagina e male in un'altra sposta
+   * un debito senza che se ne accorga nessuno. → ADR-0075, ADR-0060
+   */
+  tricount?: string
 }): Settlement | null {
   /* `=== 0` prende anche `-0`, che è uguale a zero per `===`. */
   if (!Number.isFinite(opts.amount) || opts.amount === 0) return null
@@ -81,5 +89,9 @@ export function newSettlement(opts: {
        con un verso già suo vorrebbe dire due volte la stessa cosa — con la
        possibilità che le due dicano cose diverse. */
     amount: Math.round(Math.abs(opts.amount) * 100) / 100,
+    /* Assente vuol dire «il rapporto di ogni giorno»: la chiave non si scrive
+       mai vuota, perché un `tricount: ''` non è un progetto e non è nemmeno
+       l'assenza — sarebbe una terza cosa che nessuno gestisce. */
+    ...(opts.tricount !== undefined && opts.tricount !== '' ? { tricount: opts.tricount } : {}),
   }
 }

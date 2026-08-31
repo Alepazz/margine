@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { validateExpense } from '../../src/domain/expense-rules.ts'
+import { validateExpense, validateTricount } from '../../src/domain/expense-rules.ts'
 import { CATEGORIES } from './taxonomy.mjs'
 import { validateDataset } from './validate-core.mjs'
 
@@ -130,4 +130,55 @@ describe('regole di una spesa: il browser e l’import concordano', () => {
     const taken = { ...CTX, takenIds: new Set(['2026-08-20-abcd1234']) }
     expect(validateExpense(base(), taken).length).toBeGreaterThan(0)
   })
+})
+
+/*
+ * Le stesse due implementazioni, sui **tricount**: da quando esistono i progetti
+ * le regole che li governano stanno di nuovo in due posti, e la lezione della
+ * cifratura (→ ADR-0073) vale identica qui — un controllo nuovo va aggiunto ai
+ * due lati e a questa tabella, o le due smettono di dire la stessa cosa in
+ * silenzio. Come per le spese, la garanzia è **in una direzione**: quello che
+ * l'app crea, l'import lo accetta. → ADR-0074
+ */
+const PROGETTO = { id: 'casa-nuova', name: 'Casa nuova', members: ['me', 'partner'], offBudget: true }
+
+const TRICOUNT_ACCETTABILI = [
+  ['un progetto', PROGETTO],
+  ['un progetto con la categoria della rata', { ...PROGETTO, recurringCategory: 'casa' }],
+  ['un tricount qualunque', { id: 'nuovo', name: 'Nuovo', members: ['me'] }],
+]
+
+const TRICOUNT_RIFIUTABILI = [
+  [
+    'un progetto che è anche una vacanza',
+    { ...PROGETTO, trip: { place: 'Senigallia', year: 2026, start: '2026-08-01', end: '2026-08-02' } },
+  ],
+  [
+    'la categoria della rata su un tricount qualunque',
+    { id: 'nuovo', name: 'Nuovo', members: ['me'], recurringCategory: 'casa' },
+  ],
+]
+
+describe('regole di un tricount: il browser e l’import concordano', () => {
+  for (const [nome, tricount] of TRICOUNT_ACCETTABILI) {
+    it(`accetta: ${nome}`, () => {
+      expect(validateTricount(tricount, new Set())).toEqual([])
+      const { errors } = validateDataset(
+        { expenses: [], tricounts: [...TRICOUNTS, tricount] },
+        CONFIG,
+      )
+      expect(errors).toEqual([])
+    })
+  }
+
+  for (const [nome, tricount] of TRICOUNT_RIFIUTABILI) {
+    it(`rifiuta: ${nome}`, () => {
+      expect(validateTricount(tricount, new Set()).length).toBeGreaterThan(0)
+      const { errors } = validateDataset(
+        { expenses: [], tricounts: [...TRICOUNTS, tricount] },
+        CONFIG,
+      )
+      expect(errors.length).toBeGreaterThan(0)
+    })
+  }
 })
