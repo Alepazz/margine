@@ -23,8 +23,9 @@ import {
   notYetInBalance,
   owedOf,
   projectMonth,
-  projectRecurring,
+  projectProgress,
   projectStats,
+  recurringDeltaOf,
   recurringProfile,
   subsetStats,
   tax730ByYear,
@@ -32,7 +33,6 @@ import {
   tripStats,
   visibleFor,
   yearlyTotals,
-  type Perimeter,
 } from './selectors'
 import type { Expense, Settlement, Tricount, Trip } from './types'
 
@@ -50,7 +50,7 @@ function expense(partial: Partial<Expense> & { id: string; date: string; amount:
 }
 
 /* I tricount della fixture: due condivisi, un personale, un viaggio. */
-const PERIMETRO: Perimeter = { vacations: new Set(['viaggio']), offBudget: new Set() }
+const PERIMETRO = new Set(['viaggio'])
 
 const DATA: Expense[] = [
   expense({ id: 'a', date: '2026-06-03', amount: 100, recurring: true, category: 'casa' }),
@@ -1007,23 +1007,21 @@ describe('statistiche di lungo periodo', () => {
 /*
  * ─────────────────────────────── progetti ───────────────────────────────
  *
- * Un progetto è un tricount con `offBudget: true`: una casa comprata, non la
- * vita di ogni mese. Le sue spese restano spese — negli elenchi, nel 730 — ma
- * escono dalle statistiche mensili e dal saldo di ogni giorno. → ADR-0074
+ * Un progetto è un tricount con `project: true`: una casa comprata. Dentro ci
+ * stanno **tre** cose che si comportano in modo diverso, e a distinguerle è la
+ * spesa e non il tricount — il capitale (`offBudget: true`) esce dai conti del
+ * mese e dal saldo di ogni giorno, la rata e il frigo no. → ADR-0079, ADR-0074
  */
 describe('progetti', () => {
   const CASA: Tricount = {
     id: 'casa-nuova',
     name: 'Casa nuova',
     members: ['me', 'partner'],
-    offBudget: true,
+    project: true,
   }
-  const PERIMETRO_CON_PROGETTO: Perimeter = {
-    vacations: new Set(['viaggio']),
-    offBudget: new Set(['casa-nuova']),
-  }
+  const CASA_CON_RATA: Tricount = { ...CASA, recurringCategory: 'mutuo' }
   /* Cifre inventate, come vuole ADR-0067: un anticipo grosso pagato da lui e
-     diviso a metà, che è la forma di ogni spesa di un progetto in due. */
+     diviso a metà, che è la forma di ogni esborso di capitale in due. */
   const anticipo = expense({
     id: 'anticipo',
     date: '2026-08-05',
@@ -1032,48 +1030,72 @@ describe('progetti', () => {
     category: 'casa',
     paidBy: 'me',
     shares: { me: 10_000, partner: 10_000 },
+    offBudget: true,
+  })
+  /* La rata: stesso tricount, **senza** `offBudget`, con la spunta ricorrente.
+     È la spesa che ADR-0079 ha portato dentro il progetto. */
+  const rata = expense({
+    id: 'rata',
+    date: '2026-08-10',
+    amount: 600,
+    tricount: 'casa-nuova',
+    category: 'mutuo',
+    paidBy: 'me',
+    shares: { me: 300, partner: 300 },
+    recurring: true,
+  })
+  /* Il frigo: spesa normale un po' grossa, dentro il progetto. */
+  const frigo = expense({
+    id: 'frigo',
+    date: '2026-08-12',
+    amount: 800,
+    tricount: 'casa-nuova',
+    category: 'casa',
+    paidBy: 'me',
+    shares: { me: 400, partner: 400 },
   })
   const OGGI_PROGETTO = '2026-08-31'
+  const VACANZE = new Set(['viaggio'])
 
-  it('sta fuori dalle statistiche mensili, e non c’è un interruttore che ce lo rimetta', () => {
+  it('il capitale sta fuori dalle statistiche mensili, e non c’è un interruttore che ce lo rimetta', () => {
     const conProgetto = [...DATA, anticipo]
     for (const includeVacations of [false, true]) {
-      const visible = visibleFor(conProgetto, { person: 'me', includeVacations }, PERIMETRO_CON_PROGETTO)
+      const visible = visibleFor(conProgetto, { person: 'me', includeVacations }, VACANZE)
       expect(visible.map((e) => e.id)).not.toContain('anticipo')
     }
     /* Ma resta una spesa: l'elenco completo la conta, come il welfare. */
     expect(allFor(conProgetto, 'me').map((e) => e.id)).toContain('anticipo')
   })
 
-  it('senza il perimetro giusto il progetto entrerebbe nelle medie', () => {
-    /* Il presidio è il perimetro, non un campo della spesa: è ciò che rende
-       necessario passare da `perimeterOf()` invece di costruire i due insiemi
-       a mano nelle pagine. */
-    const visible = visibleFor([...DATA, anticipo], { person: 'me', includeVacations: false }, PERIMETRO)
-    expect(visible.map((e) => e.id)).toContain('anticipo')
+  it('la rata e il frigo dello stesso progetto ci entrano, ed è la ragione del cambio di modello', () => {
+    /* Prima erano fuori tutti e tre, perché a decidere era il tricount: la rata
+       del mutuo spariva dalle spese fisse e il frigo da ogni media. → ADR-0079 */
+    const visible = visibleFor(
+      [...DATA, anticipo, rata, frigo],
+      { person: 'me', includeVacations: false },
+      VACANZE,
+    )
+    expect(visible.map((e) => e.id)).toContain('rata')
+    expect(visible.map((e) => e.id)).toContain('frigo')
+    expect(visible.map((e) => e.id)).not.toContain('anticipo')
   })
 
-  it('non entra nel saldo di ogni giorno', () => {
+  it('il capitale non entra nel saldo di ogni giorno, la rata sì', () => {
     const opts = { since: '2026-01-01', opening: 0, today: OGGI_PROGETTO }
     const senza = coupleBalance(DATA, [], opts)
-    const con = coupleBalance([...DATA, anticipo], [], {
-      ...opts,
-      offBudget: new Set(['casa-nuova']),
-    })
-    expect(con.balance).toBe(senza.balance)
-    /* Nemmeno come tricount da dichiarare: un progetto non si riconcilia con
-       Tricount, quindi non compare fra i gruppi né fra gli indichiarati. */
-    expect(con.groups.map((g) => g.key)).not.toContain('casa-nuova')
-    expect(con.undeclared).not.toContain('casa-nuova')
+    const conCapitale = coupleBalance([...DATA, anticipo], [], opts)
+    expect(conCapitale.balance).toBe(senza.balance)
+    /* Nemmeno come tricount da dichiarare: il capitale non si riconcilia con
+       Tricount, quindi non apre un gruppo da solo. */
+    expect(conCapitale.groups.map((g) => g.key)).not.toContain('casa-nuova')
+
+    const conRata = coupleBalance([...DATA, anticipo, rata], [], opts)
+    expect(Math.round((conRata.balance - senza.balance) * 100)).toBe(30_000)
+    expect(conRata.groups.map((g) => g.key)).toContain('casa-nuova')
   })
 
   it('un rimborso di progetto non tocca il saldo di ogni giorno', () => {
-    const opts = {
-      since: '2026-01-01',
-      opening: 0,
-      today: OGGI_PROGETTO,
-      offBudget: new Set(['casa-nuova']),
-    }
+    const opts = { since: '2026-01-01', opening: 0, today: OGGI_PROGETTO }
     const rimborso: Settlement = {
       id: 's-casa',
       date: '2026-08-20',
@@ -1088,18 +1110,35 @@ describe('progetti', () => {
     expect(con.settled).toBe(0)
   })
 
-  it('conta chi ha messo cosa, e da che parte pende il conto', () => {
-    const stats = projectStats([...DATA, anticipo], [], CASA, OGGI_PROGETTO)
-    expect(stats.count).toBe(1)
-    expect(stats.total).toBe(20_000)
-    expect(stats.couple).toBe(20_000)
-    /* Ha anticipato tutto lui, ma gli spetta la metà: la differenza è il debito. */
-    expect(stats.people.me).toEqual({ paid: 20_000, share: 10_000 })
-    expect(stats.people.partner).toEqual({ paid: 0, share: 10_000 })
+  it('spacca il progetto in capitale, corrente e rata, e la rata sta dentro il corrente', () => {
+    const stats = projectStats([...DATA, anticipo, rata, frigo], [], CASA_CON_RATA, OGGI_PROGETTO)
+    expect(stats.all.count).toBe(3)
+    expect(stats.all.total).toBe(21_400)
+    expect(stats.capital.count).toBe(1)
+    expect(stats.capital.total).toBe(20_000)
+    expect(stats.current.count).toBe(2)
+    expect(stats.current.total).toBe(1400)
+    /* Sottoinsieme, non un quarto insieme: `recurring` è dentro `current`, e
+       sommarli conterebbe due volte la rata. → ADR-0017 */
+    expect(stats.recurring.expenses.map((e) => e.id)).toEqual(['rata'])
+    expect(stats.current.expenses.map((e) => e.id)).toContain('rata')
+    /* Senza categoria dichiarata non c'è nessuna rata da riconoscere. */
+    expect(projectStats([anticipo, rata], [], CASA, OGGI_PROGETTO).recurring.count).toBe(0)
+  })
+
+  it('il debito del progetto nasce dal solo capitale', () => {
+    const stats = projectStats([...DATA, anticipo, rata, frigo], [], CASA_CON_RATA, OGGI_PROGETTO)
+    /* Ha anticipato tutto lui, ma gli spetta la metà: la differenza è il debito.
+       La rata e il frigo li ha anticipati lui pure, e il loro debito **non è
+       qui** — sta nel saldo di ogni giorno, e contarlo due volte vorrebbe dire
+       chiederne il rimborso due volte. */
+    expect(stats.capital.people.me).toEqual({ paid: 20_000, share: 10_000 })
+    expect(stats.capital.people.partner).toEqual({ paid: 0, share: 10_000 })
+    expect(stats.gross).toBe(10_000)
     expect(stats.balance).toBe(10_000)
   })
 
-  it('il rimborso del progetto abbassa il debito del progetto', () => {
+  it('il rimborso del progetto abbassa il debito, e il lordo non si muove', () => {
     const rimborso: Settlement = {
       id: 's-casa',
       date: '2026-08-20',
@@ -1120,8 +1159,47 @@ describe('progetti', () => {
     }
     const stats = projectStats([anticipo], [rimborso, quotidiano], CASA, OGGI_PROGETTO)
     expect(stats.settled).toBe(4000)
+    expect(stats.gross).toBe(10_000)
     expect(stats.balance).toBe(6000)
     expect(stats.settlements.map((s) => s.id)).toEqual(['s-casa'])
+  })
+
+  it('la barra misura sul lordo: anticipare la allunga, saldare la riempie', () => {
+    const vuoto = projectStats([anticipo], [], CASA, OGGI_PROGETTO)
+    const primo = projectProgress(vuoto)!
+    expect(primo).toMatchObject({ owed: 10_000, repaid: 0, left: 10_000, debtor: 'partner' })
+
+    const rimborso: Settlement = {
+      id: 's1',
+      date: '2026-08-20',
+      from: 'partner',
+      to: 'me',
+      amount: 4000,
+      tricount: 'casa-nuova',
+    }
+    const dopoRimborso = projectProgress(projectStats([anticipo], [rimborso], CASA, OGGI_PROGETTO))!
+    expect(dopoRimborso).toMatchObject({ owed: 10_000, repaid: 4000, left: 6000 })
+    expect(dopoRimborso.fraction).toBeCloseTo(0.4)
+
+    /* Un secondo anticipo allunga il fondo: la parte piena resta 4000, ma la
+       frazione scende. È il comportamento che Alessio ha chiesto — «più io
+       anticipo più si allunga». Col residuo al denominatore starebbe ferma. */
+    const secondo = expense({
+      ...anticipo,
+      id: 'rogito',
+      date: '2026-08-25',
+      amount: 10_000,
+      shares: { me: 5000, partner: 5000 },
+    })
+    const allungata = projectProgress(
+      projectStats([anticipo, secondo], [rimborso], CASA, OGGI_PROGETTO),
+    )!
+    expect(allungata).toMatchObject({ owed: 15_000, repaid: 4000, left: 11_000 })
+    expect(allungata.fraction).toBeCloseTo(4 / 15)
+
+    /* Nessun capitale anticipato: nessuna barra, e non una barra a zero — che
+       direbbe «sei indietro» di un debito che non esiste. */
+    expect(projectProgress(projectStats([rata], [], CASA, OGGI_PROGETTO))).toBeNull()
   })
 
   it('ciò che è datato dopo questo mese non è ancora successo', () => {
@@ -1133,30 +1211,27 @@ describe('progetti', () => {
       shares: { me: 8000, partner: 8000 },
     })
     const stats = projectStats([anticipo, rogito], [], CASA, OGGI_PROGETTO)
-    expect(stats.count).toBe(1)
+    expect(stats.all.count).toBe(1)
     expect(stats.deferred).toBe(1)
     expect(stats.balance).toBe(10_000)
     /* Dal primo giorno del suo mese entra, e il debito sale. → ADR-0064 */
     expect(projectStats([anticipo, rogito], [], CASA, '2026-10-01').balance).toBe(18_000)
   })
 
-  it('la rata del mutuo è un secondo insieme, e non si somma al primo', () => {
-    const conMutuo: Tricount = { ...CASA, recurringCategory: 'mutuo' }
-    const rata = expense({
-      id: 'rata',
-      date: '2026-08-10',
-      amount: 613,
-      tricount: 'fisse',
-      category: 'mutuo',
-      recurring: true,
-    })
-    /* Una spesa che stesse in tutti e due gli insiemi verrebbe contata due
-       volte da chi li somma: il filtro esclude il tricount del progetto. */
-    const dentro = expense({ ...anticipo, id: 'dentro', category: 'mutuo' })
-    const trovate = projectRecurring([anticipo, rata, dentro], conMutuo)
-    expect(trovate.map((e) => e.id)).toEqual(['rata'])
-    /* Senza categoria dichiarata non c'è nessun secondo insieme. */
-    expect(projectRecurring([anticipo, rata], CASA)).toEqual([])
+  it('il «di cui» del saldo è la rata di quel mese, e nient’altro', () => {
+    const tutte = [anticipo, rata, frigo]
+    /* Solo la rata: il frigo è dello stesso tricount ed è dentro il saldo, ma
+       non è mutuo; il capitale nel saldo non c'è proprio. */
+    expect(recurringDeltaOf(tutte, CASA_CON_RATA, '2026-08', OGGI_PROGETTO)).toBe(300)
+    /* Un altro mese non è questo mese. */
+    expect(recurringDeltaOf(tutte, CASA_CON_RATA, '2026-07', OGGI_PROGETTO)).toBe(0)
+    /* Senza categoria collegata non c'è nessun «di cui» da dire. */
+    expect(recurringDeltaOf(tutte, CASA, '2026-08', OGGI_PROGETTO)).toBe(0)
+    /* Una rata datata avanti non è ancora un debito, quindi non è ancora un
+       «di cui»: la stessa soglia del saldo. → ADR-0064 */
+    const prossima = expense({ ...rata, id: 'rata-9', date: '2026-09-10' })
+    expect(recurringDeltaOf([prossima], CASA_CON_RATA, '2026-09', OGGI_PROGETTO)).toBe(0)
+    expect(recurringDeltaOf([prossima], CASA_CON_RATA, '2026-09', '2026-09-01')).toBe(300)
   })
 })
 

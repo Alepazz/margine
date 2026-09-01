@@ -106,6 +106,15 @@ export function ExpenseForm({
   const [recurring, setRecurring] = useState(editing?.recurring ?? false)
   const [tax730, setTax730] = useState(editing?.tax730 ?? false)
   const [welfare, setWelfare] = useState(editing?.welfare ?? false)
+  /*
+   * Il capitale: rogito, caparra, notaio. **Spenta di partenza**, anche dentro
+   * un progetto, ed è una scelta fra due guasti. Dimenticarla su un rogito
+   * manda a picco il mese e lo vedi in un secondo; dimenticare di spegnerla su
+   * un frigo lo farebbe sparire in silenzio da ogni media, per sempre. Fra un
+   * guasto rumoroso e uno muto si sceglie il rumoroso — è la ferita di
+   * ADR-0057 al contrario. → ADR-0079
+   */
+  const [offBudget, setOffBudget] = useState(editing?.offBudget ?? false)
   const [newTrip, setNewTrip] = useState(false)
   const [newCategory, setNewCategory] = useState(false)
   const [catEmoji, setCatEmoji] = useState('')
@@ -122,6 +131,8 @@ export function ExpenseForm({
   const tricounts = dataset?.tricounts ?? []
   const chosenTricount = tricounts.find((t) => t.id === ledger)
   const isVacation = chosenTricount?.trip !== undefined
+  /* Un progetto: solo qui la casella «fuori dai conti del mese» ha senso. */
+  const isProgetto = chosenTricount?.project === true
   /*
    * In un tricount con un membro solo la spesa è al 100% di quel membro: le 370
    * in archivio sono tutte così, e offrire una divisione qui sarebbe offrire un
@@ -226,6 +237,10 @@ export function ExpenseForm({
      */
     built.tax730 = tax730
     built.welfare = welfareFlag
+    /* Come gli altri due, e per la stessa ragione: sempre un booleano, o
+       togliere la spunta non farebbe niente. Fuori da un progetto è per forza
+       falso — la casella non c'è e il dominio lo rifiuterebbe. */
+    built.offBudget = isProgetto ? offBudget : false
     /* Le altre annotazioni non si mettono da qui e non si perdono correggendo
        l'importo: si scrivono nel foglio di dettaglio. */
     if (editing?.notes !== undefined) built.notes = editing.notes
@@ -245,6 +260,8 @@ export function ExpenseForm({
     tax730,
     title,
     welfareFlag,
+    offBudget,
+    isProgetto,
   ])
 
   const takenIds = useMemo(
@@ -684,6 +701,27 @@ export function ExpenseForm({
                 />
                 Pagata col welfare aziendale
               </label>
+            ) : null}
+
+            {/* Solo dentro un progetto: fuori non c'è nessuna pagina che
+                rimetta sotto gli occhi una spesa tolta dai conti, e il dominio
+                la rifiuta. → ADR-0079 */}
+            {isProgetto ? (
+              <div className="field">
+                <label className="checkbox">
+                  <input
+                    type="checkbox"
+                    checked={offBudget}
+                    onChange={(event) => setOffBudget(event.target.checked)}
+                  />
+                  Fuori dai conti del mese
+                </label>
+                <p className="hint">
+                  {offBudget
+                    ? 'Capitale: non entra in margine, medie e confronti, e il suo debito sta nella pagina del progetto invece che nel saldo di ogni giorno.'
+                    : 'Da spuntare per rogito, caparra, notaio, agenzia. La rata del mutuo e le spese di casa no: quelle sono la vita di ogni mese.'}
+                </p>
+              </div>
             ) : null}
 
             {showErrors ? (

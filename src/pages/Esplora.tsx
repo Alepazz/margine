@@ -168,8 +168,11 @@ export function Esplora(): ReactNode {
       to: `/progetto/${stats.tricount.id}`,
       glyph: stats.tricount.emoji ?? '🏗️',
       name: stats.tricount.name,
-      value: stats.count === 0 ? '—' : formatEuro(stats.total, { decimals: 0 }),
-      hint: stats.count === 0 ? 'nessuna spesa ancora' : 'speso finora, fuori dai conti del mese',
+      value: stats.all.count === 0 ? '—' : formatEuro(stats.all.total, { decimals: 0 }),
+      /* Il totale è **tutto** il progetto, capitale compreso: è la domanda
+         «quanto ci è costata questa casa», e la scheda che apre mostra lo
+         stesso numero. Lo spacchetta la pagina, non l'anteprima. → ADR-0079 */
+      hint: stats.all.count === 0 ? 'nessuna spesa ancora' : 'speso finora, capitale compreso',
     })),
   ]
 

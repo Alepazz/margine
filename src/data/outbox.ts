@@ -343,7 +343,7 @@ function normalizePrice(entry: PriceEntry): PriceEntry {
 function normalizeTricount(tricount: Tricount): Tricount {
   const next: Tricount = { ...tricount }
   if (next.closed !== true) delete next.closed
-  if (next.offBudget !== true) delete next.offBudget
+  if (next.project !== true) delete next.project
   /* La stringa vuota è come per `subcategory`: un `tricount-edit` si applica
      come `{ ...tricount, ...campi }`, quindi per **togliere** la categoria del
      mutuo bisogna dire qualcosa, e `undefined` non sopravvive a
@@ -386,6 +386,7 @@ function normalize(expense: Expense): Expense {
   const next: Expense = { ...expense }
   if (next.tax730 === false) delete next.tax730
   if (next.welfare === false) delete next.welfare
+  if (next.offBudget === false) delete next.offBudget
   if (next.notes !== undefined && next.notes.trim() === '') delete next.notes
   if (next.receiptLinks !== undefined && next.receiptLinks.length === 0) delete next.receiptLinks
   if (!next.subcategory) delete next.subcategory

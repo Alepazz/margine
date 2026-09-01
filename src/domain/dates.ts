@@ -46,6 +46,18 @@ export function monthLabel(month: MonthKey): string {
   return `${capitalize(MONTHS_LONG[m - 1] ?? '?')} ${year}`
 }
 
+/**
+ * `2026-07` → `luglio`, senza l'anno: per le frasi in cui l'anno è rumore.
+ *
+ * «di cui 320 € di mutuo di settembre 2026» si legge come un modulo; «di
+ * settembre» come una frase. L'anno non serve, perché quel numero parla sempre
+ * del mese in corso. → ADR-0081
+ */
+export function monthNameOf(month: MonthKey): string {
+  const { month: m } = parseMonthKey(month)
+  return MONTHS_LONG[m - 1] ?? '?'
+}
+
 /** `2026-07` → `lug 26`, per gli assi dei grafici. */
 export function monthLabelShort(month: MonthKey): string {
   const { year, month: m } = parseMonthKey(month)

@@ -115,6 +115,7 @@ export const FIELD_LABELS: Record<Exclude<keyof Expense, 'id'>, string> = {
   receiptLinks: 'scontrini',
   welfare: 'welfare',
   tax730: '730',
+  offBudget: 'capitale',
 }
 
 export function changedFields(delta: ExpenseDelta): string[] {

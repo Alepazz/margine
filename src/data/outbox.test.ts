@@ -107,26 +107,50 @@ describe('creare, correggere, eliminare', () => {
   })
 
   it('una correzione spegne i flag portando false, non omettendoli', () => {
-    /* È il contratto su cui poggia il modulo di inserimento: le due spunte
-       (730 e welfare) viaggiano **sempre** come booleani, perché un campo
-       assente in un `update` vuol dire «lascia com'era» e togliere la spunta
-       non farebbe niente. A spegnerli è `normalize`, che cancella la chiave
-       quando il valore è falso: il file non si riempie di `false`. */
+    /* È il contratto su cui poggia il modulo di inserimento: le **tre** spunte
+       (730, welfare e capitale) viaggiano **sempre** come booleani, perché un
+       campo assente in un `update` vuol dire «lascia com'era» e togliere la
+       spunta non farebbe niente. A spegnerli è `normalize`, che cancella la
+       chiave quando il valore è falso: il file non si riempie di `false`.
+
+       `offBudget` è entrato per terzo con ADR-0079, e se questo test avesse
+       continuato a nominarne due la sua metà del contratto non l'avrebbe
+       presidiata nessuno: la spunta si sarebbe accesa e non più spenta, e il
+       capitale sarebbe rimasto fuori dai conti per sempre. */
     const acceso = applyOps(DATASET, [patch({ tax730: true, welfare: true })])
     expect(acceso.expenses[0]?.tax730).toBe(true)
     expect(acceso.expenses[0]?.welfare).toBe(true)
 
-    const spento = applyOps(acceso, [
+    /* Il capitale non passa da `patch`: è un campo del modulo di correzione,
+       non un'annotazione del foglio di dettaglio. Arriva quindi con `update`. */
+    const capitale = applyOps(acceso, [
       {
         kind: 'update',
         expenseId: 'a',
-        fields: { ...(acceso.expenses[0] as Expense), tax730: false, welfare: false },
-        entryId: 'u',
+        fields: { ...(acceso.expenses[0] as Expense), offBudget: true },
+        entryId: 'u0',
         ts: 2,
+      },
+    ])
+    expect(capitale.expenses[0]?.offBudget).toBe(true)
+
+    const spento = applyOps(capitale, [
+      {
+        kind: 'update',
+        expenseId: 'a',
+        fields: {
+          ...(capitale.expenses[0] as Expense),
+          tax730: false,
+          welfare: false,
+          offBudget: false,
+        },
+        entryId: 'u',
+        ts: 3,
       },
     ])
     expect(spento.expenses[0]).not.toHaveProperty('tax730')
     expect(spento.expenses[0]).not.toHaveProperty('welfare')
+    expect(spento.expenses[0]).not.toHaveProperty('offBudget')
 
     /* E l'operazione si riconosce come applicata, altrimenti resterebbe in coda
        per sempre: il confronto è con l'intenzione normalizzata, quindi «flag a
@@ -134,12 +158,12 @@ describe('creare, correggere, eliminare', () => {
     const spegni: OutboxEntry = {
       kind: 'update',
       expenseId: 'a',
-      fields: { tax730: false, welfare: false },
+      fields: { tax730: false, welfare: false, offBudget: false },
       entryId: 'u2',
-      ts: 3,
+      ts: 4,
     }
     expect(isAlreadyApplied(spento, undefined, spegni)).toBe(true)
-    expect(isAlreadyApplied(acceso, undefined, spegni)).toBe(false)
+    expect(isAlreadyApplied(capitale, undefined, spegni)).toBe(false)
   })
 
   it('elimina una spesa', () => {

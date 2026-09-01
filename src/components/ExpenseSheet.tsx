@@ -385,6 +385,16 @@ export function ExpenseSheet({
                 <dd>Welfare aziendale, fuori dal budget</dd>
               </div>
             ) : null}
+            {/* Si **vede** qui e si **cambia** in «Correggi»: una spesa che
+                sparisce dai conti del mese e dal saldo deve dirlo dove la si
+                apre, o l'unico modo di accorgersene è un totale che non torna.
+                → ADR-0079 */}
+            {expense.offBudget ? (
+              <div className="kv-row">
+                <dt>Nei conti</dt>
+                <dd>Capitale: fuori dal mese e dal saldo di ogni giorno</dd>
+              </div>
+            ) : null}
           </dl>
 
           <div className="stack" style={{ gap: 12 }}>

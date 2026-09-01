@@ -49,29 +49,18 @@ export function vacationIdsOf(tricounts: readonly Tricount[]): Set<string> {
   return new Set(tricounts.filter((t) => t.trip).map((t) => t.id))
 }
 
-/** Gli id dei tricount che sono progetti: la spesa che sta fuori dai conti del mese. */
-export function offBudgetIdsOf(tricounts: readonly Tricount[]): Set<string> {
-  return new Set(tricounts.filter((t) => t.offBudget === true).map((t) => t.id))
-}
-
 /**
- * Quali tricount contano nelle statistiche mensili e quali no.
+ * Vero quando la spesa è un **esborso di capitale**: il rogito, la caparra, il
+ * notaio. Sta fuori dai conti del mese e fuori dal saldo di ogni giorno.
  *
- * È un oggetto solo e non due parametri di proposito: sono la **stessa
- * domanda** — «cosa sta dentro il perimetro di questo mese?» — e tenerli
- * separati vorrebbe dire che il giorno che ne nasce un terzo tipo, metà dei
- * chiamanti lo riceve e metà no. Si costruisce con `perimeterOf()`, una volta,
- * dai tricount.
+ * Era una proprietà del **tricount** (`offBudget`, → ADR-0074), e non poteva
+ * restarlo: dentro il tricount di una casa comprata convivono il rogito, che
+ * non è la vita di nessun mese, e la rata del mutuo, che è la vita di ogni
+ * mese. Un interruttore per tutto il tricount ne avrebbe per forza sbagliato
+ * uno dei due. → ADR-0079
  */
-export interface Perimeter {
-  /** I tricount che sono viaggi: dentro o fuori a scelta di chi guarda. */
-  vacations: ReadonlySet<string>
-  /** I tricount che sono progetti: sempre fuori. → ADR-0074 */
-  offBudget: ReadonlySet<string>
-}
-
-export function perimeterOf(tricounts: readonly Tricount[]): Perimeter {
-  return { vacations: vacationIdsOf(tricounts), offBudget: offBudgetIdsOf(tricounts) }
+export function isCapital(expense: Expense): boolean {
+  return expense.offBudget === true
 }
 
 export function shareOf(expense: Expense, person: PersonId): number {
@@ -116,20 +105,21 @@ export function welfareShare(expense: Expense): number {
  * confronti. Le pagine che raccontano un fatto invece di misurare un budget — Spese,
  * Vacanze, 730, Gatto — hanno il loro perimetro e non passano da qui.
  *
- * I progetti restano fuori **sempre**, senza un interruttore che li riporti
+ * Il capitale resta fuori **sempre**, senza un interruttore che lo riporti
  * dentro: le vacanze sono la vita di ogni anno e ha senso chiedersi quanto
- * pesano, una casa comprata no. → ADR-0074
+ * pesano, un rogito no. Ma la rata del mutuo e il frigo della casa nuova **ci
+ * entrano**, perché quelli la vita di ogni mese la sono. → ADR-0079, ADR-0074
  */
 export function visibleFor(
   expenses: readonly Expense[],
   view: ViewOptions,
-  perimeter: Perimeter,
+  vacations: ReadonlySet<string>,
 ): Expense[] {
   return expenses.filter(
     (e) =>
       toCents(shareOf(e, view.person)) > 0 &&
-      !perimeter.offBudget.has(e.tricount) &&
-      (view.includeVacations || !perimeter.vacations.has(e.tricount)) &&
+      !isCapital(e) &&
+      (view.includeVacations || !vacations.has(e.tricount)) &&
       !fundedByWelfare(e, view.person),
   )
 }
@@ -1015,23 +1005,9 @@ export function coupleBalance(
      */
     today: string
     groups?: Record<string, BalanceStart>
-    /**
-     * I tricount che sono progetti: le loro spese e i loro rimborsi **non
-     * entrano qui**, perché un progetto ha un debito suo con i suoi tempi e
-     * sommarlo a quello della spesa quotidiana renderebbe illeggibili tutti e
-     * due. Li conta `projectStats()`, uno alla volta. → ADR-0074
-     *
-     * Facoltativo, e non è un ripiego silenzioso come quello che ADR-0064 ha
-     * tolto a `today`: assente vuol dire «non ci sono progetti», che è la verità
-     * finché nessuno ne crea uno. E il chiamante in produzione è **uno solo**,
-     * `useCoupleBalance()`, che esiste apposta perché le opzioni non possano
-     * divergere fra le tre pagine che mostrano il saldo.
-     */
-    offBudget?: ReadonlySet<string>
   },
 ): CoupleBalance {
   const movements: BalanceMovement[] = []
-  const offBudget = opts.offBudget ?? new Set<string>()
   const buckets = new Map<string, Bucket>()
   let settled = 0
   let outsideCouple = 0
@@ -1072,10 +1048,12 @@ export function coupleBalance(
   for (const key of Object.keys(opts.groups ?? {})) bucketOf(key)
 
   for (const expense of allExpenses) {
-    /* Un progetto ha un saldo suo: esce prima di tutto, compreso il conteggio
+    /* Il capitale ha un saldo suo: esce prima di tutto, compreso il conteggio
        delle voci rinviate — che serve a spiegare una divergenza da Tricount, e
-       un progetto con Tricount non si confronta. → ADR-0074 */
-    if (offBudget.has(expense.tricount)) continue
+       il capitale di un progetto con Tricount non si confronta. La rata del
+       mutuo e il frigo invece restano: sono debiti di ogni giorno come gli
+       altri, e si saldano con gli altri. → ADR-0079, ADR-0074 */
+    if (isCapital(expense)) continue
     /* Datata dopo questo mese: non è ancora un debito. Esce **prima** di
        `bucketOf`, quindi non conta nemmeno nella storia del tricount: uno che
        esiste solo nel futuro non ha niente da dire oggi. → ADR-0064 */
@@ -1120,9 +1098,20 @@ export function coupleBalance(
 
   let settlementDelta = 0
   for (const settlement of settlements) {
-    /* Un rimborso di progetto salda il progetto, non il rapporto di ogni
-       giorno: sta nel suo `projectStats()`. → ADR-0075 */
-    if (settlement.tricount !== undefined && offBudget.has(settlement.tricount)) continue
+    /* Un rimborso di progetto salda il capitale di quel progetto, non il
+       rapporto di ogni giorno: sta nel suo `projectStats()`. → ADR-0079, ADR-0075
+   
+       Qui basta la **presenza** della chiave, e prima invece si controllava che
+       puntasse a un progetto vero. È un pezzo di robustezza scambiato con la
+       fine dell'insieme di id da passare in giro, e il conto va saputo: un
+       rimborso che puntasse a un tricount qualunque sparirebbe da qui **e** da
+       ogni pagina, perché nessuna chiama `projectStats()` su un tricount che
+       non è un progetto. A tenerlo fuori dai dati non è una guardia in
+       scrittura — `addSettlement` non ne ha — ma il fatto che a valorizzare
+       quella chiave sia **un posto solo**, la pagina del progetto, che passa
+       sempre l'id del progetto che sta mostrando. `npm run validate` lo
+       rifiuta, ma dopo. */
+    if (settlement.tricount !== undefined) continue
     /* La stessa regola delle spese, e non per simmetria: un rimborso datato
        avanti abbasserebbe un debito che ancora non esiste. → ADR-0064 */
     if (notYet(settlement.date)) {
@@ -1203,36 +1192,127 @@ export interface ProjectShare {
   share: number
 }
 
-/**
- * Il conto di un progetto: quanto è costato, chi ha messo cosa, chi deve a chi.
- *
- * È il saldo di ogni giorno riscritto per un perimetro solo, e non è una
- * duplicazione: il verso lo dà **`balanceDeltaOf()`**, la stessa funzione, e
- * quindi la regola che decide da che parte pende il conto sta in un posto solo.
- * Quello che cambia è cosa si guarda — un tricount invece di tutti — e il fatto
- * che un progetto non ha un punto di partenza dichiarato, perché comincia
- * quando lo crei. → ADR-0074
- */
-export interface ProjectStats {
-  tricount: Tricount
+/** Un pezzo di progetto: un insieme di spese e i suoi totali. */
+export interface ProjectSlice {
   /** Il conto intero, quote di terzi comprese. */
   total: number
   /** Quanto è uscito dalle vostre tasche in due. */
   couple: number
   count: number
+  people: Record<PersonId, ProjectShare>
+  /** Le spese, dalla più recente. */
+  expenses: Expense[]
+}
+
+/**
+ * Il conto di un progetto, spaccato nei tre insiemi che lo compongono.
+ *
+ * I tre non sono una comodità dell'interfaccia: sono tre cose che si comportano
+ * in modo diverso, e prima stavano in due tricount perché il modello non sapeva
+ * distinguerle dentro uno solo.
+ *
+ * - `capital` — rogito, caparra, notaio: fuori dal mese e fuori dal saldo di
+ *   ogni giorno. È l'unico che genera il debito di questo `balance`.
+ * - `recurring` — la rata del mutuo, riconosciuta dalla categoria collegata al
+ *   tricount: dentro il mese fra le **fisse**, dentro il saldo di ogni giorno.
+ * - `current` — la rata **più** il frigo e i lavori: tutto ciò che non è
+ *   capitale. `recurring` è un suo sottoinsieme, quindi i due **non si
+ *   sommano** — è la stessa regola della pagina Casa. → ADR-0079, ADR-0017
+ *
+ * Il verso del conto lo dà **`balanceDeltaOf()`**, la stessa funzione del saldo
+ * di ogni giorno: la regola che decide da che parte pende sta in un posto solo.
+ * → ADR-0074
+ */
+export interface ProjectStats {
+  tricount: Tricount
+  /** Tutto il progetto: capitale e corrente insieme. «Quanto abbiamo speso, in tutto». */
+  all: ProjectSlice
+  capital: ProjectSlice
+  current: ProjectSlice
+  /** Sottoinsieme di `current`: solo la rata. Vuoto se nessuna categoria è collegata. */
+  recurring: ProjectSlice
   firstDate?: string
   lastDate?: string
-  people: Record<PersonId, ProjectShare>
+  /**
+   * Il debito che il **capitale** ha generato, prima dei rimborsi. Positivo =
+   * `partner` deve a `me`, lo stesso segno fisso del saldo di ogni giorno.
+   *
+   * È il fondo della barra dei rimborsi: cresce quando uno dei due anticipa, e
+   * non si muove quando l'altro salda.
+   */
+  gross: number
   /** Rimborsi già registrati per questo progetto, in valore assoluto. */
   settled: number
-  /** Positivo = `partner` deve a `me`: lo stesso segno fisso del saldo di ogni giorno. */
+  /** `gross` più i rimborsi: quanto resta da saldare, col segno di `gross`. */
   balance: number
   /** Quante voci sono datate dopo il mese corrente, e quindi non contate qui. → ADR-0064 */
   deferred: number
-  /** Le spese del progetto, dalla più recente. */
-  expenses: Expense[]
   /** I rimborsi del progetto, dal più recente. */
   settlements: Settlement[]
+}
+
+/** Quanto è stato rimborsato del capitale, e quanto manca. */
+export interface ProjectProgress {
+  /** Il debito da coprire, sempre positivo. */
+  owed: number
+  /** Quanto ne è già rientrato, fra zero e `owed`. */
+  repaid: number
+  /** Quanto manca: `owed - repaid`. */
+  left: number
+  /** La frazione già rientrata, 0–1. */
+  fraction: number
+  /** Chi deve ancora dare, e a chi. `null` quando non c'è più debito. */
+  debtor: PersonId | null
+  creditor: PersonId | null
+}
+
+/**
+ * La barra dei rimborsi: «hai rimborsato X dei Y che ti spettano».
+ *
+ * Il fondo è il debito **lordo**, non il residuo, ed è ciò che le dà il
+ * comportamento che serve: più uno dei due anticipa più la barra si allunga,
+ * più l'altro salda più la parte piena avanza. Con il residuo al denominatore
+ * la barra starebbe ferma al 100 % per sempre.
+ *
+ * `repaid` è tosato agli estremi: un rimborso registrato nel verso sbagliato
+ * gonfierebbe il debito invece di ridurlo, e una barra che va oltre il suo
+ * fondo o sotto lo zero non è leggibile. Il numero vero resta in `balance`.
+ * → ADR-0080
+ */
+export function projectProgress(stats: ProjectStats): ProjectProgress | null {
+  const gross = toCents(stats.gross)
+  if (gross === 0) return null
+  const owed = Math.abs(gross)
+  const repaid = Math.min(owed, Math.max(0, owed - Math.abs(toCents(stats.balance))))
+  const left = owed - repaid
+  const debtorSide: PersonId = gross > 0 ? 'partner' : 'me'
+  return {
+    owed: owed / 100,
+    repaid: repaid / 100,
+    left: left / 100,
+    fraction: repaid / owed,
+    debtor: left === 0 ? null : debtorSide,
+    creditor: left === 0 ? null : debtorSide === 'partner' ? 'me' : 'partner',
+  }
+}
+
+function sliceOf(expenses: readonly Expense[]): ProjectSlice {
+  const paid: Record<PersonId, number> = { me: 0, partner: 0 }
+  const share: Record<PersonId, number> = { me: 0, partner: 0 }
+  for (const expense of expenses) {
+    if (expense.paidBy !== 'others') paid[expense.paidBy] += toCents(expense.amount)
+    for (const person of PERSON_IDS) share[person] += toCents(shareOf(expense, person))
+  }
+  return {
+    total: sumBy(expenses, (e) => e.amount),
+    couple: sumBy(expenses, coupleShare),
+    count: expenses.length,
+    people: {
+      me: { paid: paid.me / 100, share: share.me / 100 },
+      partner: { paid: paid.partner / 100, share: share.partner / 100 },
+    },
+    expenses: [...expenses],
+  }
 }
 
 export function projectStats(
@@ -1247,29 +1327,37 @@ export function projectStats(
    */
   today: string,
 ): ProjectStats {
-  const expenses = allExpenses.filter((e) => e.tricount === tricount.id)
-  const settlements = allSettlements.filter((s) => s.tricount === tricount.id)
-
   let deferred = 0
-  let cents = 0
-  const paid: Record<PersonId, number> = { me: 0, partner: 0 }
-  const share: Record<PersonId, number> = { me: 0, partner: 0 }
   const counted: Expense[] = []
-
-  for (const expense of expenses) {
+  for (const expense of allExpenses) {
+    if (expense.tricount !== tricount.id) continue
     if (notYetInBalance(expense.date, today)) {
       deferred += 1
       continue
     }
     counted.push(expense)
-    if (expense.paidBy !== 'others') paid[expense.paidBy] += toCents(expense.amount)
-    for (const person of PERSON_IDS) share[person] += toCents(shareOf(expense, person))
-    cents += toCents(balanceDeltaOf(expense))
   }
+  /* Un ordinamento solo: gli insiemi che ne discendono restano ordinati, e
+     l'elenco che serve alla pagina porta già gli estremi alle sue due punte. */
+  const sorted = counted.sort(byDateDesc)
+
+  const capital = sorted.filter(isCapital)
+  const current = sorted.filter((e) => !isCapital(e))
+  const category = tricount.recurringCategory
+  const recurring =
+    category === undefined || category === '' ? [] : current.filter((e) => e.category === category)
+
+  /* Solo il capitale genera il debito di questo conto: la rata e il frigo
+     stanno già nel saldo di ogni giorno, e contarli anche qui vorrebbe dire
+     chiederne il rimborso due volte. → ADR-0079 */
+  let gross = 0
+  for (const expense of capital) gross += toCents(balanceDeltaOf(expense))
 
   let settled = 0
+  let cents = gross
   const countedSettlements: Settlement[] = []
-  for (const settlement of settlements) {
+  for (const settlement of allSettlements) {
+    if (settlement.tricount !== tricount.id) continue
     if (notYetInBalance(settlement.date, today)) {
       deferred += 1
       continue
@@ -1282,48 +1370,56 @@ export function projectStats(
     cents += settlement.from === 'partner' ? -amount : amount
   }
 
-  /* Un ordinamento solo: l'elenco che serve alla pagina porta già gli estremi
-     alle sue due punte. */
-  const sorted = [...counted].sort(byDateDesc)
   const first = sorted[sorted.length - 1]
   const last = sorted[0]
 
   return {
     tricount,
-    total: sumBy(counted, (e) => e.amount),
-    couple: sumBy(counted, coupleShare),
-    count: counted.length,
+    all: sliceOf(sorted),
+    capital: sliceOf(capital),
+    current: sliceOf(current),
+    recurring: sliceOf(recurring),
     ...(first !== undefined ? { firstDate: first.date } : {}),
     ...(last !== undefined ? { lastDate: last.date } : {}),
-    people: {
-      me: { paid: paid.me / 100, share: share.me / 100 },
-      partner: { paid: paid.partner / 100, share: share.partner / 100 },
-    },
+    gross: gross / 100,
     settled: settled / 100,
     balance: cents / 100,
     deferred,
-    expenses: sorted,
-    settlements: [...countedSettlements].sort((a, b) => (a.date === b.date ? 0 : a.date < b.date ? 1 : -1)),
+    settlements: countedSettlements.sort((a, b) => (a.date === b.date ? 0 : a.date < b.date ? 1 : -1)),
   }
 }
 
 /**
- * Le spese in cui il progetto **continua a costare** dentro i conti di ogni
- * giorno: la rata del mutuo di una casa comprata.
+ * Il «di cui» del saldo: quanto della rata di questo mese pesa sul saldo di
+ * ogni giorno. Positivo = `partner` deve a `me`, come tutto il resto.
  *
- * Il filtro esclude il tricount del progetto, e non è una precauzione teorica:
- * senza, una spesa che stesse in tutti e due gli insiemi verrebbe contata due
- * volte da chi li somma. È la lezione della pagina Casa, dove le 46 voci
- * nell'intersezione fra tricount e categoria sono il motivo per cui i due
- * elenchi non si fondono. → ADR-0074, ADR-0017
+ * La finestra è **il mese**, non «dall'ultimo rimborso»: così il numero è vero
+ * comunque sia andata prima. Un rimborso parziale lascerebbe in piedi un pezzo
+ * di debito di mutuo che una finestra «dall'ultimo rimborso» azzererebbe in
+ * silenzio, ed è meglio un numero che non pretende di essere una fetta esatta
+ * del saldo che uno che lo pretende e sbaglia. La frase a schermo lo dice —
+ * «di cui 200 € di mutuo di settembre» — nominando il mese. → ADR-0081
+ *
+ * Salta le voci datate dopo questo mese, con la stessa soglia del saldo: una
+ * rata di ottobre non è ancora un debito, quindi non è ancora un «di cui».
  */
-export function projectRecurring(
+export function recurringDeltaOf(
   allExpenses: readonly Expense[],
   tricount: Tricount,
-): Expense[] {
+  month: MonthKey,
+  today: string,
+): number {
   const category = tricount.recurringCategory
-  if (category === undefined || category === '') return []
-  return allExpenses.filter((e) => e.category === category && e.tricount !== tricount.id)
+  if (category === undefined || category === '') return 0
+  let cents = 0
+  for (const expense of allExpenses) {
+    if (expense.tricount !== tricount.id || expense.category !== category) continue
+    if (isCapital(expense)) continue
+    if (monthKeyOf(expense.date) !== month) continue
+    if (notYetInBalance(expense.date, today)) continue
+    cents += toCents(balanceDeltaOf(expense))
+  }
+  return cents / 100
 }
 
 // ─────────────────────────────── vacanze ───────────────────────────────

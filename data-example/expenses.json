@@ -9377,6 +9377,120 @@
       "tricount": "condivise",
       "category": "ristoranti",
       "recurring": false
+    },
+    {
+      "id": "2026-04-10-0649",
+      "date": "2026-04-10",
+      "title": "Caparra",
+      "amount": 12000,
+      "shares": {
+        "me": 6000,
+        "partner": 6000
+      },
+      "paidBy": "me",
+      "tricount": "casa-al-mare",
+      "category": "casa",
+      "recurring": false,
+      "offBudget": true
+    },
+    {
+      "id": "2026-06-18-0650",
+      "date": "2026-06-18",
+      "title": "Rogito e notaio",
+      "amount": 8000,
+      "shares": {
+        "me": 4000,
+        "partner": 4000
+      },
+      "paidBy": "me",
+      "tricount": "casa-al-mare",
+      "category": "casa",
+      "recurring": false,
+      "offBudget": true
+    },
+    {
+      "id": "2026-05-06-0651",
+      "date": "2026-05-06",
+      "title": "Rata del mutuo",
+      "amount": 640,
+      "shares": {
+        "me": 320,
+        "partner": 320
+      },
+      "paidBy": "me",
+      "tricount": "casa-al-mare",
+      "category": "mutuo",
+      "recurring": true
+    },
+    {
+      "id": "2026-06-06-0652",
+      "date": "2026-06-06",
+      "title": "Rata del mutuo",
+      "amount": 640,
+      "shares": {
+        "me": 320,
+        "partner": 320
+      },
+      "paidBy": "me",
+      "tricount": "casa-al-mare",
+      "category": "mutuo",
+      "recurring": true
+    },
+    {
+      "id": "2026-07-06-0653",
+      "date": "2026-07-06",
+      "title": "Rata del mutuo",
+      "amount": 640,
+      "shares": {
+        "me": 320,
+        "partner": 320
+      },
+      "paidBy": "me",
+      "tricount": "casa-al-mare",
+      "category": "mutuo",
+      "recurring": true
+    },
+    {
+      "id": "2026-08-06-0654",
+      "date": "2026-08-06",
+      "title": "Rata del mutuo",
+      "amount": 640,
+      "shares": {
+        "me": 320,
+        "partner": 320
+      },
+      "paidBy": "me",
+      "tricount": "casa-al-mare",
+      "category": "mutuo",
+      "recurring": true
+    },
+    {
+      "id": "2026-07-22-0655",
+      "date": "2026-07-22",
+      "title": "Frigorifero",
+      "amount": 720,
+      "shares": {
+        "me": 360,
+        "partner": 360
+      },
+      "paidBy": "me",
+      "tricount": "casa-al-mare",
+      "category": "casa",
+      "recurring": false
+    },
+    {
+      "id": "2026-08-08-0656",
+      "date": "2026-08-08",
+      "title": "Imbianchino",
+      "amount": 480,
+      "shares": {
+        "me": 240,
+        "partner": 240
+      },
+      "paidBy": "partner",
+      "tricount": "casa-al-mare",
+      "category": "casa",
+      "recurring": false
     }
   ],
   "tricounts": [
@@ -9413,6 +9527,17 @@
         "me",
         "partner"
       ]
+    },
+    {
+      "id": "casa-al-mare",
+      "name": "Casa al mare",
+      "emoji": "🏖️",
+      "members": [
+        "me",
+        "partner"
+      ],
+      "project": true,
+      "recurringCategory": "mutuo"
     },
     {
       "id": "2025-sicilia",
@@ -9498,7 +9623,17 @@
       }
     }
   ],
-  "settlements": [],
+  "settlements": [
+    {
+      "id": "rimborso-2026-07-01-a1b2c3",
+      "date": "2026-07-01",
+      "from": "partner",
+      "to": "me",
+      "amount": 4000,
+      "tricount": "casa-al-mare",
+      "note": "Prima tranche"
+    }
+  ],
   "prices": [
     {
       "id": "prezzo-2026-07-20-a1c3e5",

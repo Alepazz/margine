@@ -78,7 +78,15 @@ const MONTHS = monthsUpTo(FIRST_MONTH, TODAY.slice(0, 7))
 
 // ─────────────────────── categorie ───────────────────────
 
-const CATEGORIES = TAXONOMY
+/*
+ * La tassonomia iniziale, più la categoria della rata del progetto.
+ *
+ * Sta **qui** e non in `taxonomy.mjs`: quella è il valore iniziale di ogni
+ * installazione (→ ADR-0024), e un mutuo non ce l'hanno tutti. Senza slot di
+ * colore, quindi confluisce in «Altre voci» — la tavolozza resta a otto.
+ * → ADR-0079, ADR-0029
+ */
+const CATEGORIES = [...TAXONOMY, { id: 'mutuo', label: 'Mutuo', emoji: '🔑' }]
 
 // ─────────────────────── tricount ───────────────────────
 
@@ -89,6 +97,19 @@ const BASE_TRICOUNTS = [
   { id: 'personali-alessio', name: 'Le mie spese', emoji: '🙋', members: ['me'] },
   { id: 'personali-federica', name: 'Le sue spese', emoji: '🙆', members: ['partner'] },
   { id: 'fisse', name: 'Casa', emoji: '🏡', members: ['me', 'partner'] },
+  /* Un **progetto**: una casa comprata. Sta nei dati di esempio perché il
+     modello che lo governa è il più facile da rompere per distrazione — dentro
+     lo stesso tricount convivono spese che entrano nei conti del mese e spese
+     che ne stanno fuori — e senza un esempio nessuno lo vedrebbe mai al banco.
+     → ADR-0079 */
+  {
+    id: 'casa-al-mare',
+    name: 'Casa al mare',
+    emoji: '🏖️',
+    members: ['me', 'partner'],
+    project: true,
+    recurringCategory: 'mutuo',
+  },
 ]
 
 const TRIPS = [
@@ -174,6 +195,9 @@ function add(expense) {
     recurring: expense.recurring ?? false,
   }
   if (expense.subcategory) entry.subcategory = expense.subcategory
+  /* Il capitale: rogito, caparra, notaio. Fuori dai conti del mese e dal saldo
+     di ogni giorno, e **solo** dentro un progetto. → ADR-0079 */
+  if (expense.offBudget) entry.offBudget = true
   if (expense.tax730) entry.tax730 = true
   if (expense.notes) entry.notes = expense.notes
   if (expense.receiptLinks) entry.receiptLinks = expense.receiptLinks
@@ -698,6 +722,79 @@ const config = {
   },
 }
 
+/*
+ * ── Il progetto: una casa comprata ──
+ *
+ * Tre insiemi che si comportano in modo diverso, tutti e tre in questo tricount.
+ * È l'esempio che rende visibile ADR-0079: senza, «fuori dai conti del mese»
+ * resterebbe una casella che non si vede mai spuntata.
+ */
+
+// Il capitale: esce dai conti del mese e dal saldo di ogni giorno.
+add({
+  date: '2026-04-10',
+  title: 'Caparra',
+  amount: 12_000,
+  tricount: 'casa-al-mare',
+  category: 'casa',
+  paidBy: 'me',
+  offBudget: true,
+})
+add({
+  date: '2026-06-18',
+  title: 'Rogito e notaio',
+  amount: 8000,
+  tricount: 'casa-al-mare',
+  category: 'casa',
+  paidBy: 'me',
+  offBudget: true,
+})
+
+// La rata: dentro il mese fra le fisse, dentro il saldo di ogni giorno.
+for (const month of ['2026-05', '2026-06', '2026-07', '2026-08']) {
+  add({
+    date: dateOf(month, 6),
+    title: 'Rata del mutuo',
+    amount: 640,
+    tricount: 'casa-al-mare',
+    category: 'mutuo',
+    recurring: true,
+    paidBy: 'me',
+  })
+}
+
+// Le altre: spese normali un po' grosse, dentro tutto come qualunque spesa.
+add({
+  date: '2026-07-22',
+  title: 'Frigorifero',
+  amount: 720,
+  tricount: 'casa-al-mare',
+  category: 'casa',
+  paidBy: 'me',
+})
+add({
+  date: '2026-08-08',
+  title: 'Imbianchino',
+  amount: 480,
+  tricount: 'casa-al-mare',
+  category: 'casa',
+  paidBy: 'partner',
+})
+
+/* Un rimborso del progetto: serve a far vedere una barra a metà invece che a
+   zero, che è il caso in cui si capisce cosa misura. → ADR-0079, ADR-0075 */
+const SETTLEMENTS = [
+  {
+    id: 'rimborso-2026-07-01-a1b2c3',
+    date: '2026-07-01',
+    from: 'partner',
+    to: 'me',
+    amount: 4000,
+    tricount: 'casa-al-mare',
+    note: 'Prima tranche',
+  },
+]
+
 /**
  * Rilevazioni di prezzo di esempio. → ADR-0041
  *
@@ -724,8 +821,9 @@ const dataset = {
   updatedAt: `${TODAY}T09:00:00.000Z`,
   expenses,
   tricounts: TRICOUNTS,
-  /* I rimborsi si registrano dall'app: nei dati di esempio si parte da zero. */
-  settlements: [],
+  /* I rimborsi di ogni giorno si registrano dall'app e partono da zero; quello
+     del progetto c'è, perché una barra dei rimborsi a zero non mostra niente. */
+  settlements: SETTLEMENTS,
   prices: PRICES,
 }
 

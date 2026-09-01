@@ -71,38 +71,37 @@ export interface Tricount {
   trip?: TripInfo
   /**
    * Vero quando il tricount è un **progetto**: una cosa che si compra una volta
-   * — una casa — e che non è la vita di tutti i mesi.
+   * — una casa — e che poi continua a costare per anni.
    *
-   * Le sue spese restano spese a tutti gli effetti: stanno negli elenchi, nel
-   * 730, nel saldo del progetto. Ma **non passano da `visibleFor()`**, quindi
-   * non entrano in margine, medie, proiezioni e confronti: trentaseimila euro
-   * di rogito in un mese renderebbero quel mese incomparabile con ogni altro, e
-   * la media di un anno la porterebbero via da sola. → ADR-0074
-   *
-   * E non entrano nemmeno nel saldo di ogni giorno: il debito di un progetto si
-   * salda per conto suo, con i suoi tempi, e sommarlo a quello della spesa
-   * quotidiana renderebbe illeggibili tutti e due.
+   * Essere un progetto vuol dire due cose, e **nessuna delle due è «sta fuori
+   * dai conti del mese»**: ha una pagina sua, e ha un compartimento di rimborsi
+   * suo (`Settlement.tricount`, → ADR-0075). A stare fuori dai conti è la
+   * singola spesa, con `Expense.offBudget`, perché dentro lo stesso progetto
+   * convivono tre cose diverse: il rogito, che non è la vita di nessun mese; la
+   * rata del mutuo, che è la vita di ogni mese; e il frigo, che è una spesa
+   * normale un po' grossa. → ADR-0079, ADR-0074
    */
-  offBudget?: boolean
+  project?: boolean
   /**
-   * La categoria in cui il progetto **continua a costare** dentro i conti di
-   * ogni giorno: per una casa comprata, la rata del mutuo.
+   * La categoria della spesa con cui il progetto **continua a costare ogni
+   * mese**: per una casa comprata, la rata del mutuo.
    *
-   * Quelle spese vivono altrove — nel tricount delle fisse, con la spunta
-   * ricorrente, divise a metà — perché sono la vita di tutti i mesi e devono
-   * erodere il margine come l'affitto che sostituiscono. La pagina del progetto
-   * le mostra come un **secondo insieme, mai sommato al primo**: è la stessa
-   * regola della pagina Casa, dove il tricount e la categoria non coincidono e
-   * fonderli conterebbe due volte l'intersezione. → ADR-0074, ADR-0017
+   * Quelle spese vivono **dentro** il tricount del progetto, con la spunta
+   * ricorrente e senza `offBudget`: entrano nel mese fra le fisse, come
+   * l'affitto che sostituiscono, ed entrano nel saldo di ogni giorno. La
+   * categoria non serve a spostarle: serve a **riconoscerle**, per poter dire
+   * «di questo saldo, tanto è mutuo». Senza una categoria dedicata quel «di
+   * cui» finirebbe per contare anche il condominio, che un domani sarà pure
+   * ricorrente. → ADR-0079
    *
-   * Ha senso solo su un tricount `offBudget`, e la validazione lo pretende.
+   * Ha senso solo su un tricount `project`, e la validazione lo pretende.
    */
   recurringCategory?: string
 }
 
-/** Vero se il tricount è un progetto: la sua spesa sta fuori dai conti del mese. */
+/** Vero se il tricount è un progetto: ha una pagina sua e rimborsi suoi. */
 export function isProject(tricount: Tricount): boolean {
-  return tricount.offBudget === true
+  return tricount.project === true
 }
 
 /** I tricount che sono progetti, nell'ordine dei dati. */
@@ -235,6 +234,27 @@ export interface Expense {
    * quella la rimborsa in contanti. → ADR-0014
    */
   welfare?: boolean
+  /**
+   * **Esborso di capitale**: sta fuori dai conti del mese e fuori dal saldo di
+   * ogni giorno. Il rogito, la caparra, il notaio, l'agenzia.
+   *
+   * Non passa da `visibleFor()` — trentaseimila euro in un mese lo renderebbero
+   * incomparabile con ogni altro, e la media di un anno la porterebbero via da
+   * sola — e non passa da `coupleBalance()`, perché un debito che rientra a
+   * rate negli anni, sommato al conto della spesa, cancellerebbe per mesi la
+   * domanda «chi ha pagato l'ultima volta». Il suo debito lo conta
+   * `projectStats()`, e lo mostra la barra dei rimborsi.
+   *
+   * Resta una spesa a tutti gli effetti dove si racconta un fatto: elenchi,
+   * 730, pagina del progetto.
+   *
+   * La spunta è **spenta** di partenza, e non si accende da sé nemmeno dentro
+   * un progetto: dimenticarla su un rogito manda a picco il mese e te ne
+   * accorgi in un secondo, dimenticare di **spegnerla** su un frigo lo farebbe
+   * sparire in silenzio da ogni media. Fra i due guasti si sceglie quello
+   * rumoroso. → ADR-0079
+   */
+  offBudget?: boolean
 }
 
 export interface Subcategory {
@@ -393,8 +413,10 @@ export interface Settlement {
    * gruppo alla volta. Un progetto però ha un debito suo, con i suoi tempi
    * (diciottomila euro che rientrano in tre anni), e mescolarlo al saldo del
    * pane e delle bollette renderebbe illeggibili tutti e due. Quindi il verso
-   * di questo campo è: **valorizzato solo per un tricount `offBudget`**, e la
-   * validazione lo pretende. → ADR-0075, ADR-0019
+   * di questo campo è: **valorizzato solo per un tricount `project`**, e la
+   * validazione lo pretende. Salda il **capitale** del progetto — le spese con
+   * `offBudget` — perché il resto (la rata, il frigo) sta già nel saldo di ogni
+   * giorno e si salda con quello. → ADR-0079, ADR-0075, ADR-0019
    */
   tricount?: string
 }

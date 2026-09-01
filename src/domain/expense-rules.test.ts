@@ -241,15 +241,15 @@ describe('un progetto', () => {
   const vuoto = new Set<string>()
 
   it('si crea come un tricount qualunque, con la spunta', () => {
-    expect(validateTricount({ ...base, offBudget: true }, vuoto)).toEqual([])
-    expect(validateTricount({ ...base, offBudget: true, recurringCategory: 'mutuo' }, vuoto)).toEqual([])
+    expect(validateTricount({ ...base, project: true }, vuoto)).toEqual([])
+    expect(validateTricount({ ...base, project: true, recurringCategory: 'mutuo' }, vuoto)).toEqual([])
   })
 
   it('non può essere anche una vacanza', () => {
     const problemi = validateTricount(
       {
         ...base,
-        offBudget: true,
+        project: true,
         trip: { place: 'Senigallia', year: 2026, start: '2026-08-01', end: '2026-08-02' },
       },
       vuoto,

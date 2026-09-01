@@ -273,6 +273,11 @@
       "id": "altro",
       "label": "Altro",
       "emoji": "▫️"
+    },
+    {
+      "id": "mutuo",
+      "label": "Mutuo",
+      "emoji": "🔑"
     }
   ],
   "catCategory": "gatto",

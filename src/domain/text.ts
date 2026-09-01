@@ -36,3 +36,37 @@ export function nameKey(text: string): string {
 export function aTo(name: string): string {
   return /^[aeiouàèéìòù]/i.test(name.trim()) ? 'ad' : 'a'
 }
+
+/**
+ * Il «di cui» del saldo: «di cui 200 € di mutuo di settembre».
+ *
+ * La finestra è **il mese**, e la frase lo nomina: così il numero non pretende
+ * di essere una fetta esatta del saldo, che è cumulativo e che nessun rimborso
+ * imputa a una voce piuttosto che a un'altra. Se non vi saldate da tre mesi,
+ * dentro il saldo di mutuo ce n'è di più — e la frase resta vera lo stesso,
+ * perché parla di settembre. → ADR-0081
+ *
+ * Quando la rata tira dalla parte opposta al saldo — l'altra persona l'ha
+ * anticipata questo mese, ma nel complesso è lei a doverti — «di cui»
+ * mentirebbe: quel numero non è dentro il totale, lo abbassa. La seconda frase
+ * esiste per quel caso, ed è l'unica ragione per cui questa funzione non è una
+ * interpolazione scritta sul posto.
+ */
+export function diCuiLabel(opts: {
+  /** Quanto la rata sposta il saldo, già girato dal punto di vista di chi guarda. */
+  delta: number
+  /** Il saldo, dallo stesso punto di vista. */
+  balance: number
+  /** Come si chiama la rata: la categoria collegata al progetto. */
+  label: string
+  /** Il mese di cui si parla, per esteso. */
+  month: string
+  /** Come si scrive un importo: il formattatore lo passa chi chiama. */
+  format: (value: number) => string
+}): string | null {
+  const cifra = opts.format(Math.abs(opts.delta))
+  const nome = `${opts.label.toLocaleLowerCase('it-IT')} di ${opts.month.toLocaleLowerCase('it-IT')}`
+  if (opts.delta === 0) return null
+  const concorde = opts.balance === 0 || (opts.delta > 0) === (opts.balance > 0)
+  return concorde ? `di cui ${cifra} di ${nome}` : `${cifra} di ${nome} tirano dall'altra parte`
+}

@@ -125,6 +125,16 @@ export function validateExpense(expense: Expense, ctx: RulesContext): string[] {
         errors.push('Un conto anticipato da qualcuno del gruppo esiste solo in vacanza.')
       }
     }
+    /*
+     * Il capitale esiste solo dentro un progetto, e non è una formalità: una
+     * spesa `offBudget` sparisce dal mese e dal saldo di ogni giorno, e fuori
+     * da un progetto non c'è nessuna pagina che la rimetta sotto gli occhi.
+     * Sarebbe un buco silenzioso nei conti, che è il difetto peggiore che
+     * questa app possa avere. → ADR-0079
+     */
+    if (expense.offBudget === true && tricount.project !== true) {
+      errors.push('Solo la spesa di un progetto può stare fuori dai conti del mese.')
+    }
   }
 
   if (expense.welfare === true && expense.paidBy === 'others') {
@@ -149,9 +159,9 @@ export interface TricountDraft {
     start: string
     end: string
   }
-  /** Un progetto: la sua spesa sta fuori dai conti del mese. → ADR-0074 */
-  offBudget?: boolean
-  /** La categoria in cui il progetto continua a costare (il mutuo). → ADR-0074 */
+  /** Un progetto: ha una pagina sua e un compartimento di rimborsi suo. → ADR-0079 */
+  project?: boolean
+  /** La categoria della rata con cui il progetto costa ogni mese (il mutuo). → ADR-0079 */
   recurringCategory?: string
 }
 
@@ -179,15 +189,16 @@ export function validateTricount(draft: TricountDraft, takenIds: ReadonlySet<str
     }
   }
 
-  /* Una vacanza è la vita di ogni anno e si può scegliere se contarla; un
-     progetto sta fuori sempre. Le due cose insieme non vogliono dire niente, e
-     l'interfaccia non le offre insieme: qui si presidia il dato. → ADR-0074 */
-  if (draft.trip && draft.offBudget === true) {
+  /* Una vacanza si sceglie se contarla e finisce; un progetto ha una pagina sua
+     e dei rimborsi suoi e non finisce. Le due cose insieme non vogliono dire
+     niente, e l'interfaccia non le offre insieme: qui si presidia il dato.
+     → ADR-0079, ADR-0074 */
+  if (draft.trip && draft.project === true) {
     errors.push('Una vacanza non può essere anche un progetto.')
   }
-  /* La categoria in cui un progetto continua a costare non ha senso su un
-     tricount che non è un progetto: sarebbe un campo che non guarda nessuno. */
-  if (draft.recurringCategory && draft.offBudget !== true) {
+  /* La categoria della rata non ha senso su un tricount che non è un progetto:
+     sarebbe un campo che non guarda nessuno. */
+  if (draft.recurringCategory && draft.project !== true) {
     errors.push('La categoria ricorrente vale solo per un progetto.')
   }
   return errors

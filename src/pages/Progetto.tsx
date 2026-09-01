@@ -6,11 +6,14 @@
  * sempre in `git log`, che è esattamente ciò che `expenses.json.enc` esiste per
  * evitare. → ADR-0074, ADR-0067
  *
- * Due insiemi che **non si sommano mai**, come nella pagina Casa: quello che il
- * progetto è costato una volta (il tricount) e quello che continua a costare
- * ogni mese (la categoria del mutuo, che vive nel tricount delle fisse ed erode
- * il margine come l'affitto che sostituisce). Fonderli in un numero solo
- * mescolerebbe un capitale e una rata. → ADR-0074, ADR-0017
+ * Tre insiemi, e stanno **tutti e tre dentro questo tricount**: il capitale che
+ * si spende una volta (rogito, caparra, notaio), la rata che torna ogni mese, e
+ * le spese normali un po' grosse (il frigo, i lavori). Solo il primo sta fuori
+ * dai conti del mese e dal saldo di ogni giorno; gli altri due sono vita di
+ * tutti i giorni e si comportano come tale.
+ *
+ * `recurring` è un **sottoinsieme** di `current`, quindi quei due numeri non si
+ * sommano: è la stessa regola della pagina Casa. → ADR-0079, ADR-0074, ADR-0017
  */
 
 import { useMemo, useState, type ReactNode } from 'react'
@@ -19,10 +22,11 @@ import { Link, useParams } from 'react-router-dom'
 import { BarList } from '../components/charts/BarList'
 import { ExpenseList } from '../components/ExpenseList'
 import { ExpenseSheet } from '../components/ExpenseSheet'
-import { AmountInput, Card, Notice, StatTile, useToast } from '../components/ui'
+import { AmountInput, Card, Notice, Segmented, StatTile, useToast } from '../components/ui'
+import { ProjectBar } from '../components/ProjectBar'
 import { formatDate, monthKeyOf, monthLabel } from '../domain/dates'
 import { formatEuro, toCents } from '../domain/money'
-import { projectRecurring, subsetStats } from '../domain/selectors'
+import { subsetStats } from '../domain/selectors'
 import { newSettlement, settlementDirection } from '../domain/settlement'
 import { aTo } from '../domain/text'
 import { titleOf, type Expense } from '../domain/types'
@@ -34,7 +38,6 @@ export function Progetto(): ReactNode {
   const { id } = useParams<{ id: string }>()
   const {
     config,
-    dataset,
     view,
     lookup,
     chart,
@@ -48,6 +51,7 @@ export function Progetto(): ReactNode {
   const other = person === 'me' ? 'partner' : 'me'
   const [selected, setSelected] = useState<Expense | null>(null)
   const [custom, setCustom] = useState('')
+  const [scope, setScope] = useState<'tutte' | 'capitale' | 'correnti'>('tutte')
 
   /* Dallo stesso posto dell'anteprima nell'hub e dell'avviso nel Saldo: i tre
      devono dire lo stesso numero. Cercare qui dentro risolve in una riga anche
@@ -56,12 +60,16 @@ export function Progetto(): ReactNode {
   const stats = useProjects().find((project) => project.tricount.id === id)
   const tricount = stats?.tricount
 
-  /* Il secondo insieme: la rata, che vive altrove e non si somma al primo. */
-  const rate = useMemo(
-    () => (tricount === undefined ? [] : projectRecurring(dataset.expenses, tricount)),
-    [dataset.expenses, tricount],
+  /* La rata: sottoinsieme di `current`, mai sommata al capitale. `subsetStats`
+     serve per le medie al mese, che `ProjectSlice` non calcola. */
+  const rateStats = useMemo(
+    () => subsetStats(stats?.recurring.expenses ?? [], person),
+    [stats, person],
   )
-  const rateStats = useMemo(() => subsetStats(rate, person), [rate, person])
+  const correnteStats = useMemo(
+    () => subsetStats(stats?.current.expenses ?? [], person),
+    [stats, person],
+  )
 
   if (tricount === undefined || stats === undefined) {
     return (
@@ -111,6 +119,14 @@ export function Progetto(): ReactNode {
   }
 
   const titolo = titleOf(tricount)
+  const capitale = stats.capital
+  const corrente = stats.current
+  const elenchi = [
+    { key: 'tutte', label: 'Tutte', expenses: stats.all.expenses, total: stats.all.total },
+    { key: 'capitale', label: 'Capitale', expenses: capitale.expenses, total: capitale.total },
+    { key: 'correnti', label: 'Correnti', expenses: corrente.expenses, total: corrente.total },
+  ] as const
+  const elenco = elenchi.find((e) => e.key === scope) ?? elenchi[0]
 
   return (
     <>
@@ -118,43 +134,61 @@ export function Progetto(): ReactNode {
         <div className="page-head-text">
           <h1>{titolo}</h1>
           <p className="page-sub">
-            {stats.count} {stats.count === 1 ? 'voce' : 'voci'}
-            {stats.firstDate ? ` · dal ${formatDate(stats.firstDate)}` : ''} · fuori dai conti del
-            mese
+            {stats.all.count} {stats.all.count === 1 ? 'voce' : 'voci'}
+            {stats.firstDate ? ` · dal ${formatDate(stats.firstDate)}` : ''}
           </p>
         </div>
       </div>
 
       <div className="stack">
-        {stats.count === 0 ? (
+        {stats.all.count === 0 ? (
           <Notice>
             Nessuna spesa ancora. Aggiungine una col <strong>+</strong> scegliendo «{titolo}» come
-            tricount: da lì in poi questa pagina si riempie da sola.
+            tricount: da lì in poi questa pagina si riempie da sola. Sul rogito, sulla caparra e sul
+            notaio metti la spunta <strong>«fuori dai conti del mese»</strong>; sul frigo e sulla
+            rata no.
           </Notice>
         ) : null}
 
         <Card>
           <div className="hero">
-            <span className="hero-label">Quanto è costato finora</span>
-            <span className="hero-value">{formatEuro(stats.total, { decimals: 0 })}</span>
+            <span className="hero-label">Quanto è costato finora, in tutto</span>
+            <span className="hero-value">{formatEuro(stats.all.total, { decimals: 0 })}</span>
             <span className="hero-hint">
-              {toCents(stats.total) === toCents(stats.couple)
-                ? `La tua quota è ${formatEuro(stats.people[person].share, { decimals: 0 })}.`
-                : `${formatEuro(stats.couple, { decimals: 0 })} vostri, il resto di altri.`}
+              {/* «Con e senza rogito» in una riga: è la domanda che si fa chi
+                  guarda questa pagina, e chiederle due schede sarebbe chiederle
+                  una sottrazione. */}
+              {formatEuro(capitale.total, { decimals: 0 })} di capitale ·{' '}
+              {formatEuro(corrente.total, { decimals: 0 })} di spese correnti
             </span>
           </div>
         </Card>
 
+        {/*
+          La barra dei rimborsi. Sta in alto perché è la domanda con cui si apre
+          questa pagina — «a che punto siamo» — e la disegna lo stesso
+          componente del Riepilogo, così i due non possono divergere. → ADR-0080
+        */}
+        <Card title="A che punto siamo con i rimborsi" note="Solo il capitale: la rata si salda col saldo di ogni giorno">
+          <ProjectBar stats={stats} person={person} people={config.people} />
+          {toCents(stats.gross) === 0 ? (
+            <p className="empty">
+              Nessun capitale anticipato, quindi non c'è niente da rimborsare. La barra compare alla
+              prima spesa segnata «fuori dai conti del mese».
+            </p>
+          ) : null}
+        </Card>
+
         <div className="kpi-row">
           <StatTile
-            label={`Messi da ${config.people.me.name}`}
-            value={formatEuro(stats.people.me.paid, { decimals: 0 })}
-            hint={`gli spetta ${formatEuro(stats.people.me.share, { decimals: 0 })}`}
+            label={`Capitale messo da ${config.people.me.name}`}
+            value={formatEuro(capitale.people.me.paid, { decimals: 0 })}
+            hint={`gli spetta ${formatEuro(capitale.people.me.share, { decimals: 0 })}`}
           />
           <StatTile
-            label={`Messi da ${config.people.partner.name}`}
-            value={formatEuro(stats.people.partner.paid, { decimals: 0 })}
-            hint={`le spetta ${formatEuro(stats.people.partner.share, { decimals: 0 })}`}
+            label={`Capitale messo da ${config.people.partner.name}`}
+            value={formatEuro(capitale.people.partner.paid, { decimals: 0 })}
+            hint={`le spetta ${formatEuro(capitale.people.partner.share, { decimals: 0 })}`}
           />
           <StatTile
             label="Rimborsi registrati"
@@ -171,13 +205,13 @@ export function Progetto(): ReactNode {
         </div>
 
         <Card
-          title="Chi deve a chi"
-          note="Il debito di questo progetto, tenuto separato da quello di ogni giorno"
+          title="Chi deve a chi, sul capitale"
+          note="Tenuto separato dal saldo di ogni giorno, dove stanno rata e spese correnti"
         >
           <div className="hero">
             <span className="hero-label">
               {pari
-                ? 'Siete in pari su questo progetto'
+                ? 'Siete in pari sul capitale di questo progetto'
                 : cents > 0
                   ? `${config.people[other].name} deve a te`
                   : `Devi ${aTo(config.people[other].name)} ${config.people[other].name}`}
@@ -226,7 +260,7 @@ export function Progetto(): ReactNode {
               <p className="hint">
                 Il rimborso va da {config.people[verso.debtor].name}{' '}
                 {aTo(config.people[verso.creditor].name)} {config.people[verso.creditor].name}, con
-                la data di oggi. Un progetto si rientra a rate, e ogni rata si registra qui: questi
+                la data di oggi. Un capitale rientra a rate, e ogni rata si registra qui: questi
                 rimborsi non toccano il saldo di ogni giorno, che resta la domanda «chi ha pagato la
                 spesa».
               </p>
@@ -243,50 +277,16 @@ export function Progetto(): ReactNode {
           ) : null}
         </Card>
 
-        {stats.count > 0 ? (
-          <Card title="Chi ha anticipato" note="Soldi usciti dal conto, non quote">
-            <BarList
-              items={[
-                {
-                  key: 'me',
-                  label: config.people.me.name,
-                  value: stats.people.me.paid,
-                  color: chart.seq[5] ?? '#256abf',
-                },
-                {
-                  key: 'partner',
-                  label: config.people.partner.name,
-                  value: stats.people.partner.paid,
-                  color: chart.seq[3] ?? '#3987e5',
-                },
-              ]}
-            />
-            <div className="card-foot">
-              Anticipare non è sostenere: la quota di ciascuno è metà del conto, e la differenza fra
-              le due colonne è il debito qui sopra.
-            </div>
-          </Card>
-        ) : null}
-
-        {stats.count > 0 ? (
-          <Card
-            title="Le spese del progetto"
-            note={`${stats.count} ${stats.count === 1 ? 'voce' : 'voci'}`}
-          >
-            <ExpenseList
-              today={today}
-              expenses={stats.expenses}
-              person={person}
-              lookup={lookup}
-              onSelect={setSelected}
-              showSource={false}
-              pageSize={LIST_PAGE}
-            />
-          </Card>
-        ) : null}
-
+        {/*
+          La sezione dei rimborsi. È «lo strumento con cui Federica vede a che
+          punto è», chiesto da Alessio il 01/09/2026: sta subito sotto il conto,
+          e non in fondo alla pagina.
+        */}
         {stats.settlements.length > 0 ? (
-          <Card title="I rimborsi di questo progetto" note="Solo questi: quelli di ogni giorno stanno nella pagina Saldo">
+          <Card
+            title="I rimborsi di questo progetto"
+            note="Solo questi: quelli di ogni giorno stanno nella pagina Saldo"
+          >
             <div className="list">
               {stats.settlements.map((settlement) => (
                 <div className="list-row is-static" key={settlement.id}>
@@ -321,79 +321,155 @@ export function Progetto(): ReactNode {
           </Card>
         ) : null}
 
+        {capitale.count > 0 ? (
+          <Card title="Chi ha anticipato il capitale" note="Soldi usciti dal conto, non quote">
+            <BarList
+              items={[
+                {
+                  key: 'me',
+                  label: config.people.me.name,
+                  value: capitale.people.me.paid,
+                  color: chart.seq[5] ?? '#256abf',
+                },
+                {
+                  key: 'partner',
+                  label: config.people.partner.name,
+                  value: capitale.people.partner.paid,
+                  color: chart.seq[3] ?? '#3987e5',
+                },
+              ]}
+            />
+            <div className="card-foot">
+              Anticipare non è sostenere: la quota di ciascuno è metà del conto, e la differenza fra
+              le due colonne è il debito qui sopra.
+            </div>
+          </Card>
+        ) : null}
+
         {/*
-          Il secondo insieme. Mai sommato al primo, e la scheda lo dice: sopra
-          c'è un capitale, qui una rata che torna ogni mese ed erode il margine
-          come l'affitto. → ADR-0074, ADR-0017
+          Un elenco solo con un filtro, invece di tre elenchi uno sotto l'altro:
+          «quanto abbiamo speso per Senigallia, con e senza rogito» è **una**
+          domanda con un interruttore, non tre schede da confrontare a occhio.
+        */}
+        {stats.all.count > 0 ? (
+          <Card
+            title="Le spese del progetto"
+            note={`${elenco.expenses.length} ${
+              elenco.expenses.length === 1 ? 'voce' : 'voci'
+            } · ${formatEuro(elenco.total, { decimals: 0 })}`}
+          >
+            <div style={{ marginBottom: 12 }}>
+              <Segmented
+                value={scope}
+                onChange={setScope}
+                ariaLabel="Quali spese mostrare"
+                options={elenchi.map((e) => ({ value: e.key, label: e.label }))}
+              />
+            </div>
+            {elenco.expenses.length === 0 ? (
+              <p className="empty">Nessuna voce in questo insieme.</p>
+            ) : (
+              <ExpenseList
+                today={today}
+                expenses={elenco.expenses}
+                person={person}
+                lookup={lookup}
+                onSelect={setSelected}
+                showSource={false}
+                pageSize={LIST_PAGE}
+              />
+            )}
+          </Card>
+        ) : null}
+
+        {/*
+          La rata. Sottoinsieme delle correnti, quindi la scheda lo dice: questo
+          numero è **dentro** quello lì sopra, non in aggiunta. → ADR-0017
         */}
         {tricount.recurringCategory ? (
           <Card
             title={`Quanto costa ogni mese: ${lookup.label(tricount.recurringCategory)}`}
-            note="Sta nei conti di ogni giorno, non qui sopra: questi due numeri non si sommano"
+            note="Dentro le spese correnti, non in aggiunta: entra nel mese fra le fisse e nel saldo di ogni giorno"
           >
             {rateStats.count === 0 ? (
               <p className="empty">
                 Nessuna spesa ancora in «{lookup.label(tricount.recurringCategory)}». Quando la rata
-                arriva, si registra come una spesa normale nel tricount delle fisse, con la spunta
-                «ricorrente»: è quella spunta a farla scontare dallo spendibile dal primo giorno del
-                mese.
+                arriva, si registra qui dentro come spesa normale — con la spunta{' '}
+                <strong>«ricorrente»</strong> e <strong>senza</strong> quella del capitale: è la
+                prima a farla scontare dallo spendibile dal primo giorno del mese, la seconda la
+                farebbe sparire dai conti.
               </p>
             ) : (
-              <>
-                <div className="kpi-row" style={{ marginBottom: 14 }}>
-                  <StatTile
-                    label="Pagato finora"
-                    value={formatEuro(rateStats.total, { decimals: 0 })}
-                    hint={`${rateStats.count} ${rateStats.count === 1 ? 'rata' : 'rate'} su ${
-                      rateStats.months
-                    } mesi`}
-                  />
-                  <StatTile
-                    label="Media al mese"
-                    value={formatEuro(rateStats.monthlyAvgTotal, { decimals: 0 })}
-                    hint={`la tua quota: ${formatEuro(rateStats.monthlyAvgShare, { decimals: 0 })}`}
-                  />
-                  <StatTile
-                    label="La tua quota, in tutto"
-                    value={formatEuro(rateStats.share, { decimals: 0 })}
-                  />
-                </div>
-                <ExpenseList
-                  today={today}
-                  expenses={rateStats.expenses}
-                  person={person}
-                  lookup={lookup}
-                  onSelect={setSelected}
-                  pageSize={LIST_PAGE}
+              <div className="kpi-row">
+                <StatTile
+                  label="Pagato finora"
+                  value={formatEuro(rateStats.total, { decimals: 0 })}
+                  hint={`${rateStats.count} ${rateStats.count === 1 ? 'rata' : 'rate'} su ${
+                    rateStats.months
+                  } mesi`}
                 />
-              </>
+                <StatTile
+                  label="Media al mese"
+                  value={formatEuro(rateStats.monthlyAvgTotal, { decimals: 0 })}
+                  hint={`la tua quota: ${formatEuro(rateStats.monthlyAvgShare, { decimals: 0 })}`}
+                />
+                <StatTile
+                  label="La tua quota, in tutto"
+                  value={formatEuro(rateStats.share, { decimals: 0 })}
+                />
+              </div>
             )}
+          </Card>
+        ) : null}
+
+        {corrente.count > 0 ? (
+          <Card
+            title="Quanto pesa ogni mese, tutto compreso"
+            note="Rata e spese correnti insieme: è la parte che entra nei conti di ogni giorno"
+          >
+            <div className="kpi-row">
+              <StatTile
+                label="Spese correnti"
+                value={formatEuro(corrente.total, { decimals: 0 })}
+                hint={`${corrente.count} ${corrente.count === 1 ? 'voce' : 'voci'}`}
+              />
+              <StatTile
+                label="Media al mese"
+                value={formatEuro(correnteStats.monthlyAvgTotal, { decimals: 0 })}
+                hint={`la tua quota: ${formatEuro(correnteStats.monthlyAvgShare, { decimals: 0 })}`}
+              />
+              <StatTile
+                label="La tua quota, in tutto"
+                value={formatEuro(correnteStats.share, { decimals: 0 })}
+              />
+            </div>
           </Card>
         ) : null}
 
         <Card
           title="Come è contato questo progetto"
-          note="Le regole che lo tengono fuori dai conti di ogni giorno"
+          note="Quali spese stanno nei conti di ogni giorno e quali no"
         >
           <div className="stack" style={{ gap: 8 }}>
             <p className="hint">
-              Le sue spese <strong>non entrano</strong> in margine, medie, proiezioni e confronti: un
-              capitale in un mese renderebbe quel mese incomparabile con ogni altro. Restano nella
-              pagina Spese, nel 730 e qui.
+              <strong>Il capitale</strong> — rogito, caparra, notaio: la spesa con la spunta «fuori
+              dai conti del mese». Non entra in margine, medie, proiezioni e confronti, e il suo
+              debito non entra nel saldo di ogni giorno. Resta nella pagina Spese, nel 730 e qui.
             </p>
             <p className="hint">
-              Il suo debito <strong>non entra</strong> nel saldo di ogni giorno, e i rimborsi
-              registrati qui non lo toccano.
+              <strong>La rata</strong> — la categoria qui sotto: entra nel mese fra le spese fisse,
+              come l'affitto che sostituisce, ed entra nel saldo di ogni giorno. Nel Riepilogo il
+              saldo la nomina, con un «di cui».
             </p>
             <p className="hint">
-              Quello che il progetto continua a costare ogni mese — la rata di un mutuo — vive invece
-              nei conti di tutti i giorni, come una spesa fissa qualunque.
+              <strong>Le altre</strong> — il frigo, i lavori, i mobili: spese normali un po' grosse.
+              Entrano nel mese fra le variabili e nel saldo di ogni giorno, come qualunque spesa.
             </p>
           </div>
 
           <div className="field" style={{ marginTop: 12 }}>
             <label className="label" htmlFor="progetto-categoria">
-              La categoria della spesa ricorrente
+              La categoria della rata
             </label>
             <select
               id="progetto-categoria"
@@ -407,8 +483,8 @@ export function Progetto(): ReactNode {
                 updateTricount(tricount.id, { recurringCategory: event.target.value })
                 toast.show(
                   event.target.value === ''
-                    ? 'Categoria ricorrente tolta.'
-                    : `Categoria ricorrente: ${lookup.label(event.target.value)}.`,
+                    ? 'Categoria della rata tolta.'
+                    : `Categoria della rata: ${lookup.label(event.target.value)}.`,
                 )
               }}
             >
@@ -421,8 +497,9 @@ export function Progetto(): ReactNode {
               ))}
             </select>
             <p className="hint">
-              Per una casa comprata è la categoria del mutuo. Le sue spese si mostrano qui sopra come
-              un secondo insieme, e non si sommano mai al costo del progetto.
+              Per una casa comprata è la categoria del mutuo. Serve a <strong>riconoscere</strong> la
+              rata, non a spostarla: è quella che il Riepilogo nomina nel «di cui» del saldo. Senza,
+              il «di cui» conterebbe anche il condominio.
             </p>
           </div>
         </Card>

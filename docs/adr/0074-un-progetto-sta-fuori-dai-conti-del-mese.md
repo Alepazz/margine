@@ -1,6 +1,8 @@
 # ADR-0074: Un progetto sta fuori dai conti del mese
 
-**Status:** accepted · **Date:** 2026-08-31
+**Status:** accepted, superseded in parte da [ADR-0079](0079-il-capitale-e-una-proprieta-della-spesa.md) · **Date:** 2026-08-31
+
+> ADR-0079 sposta l'interruttore «fuori dai conti del mese» dal tricount alla singola spesa: la frase «un progetto è un tricount `offBudget`» non vale più. Tutto il resto di questo documento resta in vigore.
 
 ## Context
 

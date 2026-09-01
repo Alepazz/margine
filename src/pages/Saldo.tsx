@@ -17,12 +17,12 @@ import { formatEuro, toCents } from '../domain/money'
 import { newSettlement, settlementDirection } from '../domain/settlement'
 import { aTo } from '../domain/text'
 import { tricountLabel } from '../domain/expense-rules'
-import { useCoupleBalance, usePageData, useProjects } from './usePageData'
+import { useBalanceBreakdown, useCoupleBalance, usePageData, useProjects } from './usePageData'
 
 const MOVEMENTS_SHOWN = 25
 
 export function Saldo(): ReactNode {
-  const { config, dataset, view, today, addSettlement, removeSettlement } = usePageData()
+  const { config, dataset, view, lookup, today, addSettlement, removeSettlement } = usePageData()
   const toast = useToast()
   const person = view.person
   const other = person === 'me' ? 'partner' : 'me'
@@ -98,7 +98,12 @@ export function Saldo(): ReactNode {
    * accorgersene. Solo quelli che pendono davvero: un progetto in pari non è
    * una cosa da sapere. → ADR-0074, ADR-0064
    */
-  const progetti = useProjects().filter((stats) => toCents(stats.balance) !== 0)
+  const progetti = useProjects()
+  /* Solo quelli che pendono davvero: un progetto in pari non è una notizia. Il
+     «di cui» invece parte da **tutti**, perché un progetto saldato può avere
+     comunque una rata questo mese. */
+  const conDebito = progetti.filter((stats) => toCents(stats.balance) !== 0)
+  const diCui = useBalanceBreakdown(owedToMe, lookup, progetti)
 
   const shown = balance.movements.slice(0, limit)
   const rest = balance.movements.length - shown.length
@@ -130,6 +135,15 @@ export function Saldo(): ReactNode {
             <span className={`hero-value is-${settledUp ? 'ok' : cents > 0 ? 'ok' : 'attenzione'}`}>
               {formatEuro(Math.abs(owedToMe), { decimals: 0 })}
             </span>
+            {/* Le stesse righe del Riepilogo, dallo stesso posto: due pagine
+                che mostrano lo stesso saldo devono spiegarlo con la stessa
+                frase. Qui la `.hero` non è dentro `subgrid`, quindi una riga
+                in più non sfonda niente. → ADR-0081, ADR-0060 */}
+            {diCui.map((riga) => (
+              <span className="hero-hint" key={riga}>
+                {riga}
+              </span>
+            ))}
             <span className="hero-hint">
               {balance.undeclared.length > 0
                 ? `Totale parziale: ${balance.undeclared.length} ${
@@ -232,11 +246,11 @@ export function Saldo(): ReactNode {
           </Notice>
         ) : null}
 
-        {progetti.length > 0 ? (
+        {conDebito.length > 0 ? (
           <Notice icon="↗">
-            Oltre a questo, {progetti.length === 1 ? 'un progetto ha' : `${progetti.length} progetti hanno`} un
+            Oltre a questo, {conDebito.length === 1 ? 'un progetto ha' : `${conDebito.length} progetti hanno`} un
             debito aperto, contato a parte:{' '}
-            {progetti.map((stats, index) => {
+            {conDebito.map((stats, index) => {
               const owed = person === 'me' ? stats.balance : -stats.balance
               return (
                 <span key={stats.tricount.id}>
@@ -248,8 +262,9 @@ export function Saldo(): ReactNode {
                 </span>
               )
             })}
-            . Un capitale che rientra in anni sommato al conto della spesa renderebbe illeggibili
-            tutti e due.
+            . È il solo <strong>capitale</strong> — rogito, caparra, notaio: un capitale che
+            rientra in anni, sommato al conto della spesa, renderebbe illeggibili tutti e due. La
+            rata del mutuo e le spese di casa stanno invece nel totale qui sopra.
           </Notice>
         ) : null}
 

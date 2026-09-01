@@ -251,7 +251,7 @@ describe('prezzi', () => {
  * solo categorie esistenti, e qui invece si guarda il dato. → ADR-0074, ADR-0075
  */
 describe('progetti', () => {
-  const PROGETTO = { id: 'casa-nuova', name: 'Casa nuova', members: ['me', 'partner'], offBudget: true }
+  const PROGETTO = { id: 'casa-nuova', name: 'Casa nuova', members: ['me', 'partner'], project: true }
 
   it('un progetto è un tricount valido', () => {
     const { errors } = validateDataset(dataset([], [CONDIVISE, PROGETTO]), CONFIG)
@@ -260,7 +260,7 @@ describe('progetti', () => {
 
   it('una vacanza non può essere anche un progetto', () => {
     const { errors } = validateDataset(
-      dataset([], [CONDIVISE, { ...TRIP, offBudget: true }]),
+      dataset([], [CONDIVISE, { ...TRIP, project: true }]),
       CONFIG,
     )
     expect(errors.join(' ')).toContain('progetto')
@@ -284,6 +284,31 @@ describe('progetti', () => {
       CONFIG,
     )
     expect(buona.errors).toEqual([])
+  })
+
+  it('il capitale esiste solo dentro un progetto', () => {
+    const dentro = validateDataset(
+      dataset(
+        [expense({ tricount: 'casa-nuova', offBudget: true })],
+        [CONDIVISE, PROGETTO],
+      ),
+      CONFIG,
+    )
+    expect(dentro.errors).toEqual([])
+
+    /* Fuori da un progetto quella spesa sparirebbe dal mese e dal saldo senza
+       che nessuna pagina la rimetta sotto gli occhi. → ADR-0079 */
+    const fuori = validateDataset(
+      dataset([expense({ offBudget: true })], [CONDIVISE, PROGETTO]),
+      CONFIG,
+    )
+    expect(fuori.errors.join(' ')).toContain('progetto')
+
+    const nonBooleano = validateDataset(
+      dataset([expense({ tricount: 'casa-nuova', offBudget: 'sì' })], [CONDIVISE, PROGETTO]),
+      CONFIG,
+    )
+    expect(nonBooleano.errors.join(' ')).toContain('booleano')
   })
 
   it('un rimborso può appartenere a un progetto, e solo a un progetto', () => {

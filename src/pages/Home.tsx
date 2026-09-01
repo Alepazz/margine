@@ -18,6 +18,7 @@ import { VacationToggle } from '../components/Controls'
 import { ExpenseList } from '../components/ExpenseList'
 import { ExpenseSheet } from '../components/ExpenseSheet'
 import { MarginMeter } from '../components/MarginMeter'
+import { ProjectBar } from '../components/ProjectBar'
 import { MonthStrip } from '../components/MonthStrip'
 import { Card, DeltaLabel, Notice, StatTile, useToast } from '../components/ui'
 import { donutSlices } from '../domain/categories'
@@ -37,12 +38,13 @@ import {
   expensesOfMonth,
   fillMonthGaps,
   findMonth,
+  isCapital,
   projectMonth,
   topExpenses,
   totalShare,
 } from '../domain/selectors'
 import { projectsOf, type Expense, type PersonId } from '../domain/types'
-import { useCoupleBalance, usePageData } from './usePageData'
+import { useBalanceBreakdown, useCoupleBalance, usePageData, useProjects } from './usePageData'
 
 export function Home(): ReactNode {
   const {
@@ -116,6 +118,19 @@ export function Home(): ReactNode {
   const balance = useCoupleBalance()
   const owedToMe = person === 'me' ? balance.balance : -balance.balance
 
+  /* Le righe «di cui» le costruisce un posto solo, condiviso con la pagina
+     Saldo: due pagine che mostrano lo stesso saldo devono spiegarlo con la
+     stessa frase. → ADR-0079 */
+  const progetti = useProjects()
+  const diCui = useBalanceBreakdown(owedToMe, lookup, progetti)
+
+  /* Un progetto senza capitale anticipato non ha una barra: `ProjectBar` torna
+     `null`, e una scheda vuota attorno a niente resterebbe comunque a schermo. */
+  const barreProgetti = useMemo(
+    () => progetti.filter((stats) => toCents(stats.gross) !== 0),
+    [progetti],
+  )
+
   /*
    * Chiudere il conto dal Riepilogo, con lo stesso costruttore della pagina
    * Saldo: il verso lo decide il segno del saldo, e sbagliarlo sposterebbe un
@@ -134,6 +149,7 @@ export function Home(): ReactNode {
        poi costruisce il rimborso: dedurlo qui con un secondo confronto sul
        segno vorrebbe dire due espressioni della stessa regola. → ADR-0062 */
     devePagare: settlementDirection(owedToMe, person, other)?.debtor === person,
+    diCui,
     onSettle: () => {
       const settlement = newSettlement({
         owedToViewer: owedToMe,
@@ -192,10 +208,12 @@ export function Home(): ReactNode {
       projectsOf(dataset.tricounts)
         .map((tricount) => ({
           tricount,
-          /* La quota di chi guarda, come ogni altro numero di questa pagina. */
+          /* Solo il **capitale**: la rata e il frigo di quel progetto stanno
+             già dentro i conti di questa pagina, e nominarli qui direbbe che
+             sono fuori. → ADR-0079 */
           share: totalShare(
             expensesOfMonth(
-              dataset.expenses.filter((e) => e.tricount === tricount.id),
+              dataset.expenses.filter((e) => e.tricount === tricount.id && isCapital(e)),
               month,
             ),
             person,
@@ -272,6 +290,33 @@ export function Home(): ReactNode {
           />
         </Card>
 
+        {/*
+          La barra dei rimborsi di un progetto: quanto del capitale è rientrato.
+          Non cambia col mese scelto, ed è la stessa eccezione dichiarata del
+          saldo — è uno **stato**, non una statistica del mese (→ ADR-0058).
+          Sta sotto la barra del mese perché è la seconda cosa che si guarda
+          aprendo l'app quando c'è una casa da pagare, e la disegna lo stesso
+          componente della pagina del progetto. → ADR-0080
+        */}
+        {barreProgetti.length > 0 ? (
+          <Card
+            title="A che punto siamo con i rimborsi"
+            note="Il capitale anticipato che deve ancora rientrare: non cambia col mese"
+          >
+            <div className="stack" style={{ gap: 18 }}>
+              {barreProgetti.map((stats) => (
+                <ProjectBar
+                  key={stats.tricount.id}
+                  stats={stats}
+                  person={person}
+                  people={config.people}
+                  to={`/progetto/${stats.tricount.id}`}
+                />
+              ))}
+            </div>
+          </Card>
+        ) : null}
+
         {/* Una riga, non una scheda: dichiara che c'è dell'altro e dove
             guardarlo, senza pretendere spazio dal numero che conta. */}
         {fuoriDaiConti.length > 0 ? (
@@ -287,7 +332,8 @@ export function Home(): ReactNode {
                 </Link>
               </span>
             ))}
-            . Le spese di un progetto non entrano in margine, medie e confronti.
+            . Il capitale di un progetto non entra in margine, medie e confronti; la rata e le
+            spese di casa sì, e sono già nei numeri qui sopra.
           </Notice>
         ) : null}
 

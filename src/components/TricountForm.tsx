@@ -54,14 +54,14 @@ export function TricountForm({
     vacation ? [...PERSON_IDS] : [view.person],
   )
   /*
-   * Un progetto: una cosa che si compra una volta. La spunta si mette **qui e
-   * solo qui**, alla creazione, e non si cambia dopo: cambiarla su un tricount
-   * che ha già delle spese sposterebbe di colpo mesi di storia dentro o fuori
-   * dalle medie, e nessuno se ne accorgerebbe guardando il Riepilogo. Un
-   * tricount nato sbagliato si rifà; una media che cambia da sola no.
-   * → ADR-0074
+   * Un progetto: una cosa che si compra una volta e che poi costa per anni.
+   * Dargli questa spunta gli dà una pagina sua e un compartimento di rimborsi
+   * suo — **non** toglie le sue spese dai conti del mese: quello lo decide la
+   * singola spesa. La spunta si mette qui e non si cambia dopo, perché
+   * spegnerla su un tricount che ha già dei rimborsi suoi li renderebbe
+   * invisibili da tutte e due le parti. → ADR-0079, ADR-0074
    */
-  const [offBudget, setOffBudget] = useState(false)
+  const [project, setProject] = useState(false)
 
   /** Spegnere l'unica casella accesa non fa niente: un tricount è di qualcuno. */
   const toggleMember = (who: PersonId): void => {
@@ -95,7 +95,7 @@ export function TricountForm({
             },
           }
         : {}),
-      ...(offBudget ? { offBudget: true } : {}),
+      ...(project ? { project: true } : {}),
     }
     const problems = validateTricount(draft, takenIds)
     if (problems.length > 0) {
@@ -157,23 +157,23 @@ export function TricountForm({
         </p>
       </div>
 
-      {/* Non su una vacanza: quella è la vita di ogni anno e si sceglie se
-          contarla, un progetto sta fuori sempre — e il dominio le rifiuta
-          insieme. → ADR-0074 */}
+      {/* Non su una vacanza: quella finisce e si sceglie se contarla, un
+          progetto non finisce e ha rimborsi suoi — e il dominio le rifiuta
+          insieme. → ADR-0079, ADR-0074 */}
       {vacation ? null : (
         <div className="field">
           <label className="checkbox">
             <input
               type="checkbox"
-              checked={offBudget}
-              onChange={(event) => setOffBudget(event.target.checked)}
+              checked={project}
+              onChange={(event) => setProject(event.target.checked)}
             />
             È un progetto
           </label>
           <p className="hint">
-            {offBudget
-              ? 'Le sue spese restano negli elenchi e nel 730, ma non entrano in margine, medie e confronti, e il suo debito ha una pagina sua. Per una casa comprata, non per la spesa di ogni mese.'
-              : 'Da spuntare per una cosa che si compra una volta — una casa — e che non è la vita di ogni mese. Non si cambia dopo.'}
+            {project
+              ? 'Avrà una pagina sua e dei rimborsi suoi. Le spese grosse — rogito, caparra, notaio — si segnano una per una «fuori dai conti del mese»; la rata del mutuo e il frigo restano spese normali.'
+              : 'Da spuntare per una cosa che si compra una volta — una casa — e che poi costa per anni. Non si cambia dopo.'}
           </p>
         </div>
       )}

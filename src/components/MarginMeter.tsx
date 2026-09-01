@@ -92,10 +92,19 @@ function BalanceTag({
   owedToMe,
   otherName,
   devePagare,
+  diCui,
   onSettle,
 }: {
   owedToMe: number
   otherName: string
+  /**
+   * Le righe «di cui»: cosa, dentro questo saldo, è la rata di un progetto.
+   *
+   * Stanno **dentro** `hero-balance-foot` e non come quarta riga della metà,
+   * perché `subgrid` allinea tre righe e una quarta uscirebbe fuori dalla sua
+   * campata. → ADR-0081, ADR-0060
+   */
+  diCui: string[]
   /**
    * Vero quando è **chi guarda** a dover pagare. Arriva da fuori, calcolato con
    * `settlementDirection` — la stessa funzione che poi costruisce il rimborso —
@@ -146,6 +155,11 @@ function BalanceTag({
       </Link>
       <div className="hero-balance-foot">
         <span className="hero-hint">{stato.verso}</span>
+        {diCui.map((riga) => (
+          <span className="hero-hint" key={riga}>
+            {riga}
+          </span>
+        ))}
         {/*
           **Il pulsante appare a chi deve pagare**, e a nessun altro.
           «Saldare» è un gesto che si compie pagando: offrirlo a chi deve
@@ -186,6 +200,7 @@ export function MarginMeter({
     owedToMe: number
     otherName: string
     devePagare: boolean
+    diCui: string[]
     onSettle: () => void
   } | null
   onToggleHidden: () => void

@@ -106,20 +106,20 @@ export function validateDataset(dataset, config) {
     }
 
     /*
-     * Un progetto: la sua spesa sta fuori dai conti del mese. Le stesse tre
-     * regole che l'app applica in `validateTricount` — un booleano, mai insieme
-     * a un viaggio, e la categoria ricorrente solo su un progetto — più una che
+     * Un progetto: ha una pagina sua e dei rimborsi suoi. Le stesse tre regole
+     * che l'app applica in `validateTricount` — un booleano, mai insieme a un
+     * viaggio, e la categoria della rata solo su un progetto — più una che
      * l'app non può sbagliare perché il menù offre solo categorie esistenti, e
-     * qui invece si guarda il dato. → ADR-0074
+     * qui invece si guarda il dato. → ADR-0079, ADR-0074
      */
-    if (tricount.offBudget !== undefined && typeof tricount.offBudget !== 'boolean') {
-      errors.push(`${where}: «offBudget» non è un booleano.`)
+    if (tricount.project !== undefined && typeof tricount.project !== 'boolean') {
+      errors.push(`${where}: «project» non è un booleano.`)
     }
-    if (trip && tricount.offBudget === true) {
+    if (trip && tricount.project === true) {
       errors.push(`${where}: una vacanza non può essere anche un progetto.`)
     }
     if (tricount.recurringCategory !== undefined) {
-      if (tricount.offBudget !== true) {
+      if (tricount.project !== true) {
         errors.push(`${where}: «recurringCategory» vale solo su un progetto.`)
       }
       if (!categoryIds.has(tricount.recurringCategory)) {
@@ -163,7 +163,7 @@ export function validateDataset(dataset, config) {
       const home = tricountById.get(settlement.tricount)
       if (!home) {
         errors.push(`${where}: tricount inesistente (${settlement.tricount}).`)
-      } else if (home.offBudget !== true) {
+      } else if (home.project !== true) {
         errors.push(`${where}: «${settlement.tricount}» non è un progetto, quindi non ha rimborsi suoi.`)
       }
     }
@@ -320,6 +320,18 @@ export function validateDataset(dataset, config) {
     }
     if (expense.tax730 !== undefined && typeof expense.tax730 !== 'boolean') {
       errors.push(`${where}: «tax730» deve essere booleano.`)
+    }
+    /*
+     * Il capitale — rogito, caparra, notaio — sta fuori dal mese e fuori dal
+     * saldo di ogni giorno. Fuori da un progetto non c'è nessuna pagina che lo
+     * rimetta sotto gli occhi: sarebbe un buco silenzioso. → ADR-0079
+     */
+    if (expense.offBudget !== undefined) {
+      if (typeof expense.offBudget !== 'boolean') {
+        errors.push(`${where}: «offBudget» deve essere booleano.`)
+      } else if (expense.offBudget && tricountById.get(expense.tricount)?.project !== true) {
+        errors.push(`${where}: fuori dai conti del mese, ma «${expense.tricount}» non è un progetto.`)
+      }
     }
     if (expense.welfare !== undefined) {
       if (typeof expense.welfare !== 'boolean') {

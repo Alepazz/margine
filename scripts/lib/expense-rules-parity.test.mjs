@@ -36,6 +36,7 @@ const TRICOUNTS = [
     members: ['me', 'partner'],
     trip: { place: 'Palermo', year: 2026, start: '2026-09-12', end: '2026-09-20' },
   },
+  { id: 'casa-progetto', name: 'Casa progetto', members: ['me', 'partner'], project: true },
 ]
 
 const CTX = { categories: CATEGORIES, tricounts: TRICOUNTS, takenIds: new Set() }
@@ -88,12 +89,19 @@ const ACCETTABILI = [
     }),
   ],
   ['col welfare', base({ welfare: true })],
+  /* Il capitale di un progetto, e la stessa spesa **senza** la spunta: dentro
+     un progetto sono legittime tutte e due, ed è tutto il senso di ADR-0079. */
+  ['capitale di un progetto', base({ tricount: 'casa-progetto', offBudget: true, category: 'casa' })],
+  ['spesa corrente di un progetto', base({ tricount: 'casa-progetto', category: 'casa' })],
   ['con nota e scontrino', base({ notes: 'fattura chiesta', receiptLinks: ['https://drive.google.com/x'] })],
 ]
 
 /** I casi che il modulo deve rifiutare. */
 const RIFIUTABILI = [
   ['quote che non sommano', base({ shares: { me: 20, partner: 20 } })],
+  /* Fuori da un progetto non c'è nessuna pagina che rimetta sotto gli occhi
+     una spesa tolta dai conti: sarebbe un buco silenzioso. → ADR-0079 */
+  ['fuori dai conti, ma non in un progetto', base({ offBudget: true })],
   ['quota negativa', base({ shares: { me: -1, partner: 48.3 } })],
   ['importo a zero', base({ amount: 0, shares: { me: 0, partner: 0 } })],
   ['data inventata', base({ date: '2026-02-31' })],
@@ -140,7 +148,7 @@ describe('regole di una spesa: il browser e l’import concordano', () => {
  * silenzio. Come per le spese, la garanzia è **in una direzione**: quello che
  * l'app crea, l'import lo accetta. → ADR-0074
  */
-const PROGETTO = { id: 'casa-nuova', name: 'Casa nuova', members: ['me', 'partner'], offBudget: true }
+const PROGETTO = { id: 'casa-nuova', name: 'Casa nuova', members: ['me', 'partner'], project: true }
 
 const TRICOUNT_ACCETTABILI = [
   ['un progetto', PROGETTO],
