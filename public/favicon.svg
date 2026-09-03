@@ -1,8 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Margine">
-  <rect width="32" height="32" rx="7" fill="#101820" />
-  <!-- Il filo rosso del margine, come nel quaderno -->
-  <rect x="6.5" y="6" width="2.5" height="20" rx="1.25" fill="#e0574c" />
-  <rect x="12.5" y="8.5" width="13" height="2.6" rx="1.3" fill="#e9eff3" />
-  <rect x="12.5" y="14.7" width="9.5" height="2.6" rx="1.3" fill="#8fa3b0" />
-  <rect x="12.5" y="20.9" width="6" height="2.6" rx="1.3" fill="#8fa3b0" opacity="0.75" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Giano">
+  <!--
+    Due G specchiate e fuse, e il trattino di ciascuna è una mandorla: l'occhio
+    socchiuso del dio che guarda avanti e indietro. L'anello di sinistra è
+    ardesia (la faccia che guarda al passato), quello di destra è carta (quella
+    che guarda al futuro). → ADR-0093
+
+    Le mandorle sono l'intersezione di due cerchi di raggio 31.02, non due curve
+    di Bézier: così la forma è la stessa qui e in `scripts/make-icon.mjs`, che la
+    rasterizza con la matematica invece di interpretare un path.
+
+    Il gruppo è scalato a 0.9 perché l'icona è **maskable**: a piena misura il
+    marchio arriva a 43.5 unità dal centro e una maschera tonda, che ritaglia a
+    40, gli taglierebbe le punte degli anelli.
+  -->
+  <rect width="100" height="100" rx="22" fill="#12294a" />
+  <g transform="translate(50 50) scale(0.9) translate(-50 -50)">
+    <!-- anello del passato: varco in alto a sinistra -->
+    <path d="M14.25 39.38 A19 19 0 1 1 11 50" fill="none" stroke="#8fa3b0" stroke-width="9" />
+    <!-- anello del futuro: varco in alto a destra -->
+    <path d="M85.75 39.38 A19 19 0 1 0 89 50" fill="none" stroke="#e9eff3" stroke-width="9" />
+    <!-- i due occhi -->
+    <path d="M11 50 A31.02 31.02 0 0 1 49 50 A31.02 31.02 0 0 1 11 50 Z" fill="#e0574c" />
+    <path d="M51 50 A31.02 31.02 0 0 1 89 50 A31.02 31.02 0 0 1 51 50 Z" fill="#e0574c" />
+  </g>
 </svg>

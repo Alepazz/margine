@@ -15,6 +15,7 @@ import { useState, type ReactNode } from 'react'
 
 import { useStore } from '../data/store'
 import { PERSON_IDS, titleOf, type PersonId } from '../domain/types'
+import { Brand } from './ui'
 
 export function IdentityGate(): ReactNode {
   const { config, chooseIdentity } = useStore()
@@ -27,13 +28,7 @@ export function IdentityGate(): ReactNode {
   return (
     <div className="gate">
       <div className="gate-card">
-        <div className="brand">
-          <span className="brand-rule" aria-hidden="true" />
-          <div>
-            <div className="brand-name">Margine</div>
-            <div className="brand-sub">spese e prezzi</div>
-          </div>
-        </div>
+        <Brand />
 
         {picked === null ? (
           <>

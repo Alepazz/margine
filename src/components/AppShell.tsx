@@ -26,6 +26,7 @@ import { CardSheet } from './CardSheet'
 import { ShoppingSheet } from './ShoppingSheet'
 import { NewsSheet } from './NewsSheet'
 import { PriceSheet } from './PriceSheet'
+import { Brand } from './ui'
 
 /** I gruppi dell'hub e della colonna. Le voci di barra non ne hanno. */
 type NavGroup = 'raccolte' | 'analisi' | 'negozio'
@@ -150,19 +151,6 @@ const GROUPS: [NavGroup, string][] = [
  * `fixed`, tornerebbe anche il bisogno di misurarla — e con esso il difetto che
  * ADR-0048 ha tolto.
  */
-
-function Brand(): ReactNode {
-  return (
-    <div className="brand">
-      <span className="brand-rule" aria-hidden="true" />
-      <div>
-        <div className="brand-name">Margine</div>
-        {/* I due scopi, non uno: era «spese e statistiche» da prima dei prezzi. */}
-        <div className="brand-sub">spese e prezzi</div>
-      </div>
-    </div>
-  )
-}
 
 /**
  * La campanella, col numero di novità non viste.

@@ -19,6 +19,7 @@ import {
 
 import { currentMonthKey, monthKeyOf, todayIso, type MonthKey } from '../domain/dates'
 import {
+  APP_COMMIT_SUFFIX,
   CHANGE_GROUPS,
   noticesOf,
   unseenCount,
@@ -361,7 +362,7 @@ async function fetchEnvelope(url: string): Promise<Envelope> {
   const response = await fetch(url, { cache: 'no-store' })
   if (!response.ok) throw new Error(`${url} → HTTP ${response.status}`)
   const parsed: unknown = await response.json()
-  if (!isEnvelope(parsed)) throw new Error(`${url} non è un file cifrato di Margine.`)
+  if (!isEnvelope(parsed)) throw new Error(`${url} non è un file cifrato di Giano.`)
   return parsed
 }
 
@@ -425,7 +426,7 @@ async function fetchOptionalEnvelope(url: string): Promise<Envelope | undefined>
   /* Da qui in poi si pretende un envelope: `JSON.parse` che lancia e un envelope
      che non lo è sono guasti, e li si dice. */
   const parsed: unknown = JSON.parse(text)
-  if (!isEnvelope(parsed)) throw new Error(`${url} non è un file cifrato di Margine.`)
+  if (!isEnvelope(parsed)) throw new Error(`${url} non è un file cifrato di Giano.`)
   return parsed
 }
 
@@ -490,7 +491,7 @@ function describeError(error: unknown): string {
 }
 
 function commitMessage(entries: readonly OutboxEntry[]): string {
-  return `${describeOps(entries)} (da Margine)`
+  return `${describeOps(entries)}${APP_COMMIT_SUFFIX}`
 }
 
 /** Un segno da `localStorage`: senza storage si riparte da zero, e va bene. */
@@ -806,7 +807,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
             throw new GithubError(404, `Nel repo non c'è ${github.dataPath}: fai un primo push dei dati.`)
           }
           const parsed: unknown = JSON.parse(remote.text)
-          if (!isEnvelope(parsed)) throw new Error('Il file nel repo non è un file cifrato di Margine.')
+          if (!isEnvelope(parsed)) throw new Error('Il file nel repo non è un file cifrato di Giano.')
 
           const key = await deriveKeyCached(passphrase, parsed.kdf)
           const remoteDataset = normaliseDataset(await decryptEnvelope<Dataset>(parsed, key))
@@ -823,7 +824,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
           }
           const parsedConfig: unknown = JSON.parse(remoteConfig.text)
           if (!isEnvelope(parsedConfig)) {
-            throw new Error('La configurazione nel repo non è un file cifrato di Margine.')
+            throw new Error('La configurazione nel repo non è un file cifrato di Giano.')
           }
           const configKey = await deriveKeyCached(passphrase, parsedConfig.kdf)
           const decrypted = await decryptEnvelope<AppConfig>(parsedConfig, configKey)
@@ -852,7 +853,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
            */
           const base = remoteCards ? (JSON.parse(remoteCards.text) as unknown) : undefined
           if (base !== undefined && !isEnvelope(base)) {
-            throw new Error('Il file delle carte nel repo non è un file cifrato di Margine.')
+            throw new Error('Il file delle carte nel repo non è un file cifrato di Giano.')
           }
           const kdf = base?.kdf ?? kdfRef.current
           if (!kdf) {
@@ -880,7 +881,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
           const remoteShopping = await getFile(github, token, github.shoppingPath, parent)
           const base = remoteShopping ? (JSON.parse(remoteShopping.text) as unknown) : undefined
           if (base !== undefined && !isEnvelope(base)) {
-            throw new Error('La lista nel repo non è un file cifrato di Margine.')
+            throw new Error('La lista nel repo non è un file cifrato di Giano.')
           }
           const kdf = base?.kdf ?? kdfRef.current
           if (!kdf) {

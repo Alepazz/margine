@@ -37,7 +37,7 @@ export const DEFAULT_ITERATIONS = 600_000
  * tempo zero, in silenzio. Dall'altro lato `iterations: 1e9` inchioda l'apertura
  * per minuti su un telefono.
  *
- * Il basso è il pavimento sotto cui nessuna versione di Margine ha mai scritto; il
+ * Il basso è il pavimento sotto cui nessuna versione dell'app ha mai scritto; il
  * DEFAULT resta il valore con cui si scrive oggi. → ADR-0073, ADR-0072
  */
 export const MIN_ITERATIONS = 100_000
@@ -63,7 +63,7 @@ function base64Bytes(text: string): number {
 }
 
 /**
- * true se questo è un envelope che Margine potrebbe aver scritto.
+ * true se questo è un envelope che l'app potrebbe aver scritto.
  *
  * **I parametri si controllano, non si accettano.** Prima si guardavano solo i
  * tipi: qualunque numero passava per `iterations`, e `name`, `hash` e
@@ -73,8 +73,8 @@ function base64Bytes(text: string): number {
  * diventa permanente. → ADR-0073
  *
  * Un file fuori da questi limiti non è «un envelope con parametri strani»: è un
- * file che nessuna versione di Margine ha scritto, e il messaggio che l'app
- * mostra — «non è un file cifrato di Margine» — dice il vero.
+ * file che nessuna versione dell'app ha scritto, e il messaggio che l'app
+ * mostra — «non è un file cifrato di Giano» — dice il vero.
  */
 export function isEnvelope(value: unknown): value is Envelope {
   if (typeof value !== 'object' || value === null) return false

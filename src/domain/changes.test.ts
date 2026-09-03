@@ -201,6 +201,26 @@ describe('quali commit diventano novità', () => {
     expect(parseChanges(raw).map((c) => c.sha)).toEqual(['app'])
   })
 
+  /*
+   * Il rename dell'03/09/2026 non deve rendere muta la storia già scritta: due
+   * anni di commit portano «(da Margine)», e il repo è pubblico — quella storia
+   * non si riscrive. Se un giorno il suffisso venisse *sostituito* invece che
+   * aggiunto, la campanella smetterebbe di vedere tutto il passato senza un
+   * errore, e questo test è l'unica cosa che se ne accorge. → ADR-0092
+   */
+  it('legge anche i commit col nome di prima del rename', () => {
+    const raw = [
+      commit({ sha: 'nuovo', message: '1 spesa aggiunta (da Giano)' }),
+      commit({ sha: 'vecchio', message: '1 spesa aggiunta (da Margine)' }),
+      commit({ sha: 'altrui', message: '1 spesa aggiunta (da Qualcosaltro)' }),
+    ]
+    const letti = parseChanges(raw)
+    expect(letti.map((c) => c.sha)).toEqual(['nuovo', 'vecchio'])
+    /* E il riassunto esce pulito da entrambi: se lo `slice` togliesse la
+       lunghezza sbagliata resterebbe un pezzo di nome attaccato. */
+    expect(letti.map((c) => c.summary)).toEqual(['1 spesa aggiunta', '1 spesa aggiunta'])
+  })
+
   it('il suffisso vale solo sulla prima riga', () => {
     const raw = [commit({ sha: 'corpo', message: `Titolo vero\n\n1 spesa aggiunta${APP_COMMIT_SUFFIX}` })]
     expect(parseChanges(raw)).toEqual([])

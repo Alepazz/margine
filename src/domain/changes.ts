@@ -24,7 +24,31 @@ import type { ExpenseDelta } from './diff'
  * la campanella direbbe «il foglio di dettaglio ha un corpo che scorre», che
  * non è una novità sulle spese di nessuno.
  */
-export const APP_COMMIT_SUFFIX = ' (da Margine)'
+export const APP_COMMIT_SUFFIX = ' (da Giano)'
+
+/**
+ * I suffissi di prima del rename, che restano validi **per sempre**.
+ *
+ * L'app si chiamava *Margine* fino al 03/09/2026, e due anni di commit lo
+ * portano addosso: sostituire il suffisso invece di aggiungerlo renderebbe muta
+ * la campanella su tutta la storia già scritta, che è pubblica e non si
+ * riscrive. Un nome nuovo si **aggiunge** qui, non si scambia. → ADR-0092
+ */
+export const LEGACY_COMMIT_SUFFIXES: readonly string[] = [' (da Margine)']
+
+/**
+ * Il riassunto di un commit scritto dall'interfaccia, o `undefined` se il
+ * commit non è dell'app.
+ *
+ * È il posto unico dove si decide cosa conta come scrittura dall'app: chi legge
+ * non deve sapere quanti nomi ha avuto, e aggiungerne uno non tocca i chiamanti.
+ */
+export function appCommitSummary(firstLine: string): string | undefined {
+  for (const suffix of [APP_COMMIT_SUFFIX, ...LEGACY_COMMIT_SUFFIXES]) {
+    if (firstLine.endsWith(suffix)) return firstLine.slice(0, -suffix.length).trim()
+  }
+  return undefined
+}
 
 export type ChangeGroup = 'spese' | 'prezzi' | 'lista' | 'carte' | 'tricount' | 'config'
 
@@ -281,12 +305,12 @@ export function parseChanges(commits: readonly RawCommit[], options: ParseOption
     /* Solo la prima riga: un messaggio dell'app non ne ha altre, ma un commit
        scritto a mano sì, e il suffisso va cercato dove l'app lo mette. */
     const firstLine = commit.message.split('\n', 1)[0] ?? ''
-    if (!firstLine.endsWith(APP_COMMIT_SUFFIX)) continue
+    const summary = appCommitSummary(firstLine)
+    if (summary === undefined) continue
 
     const who = commit.login ?? commit.name
     if (options.myLogin !== undefined && who === options.myLogin) continue
 
-    const summary = firstLine.slice(0, -APP_COMMIT_SUFFIX.length).trim()
     const groups = groupsOfSummary(summary)
     if (!groups.some((group) => wanted.has(group))) continue
 

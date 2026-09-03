@@ -138,6 +138,32 @@ export function useWakeLock(): void {
 
 // ─────────────────────────── scheda ───────────────────────────
 
+/**
+ * Il marchio: filo rosso, nome, e sotto cosa fa l'app.
+ *
+ * Sta qui e non in `AppShell` perché lo mostrano **tre** schermate — la testata,
+ * il Gate e l'IdentityGate — e col nome scritto tre volte il rename del
+ * 03/09/2026 ha richiesto tre modifiche identiche: il segnale che il nome
+ * doveva stare in un posto solo. Con `sub={false}` resta il nome nudo, che è la
+ * forma che serve al Gate quando annuncia un errore. → ADR-0092
+ */
+export function Brand({ sub = true }: { sub?: boolean }): ReactNode {
+  const name = <div className="brand-name">Giano</div>
+  return (
+    <div className="brand">
+      <span className="brand-rule" aria-hidden="true" />
+      {sub ? (
+        <div>
+          {name}
+          <div className="brand-sub">la casa, i conti, la spesa</div>
+        </div>
+      ) : (
+        name
+      )}
+    </div>
+  )
+}
+
 export function Card({
   title,
   note,

@@ -1,6 +1,8 @@
-# Margine
+# Giano
 
-Cruscotto personale delle spese: legge i tricount (spese fisse condivise, personali, altre condivise, e uno per ogni vacanza) e risponde alla domanda che conta — **quanto margine ho questo mese**.
+Cruscotto personale di casa. È nato per una domanda sola — **quanto margine ho questo mese** — leggendo i tricount delle spese; poi ha imparato i prezzi al supermercato, le carte fedeltà, la lista della spesa, i viaggi e le voci da 730, e il nome è cambiato con lui. Giano è il dio delle porte: due facce, una che guarda avanti e una che guarda indietro, che è esattamente quello che fa il Riepilogo.
+
+Si chiamava **Margine** fino al 3 settembre 2026; i commit di allora portano ancora quel nome e l'app li sa leggere (→ [ADR-0092](docs/adr/0092-il-progetto-si-chiama-giano.md)).
 
 Sito statico, dati cifrati nel repo, zero servizi a pagamento. Il perché di ogni scelta sta in [`docs/adr/`](docs/adr/).
 
@@ -91,7 +93,7 @@ Serve un token GitHub, una volta per dispositivo, e il tipo dipende da chi lo cr
 
 **Se vi accedi come collaboratore** — nell'elenco dei fine-grained il repo **non c'è**, e non è un errore tuo: quel tipo di token vede solo i repo del proprio account o di un'organizzazione. Serve un token **classic** con la sola spunta **`public_repo`**: il modulo sta su **`github.com/settings/tokens/new`**, che sono le impostazioni *del tuo account* — non la linguetta *Settings* del repo, dove un collaboratore trova solo «You don't have access to repository options». → [ADR-0040](docs/adr/0040-il-token-di-chi-non-possiede-il-repo.md)
 
-In entrambi i casi il token si incolla in Margine → Impostazioni → «Scrittura nel repo», poi «Verifica la scrittura». Quel controllo prova a **scrivere** (crea un blob non referenziato, che non lascia traccia) e non a leggere: su un repo pubblico la lettura riesce senza alcun token, quindi un controllo in lettura direbbe «va tutto bene» anche con un token in sola lettura o scaduto.
+In entrambi i casi il token si incolla in Giano → Impostazioni → «Scrittura nel repo», poi «Verifica la scrittura». Quel controllo prova a **scrivere** (crea un blob non referenziato, che non lascia traccia) e non a leggere: su un repo pubblico la lettura riesce senza alcun token, quindi un controllo in lettura direbbe «va tutto bene» anche con un token in sola lettura o scaduto.
 
 Il token resta in questo browser, non entra mai nel repo. Quando scade, il salvataggio fallisce con un messaggio esplicito e le modifiche restano in coda: nulla va perso. [ADR-0005](docs/adr/0005-annotazioni-730-via-api-github.md), [ADR-0018](docs/adr/0018-l-app-scrive-le-spese-non-solo-le-annotazioni.md)
 

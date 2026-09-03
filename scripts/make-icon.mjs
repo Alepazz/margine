@@ -1,82 +1,137 @@
 /**
- * Genera `public/icon-512.png`, l'icona per «aggiungi alla schermata Home».
+ * Genera **tutte** le icone di Giano, da una sola descrizione geometrica.
  *
- * Serve un PNG perché iOS non accetta SVG per l'icona della home, e sul Mac non
- * c'è un convertitore SVG→PNG installato. Il disegno sono quattro rettangoli
- * (il filo rosso del margine e tre righe di quaderno), quindi si può dipingere a
- * mano su un buffer RGBA; la codifica PNG la fa `lib/png.mjs`, lo stesso encoder
- * delle facce di tessera del seed. Nessuna dipendenza.
+ * Il marchio sono due G specchiate e fuse, e il trattino di ciascuna è una
+ * mandorla: l'occhio socchiuso del dio che guarda avanti e indietro. Ardesia la
+ * faccia che guarda al passato, carta quella che guarda al futuro, rossi i due
+ * occhi, su un fondo navy. → ADR-0093
  *
- * È un'icona «maskable»: fondo a tutto campo, motivo dentro l'80% centrale, così
- * qualunque maschera (cerchio, quadrato stondato) non taglia niente.
+ * **Perché la matematica e non un convertitore.** Su questo Mac non c'è un
+ * SVG→PNG installato, e non lo si aggiunge: `sharp` è un binario nativo che sta
+ * nel progetto solo per l'import delle carte, e Chrome headless renderebbe la
+ * generazione dell'icona dipendente da un browser installato. Le due forme che
+ * servono si sanno scrivere come disuguaglianze — una corona circolare tagliata
+ * a un angolo, e l'intersezione di due dischi — quindi si rasterizzano
+ * direttamente, con quattro campioni per lato che fanno l'antialiasing.
+ *
+ * **La mandorla è l'intersezione di due cerchi, non una curva di Bézier.** È la
+ * scelta che tiene `public/favicon.svg` e questo file d'accordo: un arco di
+ * cerchio l'SVG lo sa disegnare e questo file lo sa calcolare, una quadratica no
+ * — e due forme *quasi* uguali fra il vettoriale e il PNG sarebbero un difetto
+ * che si vede solo affiancandoli.
+ *
+ * **Il marchio è scalato a 0.9** perché le icone dell'app sono *maskable*: a
+ * piena misura arriva a 43.5 unità dal centro, e una maschera tonda ritaglia a
+ * 40 — le punte degli anelli sarebbero tagliate su Android.
+ *
+ * Cosa scrive, e perché ognuna serve:
+ *   icon-1024.png            il master, per quando servirà una misura nuova
+ *   icon-512.png             manifest, e ripiego di apple-touch
+ *   icon-192.png             manifest, misura di Android
+ *   apple-touch-icon.png     iOS, 180px: quadrato pieno, la maschera la mette lui
+ *   favicon-32.png · -16.png i ripieghi per chi non legge l'SVG
+ *   favicon.ico              Safari vecchi e i lettori di feed: 16, 32 e 48 dentro
+ * Il vettoriale `public/favicon.svg` è scritto a mano e non si genera: è la
+ * fonte del disegno. La geometria sta in `lib/icon-geometry.mjs`, che è
+ * importabile senza scrivere niente — qui invece si scrive, quindi un test
+ * non potrebbe caricare questo file: `lib/icon-parity.test.mjs` confronta
+ * quel modulo col vettoriale.
  */
 
 import { writeFileSync } from 'node:fs'
 
+import { colorAt } from './lib/icon-geometry.mjs'
 import { PATHS, ensureDir, log } from './lib/io.mjs'
 import { png } from './lib/png.mjs'
 
-const SIZE = 512
-
-const INK = [0x10, 0x18, 0x20]
-const RULE = [0xe0, 0x57, 0x4c]
-const PAPER = [0xe9, 0xef, 0xf3]
-const MUTED = [0x8f, 0xa3, 0xb0]
-
-const pixels = Buffer.alloc(SIZE * SIZE * 4)
-
-function fill(color, alpha = 255) {
-  for (let i = 0; i < SIZE * SIZE; i += 1) {
-    pixels[i * 4] = color[0]
-    pixels[i * 4 + 1] = color[1]
-    pixels[i * 4 + 2] = color[2]
-    pixels[i * 4 + 3] = alpha
-  }
-}
-
-/** Rettangolo con angoli stondati, in coordinate 0–1 rispetto al lato. */
-function rect(x0, y0, w, h, color, radius = 0, alpha = 255) {
-  const left = Math.round(x0 * SIZE)
-  const top = Math.round(y0 * SIZE)
-  const width = Math.round(w * SIZE)
-  const height = Math.round(h * SIZE)
-  const r = Math.min(Math.round(radius * SIZE), Math.floor(width / 2), Math.floor(height / 2))
-
-  for (let y = top; y < top + height; y += 1) {
-    if (y < 0 || y >= SIZE) continue
-    for (let x = left; x < left + width; x += 1) {
-      if (x < 0 || x >= SIZE) continue
-      if (r > 0) {
-        const dx = Math.max(left + r - x, x - (left + width - 1 - r), 0)
-        const dy = Math.max(top + r - y, y - (top + height - 1 - r), 0)
-        if (dx > 0 && dy > 0 && dx * dx + dy * dy > r * r) continue
+/** Un PNG quadrato, con 4×4 campioni per pixel. */
+function render(size, { rounded = false } = {}) {
+  const N = 4
+  return png(
+    size,
+    size,
+    (px, py) => {
+      let r = 0
+      let g = 0
+      let b = 0
+      let a = 0
+      for (let sy = 0; sy < N; sy += 1) {
+        for (let sx = 0; sx < N; sx += 1) {
+          const x = ((px + (sx + 0.5) / N) / size) * 100
+          const y = ((py + (sy + 0.5) / N) / size) * 100
+          const c = colorAt(x, y, { rounded })
+          if (c === null) continue
+          r += c[0]
+          g += c[1]
+          b += c[2]
+          a += 255
+        }
       }
-      const index = (y * SIZE + x) * 4
-      const src = alpha / 255
-      pixels[index] = Math.round(color[0] * src + pixels[index] * (1 - src))
-      pixels[index + 1] = Math.round(color[1] * src + pixels[index + 1] * (1 - src))
-      pixels[index + 2] = Math.round(color[2] * src + pixels[index + 2] * (1 - src))
-      pixels[index + 3] = 255
-    }
-  }
+      const n = N * N
+      /* Media dei soli campioni dentro la sagoma: dividere per `n` scurirebbe
+         il bordo verso il nero invece di renderlo trasparente. */
+      const dentro = a / 255
+      if (dentro === 0) return [0, 0, 0, 0]
+      return [Math.round(r / dentro), Math.round(g / dentro), Math.round(b / dentro), Math.round(a / n)]
+    },
+    { alpha: true },
+  )
 }
 
-fill(INK)
-rect(0.28, 0.24, 0.045, 0.52, RULE, 0.022)
-rect(0.4, 0.29, 0.32, 0.065, PAPER, 0.032)
-rect(0.4, 0.4525, 0.235, 0.065, MUTED, 0.032)
-rect(0.4, 0.615, 0.15, 0.065, MUTED, 0.032, 190)
+/**
+ * Un ICO con dentro dei PNG.
+ *
+ * Il formato è una direttoria di sei parole per immagine più i dati in fila;
+ * `width`/`height` sono un byte solo, e 0 vuol dire 256. I payload PNG li
+ * accettano tutti i browser che contano ancora un `.ico`.
+ */
+function ico(entries) {
+  const head = Buffer.alloc(6)
+  head.writeUInt16LE(0, 0) // riservato
+  head.writeUInt16LE(1, 2) // 1 = icona
+  head.writeUInt16LE(entries.length, 4)
 
-const bytes = png(
-  SIZE,
-  SIZE,
-  (x, y) => {
-    const i = (y * SIZE + x) * 4
-    return [pixels[i], pixels[i + 1], pixels[i + 2], pixels[i + 3]]
-  },
-  { alpha: true },
-)
+  let offset = 6 + entries.length * 16
+  const dir = []
+  for (const { size, data } of entries) {
+    const e = Buffer.alloc(16)
+    e.writeUInt8(size >= 256 ? 0 : size, 0)
+    e.writeUInt8(size >= 256 ? 0 : size, 1)
+    e.writeUInt8(0, 2) // colori della palette: nessuna
+    e.writeUInt8(0, 3) // riservato
+    e.writeUInt16LE(1, 4) // piani
+    e.writeUInt16LE(32, 6) // bit per pixel
+    e.writeUInt32LE(data.length, 8)
+    e.writeUInt32LE(offset, 12)
+    dir.push(e)
+    offset += data.length
+  }
+  return Buffer.concat([head, ...dir, ...entries.map((x) => x.data)])
+}
 
+// ── Scrittura ──
 ensureDir(`${PATHS.root}/public`)
-writeFileSync(`${PATHS.root}/public/icon-512.png`, bytes)
-log(`✓ public/icon-512.png (${(bytes.length / 1024).toFixed(1)} kB)`)
+
+/* Le icone dell'app sono **quadrati pieni**: la maschera la mette il sistema, e
+   un angolo trasparente su iOS diventa bianco. Le favicon invece sono stondate
+   da noi, perché nella linguetta del browser nessuno le maschera. */
+const FILES = [
+  ['icon-1024.png', 1024, {}],
+  ['icon-512.png', 512, {}],
+  ['icon-192.png', 192, {}],
+  ['apple-touch-icon.png', 180, {}],
+  ['favicon-32.png', 32, { rounded: true }],
+  ['favicon-16.png', 16, { rounded: true }],
+]
+
+for (const [name, size, options] of FILES) {
+  const bytes = render(size, options)
+  writeFileSync(`${PATHS.root}/public/${name}`, bytes)
+  log(`✓ public/${name} (${(bytes.length / 1024).toFixed(1)} kB)`)
+}
+
+const bundle = ico(
+  [16, 32, 48].map((size) => ({ size, data: render(size, { rounded: true }) })),
+)
+writeFileSync(`${PATHS.root}/public/favicon.ico`, bundle)
+log(`✓ public/favicon.ico (16·32·48, ${(bundle.length / 1024).toFixed(1)} kB)`)

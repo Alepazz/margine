@@ -1,9 +1,9 @@
 {
-  "name": "margine",
+  "name": "giano",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Cruscotto personale delle spese, alimentato dai tricount",
+  "description": "Cruscotto personale di casa, alimentato dai tricount",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

@@ -8,6 +8,7 @@
 import { useState, type ReactNode } from 'react'
 
 import { useStore } from '../data/store'
+import { Brand } from './ui'
 
 export function Gate(): ReactNode {
   const { status, error, unlock, reload } = useStore()
@@ -19,10 +20,7 @@ export function Gate(): ReactNode {
     return (
       <div className="gate">
         <div className="gate-card">
-          <div className="brand">
-            <span className="brand-rule" aria-hidden="true" />
-            <div className="brand-name">Margine</div>
-          </div>
+          <Brand sub={false} />
           <h1 className="gate-title">Non riesco ad aprire i dati</h1>
           <p className="gate-text">{error}</p>
           <button type="button" className="btn btn-primary" onClick={reload}>
@@ -43,13 +41,7 @@ export function Gate(): ReactNode {
           void unlock(passphrase, remember)
         }}
       >
-        <div className="brand">
-          <span className="brand-rule" aria-hidden="true" />
-          <div>
-            <div className="brand-name">Margine</div>
-            <div className="brand-sub">spese e prezzi</div>
-          </div>
-        </div>
+        <Brand />
 
         <div>
           <h1 className="gate-title">Sblocca i dati</h1>

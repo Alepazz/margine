@@ -4,17 +4,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
-    <meta name="description" content="Cruscotto personale delle spese" />
-    <title>Margine</title>
+    <meta name="description" content="Cruscotto personale di casa: spese, prezzi, carte fedeltà, lista della spesa" />
+    <title>Giano</title>
 
+    <!--
+      Le icone in tutti i formati, generate da `npm run icon` a partire dalla
+      geometria in `scripts/make-icon.mjs`; il vettoriale è scritto a mano.
+      L'ordine conta: chi legge l'SVG usa quello, gli altri scendono al `.ico`.
+      → ADR-0093
+    -->
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-    <link rel="apple-touch-icon" href="./icon-512.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16.png" />
+    <link rel="icon" href="./favicon.ico" sizes="48x48 32x32 16x16" />
+    <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
 
     <!-- Installabile sulla schermata Home: si apre a tutto schermo, senza barra del browser -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="Margine" />
+    <meta name="apple-mobile-web-app-title" content="Giano" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f5f7" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0e1317" />
