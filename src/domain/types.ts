@@ -327,6 +327,13 @@ export interface GithubConfig {
    * percorso su cui poi committerebbe. → ADR-0082, ADR-0024
    */
   cardsPath?: string
+  /**
+   * Percorso del file cifrato della lista della spesa. Facoltativo come gli
+   * altri due, con la stessa regola — non si indovina un percorso su cui poi si
+   * committa — e con la stessa aggravante delle carte: il file può non esistere,
+   * quindi un percorso sbagliato lo **creerebbe**. → ADR-0088, ADR-0082
+   */
+  shoppingPath?: string
 }
 
 export interface AppConfig {
@@ -529,6 +536,75 @@ export interface CardsFile {
   /** ISO datetime dell'ultimo aggiornamento. */
   updatedAt: string
   cards: LoyaltyCard[]
+}
+
+/**
+ * In che cosa si misura una cosa da comprare.
+ *
+ * Cinque e non tre come i prezzi (`kg | l | pezzo`), perché le due cose
+ * rispondono a domande diverse: un prezzo a scaffale è per legge riferito
+ * all'unità grande, mentre in una lista si scrive quello che si compra —
+ * «500 g di macinato», «una bottiglia da 500 ml». Convertire fra le due non
+ * serve: il collegamento con l'osservatorio dei prezzi è il **nome**, e ogni
+ * riga dichiara la sua unità. → ADR-0088
+ */
+export type ShoppingUnit = 'pezzo' | 'kg' | 'g' | 'l' | 'ml'
+
+/**
+ * Una cosa da comprare, o già comprata.
+ *
+ * **Lo stato è una data, non un booleano**: `takenAt` assente vuol dire «da
+ * prendere», presente vuol dire «già presa», e la sua ora è ciò che ordina lo
+ * storico. Un booleano più una data direbbero la stessa cosa due volte, e prima
+ * o poi si contraddirebbero.
+ *
+ * `wantedAt` è il suo simmetrico: quando la cosa è **entrata o rientrata** in
+ * lista. Serve perché riprendere una voce dallo storico non la muove di posto
+ * nell'array — quindi senza questo campo una cosa richiesta un minuto fa
+ * comparirebbe in fondo alla lista, fra quelle di due settimane prima. Non si
+ * muove correggendo la quantità: modificare non è richiedere di nuovo.
+ *
+ * Il titolo è **l'unico campo obbligatorio**, per richiesta esplicita: quantità,
+ * unità, negozio e nota sono tutti facoltativi, e una lista si scrive di corsa.
+ * → ADR-0088, ADR-0089
+ */
+export interface ShoppingItem {
+  id: string
+  /** Cosa comprare, testo libero: l'unico campo che serve sempre. */
+  title: string
+  /** Quanto: 3 pezzi, 1,5 kg. Assente = non specificata. */
+  qty?: number
+  /** In che unità è `qty`. Senza `qty` non ha senso, e i validatori lo rifiutano. */
+  unit?: ShoppingUnit
+  /** Dove prenderla, testo libero come per i prezzi. Assente = ovunque. */
+  store?: string
+  /** La «descrizione»: marca, formato, «quello senza lattosio». */
+  note?: string
+  /** ISO datetime: quando è entrata (o rientrata) in lista. */
+  wantedAt: string
+  /** ISO datetime: presente = è già stata presa, cioè è nello storico. */
+  takenAt?: string
+}
+
+/**
+ * Il file della lista: il **quarto** envelope cifrato, accanto a spese,
+ * configurazione e carte.
+ *
+ * Un file suo per tre ragioni, e la terza è quella che decide: `import.mjs`
+ * ricostruisce il master da zero, quindi ciò che vive in `Dataset` va ricopiato
+ * a mano ogni mese (→ ADR-0041); la campanella decifra il file delle spese due
+ * volte per ogni novità, e la lista con le novità delle spese non c'entra
+ * (→ ADR-0051); e **ogni spunta riscrive il file per intero**, perché ogni
+ * cifratura usa un IV nuovo (→ ADR-0025) — dentro il file delle carte, ogni
+ * tocco alla cassa ricifrerebbe anche i settantacinque kilobyte delle facce
+ * delle tessere. Da sola la lista sta in pochi kilobyte, ed è l'unico dato
+ * dell'app che cambia venti volte in mezz'ora. → ADR-0088
+ */
+export interface ShoppingFile {
+  version: number
+  /** ISO datetime dell'ultimo aggiornamento. */
+  updatedAt: string
+  items: ShoppingItem[]
 }
 
 export interface Dataset {

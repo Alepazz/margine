@@ -16,6 +16,23 @@ const DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/
  * lo sa solo `Date`, quindi si costruisce la data e si controlla che non sia
  * stata riportata avanti da sé.
  */
+/**
+ * Vero se è un istante ISO completo, come lo scrive `toISOString()`.
+ *
+ * Il gemello di `isIsoDateTime` in `src/domain/dates.ts`: serve alla lista della
+ * spesa, dove `takenAt` e `wantedAt` sono istanti e non giorni — dieci cose
+ * prese nello stesso pomeriggio finirebbero in un ordine qualsiasi. Come per le
+ * date, si controlla la forma **e** che l'istante esista: `2026-02-30T…` supera
+ * una regex e non è mai esistito.
+ */
+function isDateTime(value) {
+  if (typeof value !== 'string') return false
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/.test(value)) return false
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return false
+  return parsed.toISOString().slice(0, 19) === value.slice(0, 19)
+}
+
 function isDate(value) {
   if (!DATE_RE.test(value ?? '')) return false
   const [year, month, day] = value.split('-').map(Number)
@@ -572,6 +589,109 @@ export function validateCards(file) {
     }
     if (card.note !== undefined && typeof card.note !== 'string') {
       errors.push(`${where}: «note» deve essere testo.`)
+    }
+  }
+
+  return { errors, warnings }
+}
+
+/* Gli stessi tetti di `src/domain/shopping.ts`: il test di parità li presidia. */
+const SHOPPING_UNITS = ['pezzo', 'kg', 'g', 'l', 'ml']
+const MAX_TITLE_CHARS = 100
+const MAX_NOTE_CHARS = 300
+const MAX_STORE_CHARS = 60
+const MAX_QTY = 9999
+/**
+ * Quante voci può contenere la lista prima di un avviso.
+ *
+ * Non è un errore: lo storico è anche il catalogo dei prodotti di casa
+ * (→ ADR-0089), quindi cresce di proposito. Ma oltre qualche centinaio di voci
+ * il file smette di essere piccolo — che è la ragione per cui vive separato — e
+ * val la pena saperlo.
+ */
+const MAX_ITEMS = 500
+
+/**
+ * Le regole di una voce della lista, per la sessione al Mac.
+ *
+ * Gemella di `validateShoppingItem` in `src/domain/shopping.ts`, e un test di
+ * parità prova che concordano: ciò che l'app accetta, `npm run encrypt` non lo
+ * rifiuta. La garanzia è **in una direzione**, come per le carte: qui si
+ * tollerano con un avviso cose che nel modulo non si possono produrre.
+ * → ADR-0088, ADR-0082
+ */
+export function validateShopping(file) {
+  const errors = []
+  const warnings = []
+
+  if (!file || typeof file !== 'object') {
+    return { errors: ['Il file della lista non è un oggetto.'], warnings }
+  }
+  if (!Array.isArray(file.items)) {
+    return { errors: ["Nel file della lista manca l'elenco `items`."], warnings }
+  }
+  if (file.items.length > MAX_ITEMS) {
+    warnings.push(`la lista ha ${file.items.length} voci: oltre ${MAX_ITEMS} vale la pena potarla.`)
+  }
+
+  const seen = new Set()
+  const titoli = new Map()
+  for (const item of file.items) {
+    const where = `voce ${item.id ?? '(senza id)'} «${item.title ?? ''}»`
+
+    if (!item.id) errors.push(`${where}: manca l'id.`)
+    else if (seen.has(item.id)) errors.push(`id di voce duplicato: ${item.id}.`)
+    else seen.add(item.id)
+
+    if (typeof item.title !== 'string' || item.title.trim() === '') {
+      errors.push(`${where}: manca il nome.`)
+    } else if (item.title.length > MAX_TITLE_CHARS) {
+      errors.push(`${where}: nome troppo lungo (${item.title.length} caratteri).`)
+    }
+
+    if (item.qty !== undefined) {
+      if (typeof item.qty !== 'number' || !Number.isFinite(item.qty) || item.qty <= 0) {
+        errors.push(`${where}: quantità non valida (${item.qty}).`)
+      } else if (item.qty > MAX_QTY) {
+        errors.push(`${where}: quantità oltre il massimo (${item.qty}).`)
+      } else if (Math.round(item.qty * 1000) !== item.qty * 1000) {
+        errors.push(`${where}: la quantità ha più di tre decimali (${item.qty}).`)
+      }
+    }
+
+    if (item.unit !== undefined) {
+      if (!SHOPPING_UNITS.includes(item.unit)) {
+        errors.push(`${where}: unità sconosciuta (${item.unit}).`)
+      } else if (item.qty === undefined) {
+        errors.push(`${where}: c'è l'unità ma non la quantità.`)
+      }
+    }
+
+    if (item.store !== undefined) {
+      if (typeof item.store !== 'string') errors.push(`${where}: «store» deve essere testo.`)
+      else if (item.store.length > MAX_STORE_CHARS) {
+        errors.push(`${where}: nome del negozio troppo lungo.`)
+      }
+    }
+    if (item.note !== undefined) {
+      if (typeof item.note !== 'string') errors.push(`${where}: «note» deve essere testo.`)
+      else if (item.note.length > MAX_NOTE_CHARS) errors.push(`${where}: nota troppo lunga.`)
+    }
+
+    if (!isDateTime(item.wantedAt)) errors.push(`${where}: data non valida (${item.wantedAt}).`)
+    if (item.takenAt !== undefined && !isDateTime(item.takenAt)) {
+      errors.push(`${where}: data di quando è stata presa non valida (${item.takenAt}).`)
+    }
+
+    /* Due voci con lo stesso nome sono quasi sempre la stessa cosa scritta due
+       volte da due telefoni: l'app lo impedisce (→ ADR-0089), un dato scritto a
+       mano no. Non è un errore — «pane» in lista e «pane» già preso sono
+       due stati diversi della stessa cosa solo se hanno lo stesso id. */
+    if (typeof item.title === 'string') {
+      const chiave = item.title.trim().replace(/\s+/g, ' ').toLowerCase()
+      const gia = titoli.get(chiave)
+      if (gia !== undefined) warnings.push(`${where}: stesso nome di ${gia}.`)
+      else titoli.set(chiave, where)
     }
   }
 

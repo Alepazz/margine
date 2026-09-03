@@ -20,6 +20,25 @@ const MONTHS_LONG = [
 
 const MONTHS_SHORT = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic']
 
+/**
+ * Vero se è un istante ISO completo, del genere che scrive `toISOString()`.
+ *
+ * Serve dove un giorno non basta: la lista della spesa ordina lo storico per
+ * quando una cosa è stata presa, e dieci cose prese nello stesso pomeriggio
+ * finirebbero in un ordine qualsiasi. Si controlla la **forma** e poi che
+ * l'istante esista davvero, come fa `isRealDate` per i giorni: `2026-02-30T…`
+ * supera una regex e non è mai esistito.
+ */
+export function isIsoDateTime(value: unknown): boolean {
+  if (typeof value !== 'string') return false
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/.test(value)) return false
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return false
+  /* Il giro completo: `Date` perdona `2026-02-30` scivolando al primo marzo, e
+     una data che si trasforma in un'altra non è una data valida. */
+  return parsed.toISOString().slice(0, 19) === value.slice(0, 19)
+}
+
 export function monthKeyOf(isoDate: string): MonthKey {
   return isoDate.slice(0, 7)
 }

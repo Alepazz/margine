@@ -4,14 +4,25 @@ import {
   applyCardOps,
   applyConfigOps,
   applyOps,
+  applyShoppingOps,
   describeOps,
   fileOf,
   isAlreadyApplied,
+  pendingTwin,
   pruneSettled,
   type OutboxEntry,
   type RemoteView,
 } from './outbox'
-import type { AppConfig, CardsFile, Dataset, Expense, LoyaltyCard, PriceEntry } from '../domain/types'
+import type {
+  AppConfig,
+  CardsFile,
+  Dataset,
+  Expense,
+  LoyaltyCard,
+  PriceEntry,
+  ShoppingFile,
+  ShoppingItem,
+} from '../domain/types'
 
 /**
  * Il termine di confronto della coda, con i file che il caso non guarda a
@@ -22,7 +33,7 @@ import type { AppConfig, CardsFile, Dataset, Expense, LoyaltyCard, PriceEntry } 
  * partito.
  */
 function remoto(dataset: Dataset, over: Partial<RemoteView> = {}): RemoteView {
-  return { dataset, config: undefined, cards: undefined, ...over }
+  return { dataset, config: undefined, cards: undefined, shopping: undefined, ...over }
 }
 
 const DATASET: Dataset = {
@@ -786,5 +797,227 @@ describe('le carte fedeltà', () => {
       1000,
     )
     expect(applyCardOps(CARTE, pruned.settled).cards).toEqual([])
+  })
+})
+
+// ───────────────────────── la lista della spesa ─────────────────────────
+
+const VOCE: ShoppingItem = {
+  id: 'lista-2026-09-03-a1b2c3d4',
+  title: 'Latte',
+  qty: 1,
+  unit: 'l',
+  wantedAt: '2026-09-03T10:00:00.000Z',
+}
+
+const LISTA: ShoppingFile = { version: 1, updatedAt: '2026-09-03T09:00:00.000Z', items: [] }
+
+function metti(item: ShoppingItem, ts = 1): OutboxEntry {
+  return { kind: 'list-add', item, entryId: `l${String(ts)}`, ts }
+}
+
+function prendi(itemId: string, at: string, ts = 2): OutboxEntry {
+  return { kind: 'list-take', itemId, at, entryId: `p${String(ts)}`, ts }
+}
+
+function rimetti(itemId: string, at: string, ts = 3): OutboxEntry {
+  return { kind: 'list-untake', itemId, at, entryId: `r${String(ts)}`, ts }
+}
+
+describe('la lista della spesa', () => {
+  it('va nel suo file, non fra le spese né nelle carte', () => {
+    /* Il bersaglio sbagliato non dà errore: l'operazione viene applicata a un
+       file che non la riguarda, non trova niente da fare, e resta in coda per
+       sempre. → ADR-0088 */
+    expect(fileOf({ kind: 'list-add', item: VOCE })).toBe('shopping')
+    expect(fileOf({ kind: 'list-edit', itemId: VOCE.id, fields: {} })).toBe('shopping')
+    expect(fileOf({ kind: 'list-take', itemId: VOCE.id, at: VOCE.wantedAt })).toBe('shopping')
+    expect(fileOf({ kind: 'list-untake', itemId: VOCE.id, at: VOCE.wantedAt })).toBe('shopping')
+    expect(fileOf({ kind: 'list-delete', itemId: VOCE.id })).toBe('shopping')
+  })
+
+  it('si aggiunge, e due volte la stessa non fa due voci', () => {
+    const next = applyShoppingOps(LISTA, [metti(VOCE), metti(VOCE, 2)])
+    expect(next.items).toHaveLength(1)
+    expect(next.items[0]?.title).toBe('Latte')
+  })
+
+  it('non tocca il file quando non c’è niente da fare', () => {
+    /* Stessa identità dell'oggetto: è ciò che evita di riscrivere un envelope
+       (con un IV nuovo) per un'operazione che non cambia niente. */
+    expect(
+      applyShoppingOps(LISTA, [{ kind: 'list-delete', itemId: 'ignoto', entryId: 'x', ts: 1 }]),
+    ).toBe(LISTA)
+  })
+
+  it('presa, la voce porta l’istante dell’operazione', () => {
+    const con = applyShoppingOps(LISTA, [metti(VOCE)])
+    const next = applyShoppingOps(con, [prendi(VOCE.id, '2026-09-03T18:30:00.000Z')])
+    expect(next.items[0]?.takenAt).toBe('2026-09-03T18:30:00.000Z')
+  })
+
+  /*
+   * Rimessa in lista, `takenAt` **sparisce** invece di diventare `undefined`, e
+   * `wantedAt` si sposta a ora: riprendere una cosa dallo storico è richiederla
+   * di nuovo, quindi torna in cima. → ADR-0089
+   */
+  it('rimessa in lista, torna in cima e non porta più la data di quando era presa', () => {
+    const preso = applyShoppingOps(applyShoppingOps(LISTA, [metti(VOCE)]), [
+      prendi(VOCE.id, '2026-09-03T18:30:00.000Z'),
+    ])
+    const next = applyShoppingOps(preso, [rimetti(VOCE.id, '2026-09-04T08:00:00.000Z')])
+    expect(next.items[0]).not.toHaveProperty('takenAt')
+    expect(next.items[0]?.wantedAt).toBe('2026-09-04T08:00:00.000Z')
+  })
+
+  it('si corregge, e un campo si cancella con la stringa vuota', () => {
+    const con = applyShoppingOps(LISTA, [metti({ ...VOCE, note: 'quello intero', store: 'Coop' })])
+    const senza = applyShoppingOps(con, [
+      { kind: 'list-edit', itemId: VOCE.id, fields: { note: '', store: '' }, entryId: 'e', ts: 2 },
+    ])
+    expect(senza.items[0]).not.toHaveProperty('note')
+    expect(senza.items[0]).not.toHaveProperty('store')
+  })
+
+  /*
+   * La quantità è un numero, quindi la stringa vuota non è una strada: si toglie
+   * con **zero**, che sopravvive al JSON e non vuol dire niente su una cosa da
+   * comprare. E togliendo la quantità cade anche l'unità, perché «L di latte»
+   * senza il numero non vuol dire niente. → ADR-0088
+   */
+  it('la quantità si cancella con zero, e si porta via l’unità', () => {
+    const con = applyShoppingOps(LISTA, [metti(VOCE)])
+    const senza = applyShoppingOps(con, [
+      { kind: 'list-edit', itemId: VOCE.id, fields: { qty: 0 }, entryId: 'e', ts: 2 },
+    ])
+    expect(senza.items[0]).not.toHaveProperty('qty')
+    expect(senza.items[0]).not.toHaveProperty('unit')
+  })
+
+  it('ripulisce gli spazi del titolo e del negozio', () => {
+    const next = applyShoppingOps(LISTA, [metti({ ...VOCE, title: '  Latte ', store: ' Coop ' })])
+    expect(next.items[0]?.title).toBe('Latte')
+    expect(next.items[0]?.store).toBe('Coop')
+  })
+
+  it('sopravvive al giro in localStorage', () => {
+    const round = JSON.parse(JSON.stringify(metti(VOCE))) as OutboxEntry
+    expect(round).toEqual(metti(VOCE))
+    expect(applyShoppingOps(LISTA, [round]).items[0]?.title).toBe('Latte')
+  })
+
+  it('senza il file della lista si dice «non ancora», non «sì»', () => {
+    /* `undefined` non è una lista vuota: prima che il file esista, un
+       `list-delete` risulterebbe applicato e uscirebbe dalla coda senza essere
+       mai partito. */
+    expect(isAlreadyApplied(remoto(DATASET), metti(VOCE))).toBe(false)
+    expect(
+      isAlreadyApplied(remoto(DATASET), { kind: 'list-delete', itemId: VOCE.id, entryId: 'd', ts: 1 }),
+    ).toBe(false)
+  })
+
+  /*
+   * **Si guarda lo stato, non l'istante.** Se la cosa l'ha presa anche l'altra
+   * persona, il `takenAt` nel repo è il suo: confrontando gli istanti la mia
+   * operazione non risulterebbe mai applicata e resterebbe in coda quattordici
+   * giorni, riapplicandosi a ogni caricamento.
+   */
+  it('una spunta si riconosce dallo stato, anche se l’ha presa l’altra persona', () => {
+    const suo = applyShoppingOps(applyShoppingOps(LISTA, [metti(VOCE)]), [
+      prendi(VOCE.id, '2026-09-03T17:00:00.000Z'),
+    ])
+    const mia = prendi(VOCE.id, '2026-09-03T18:30:00.000Z')
+    expect(isAlreadyApplied(remoto(DATASET, { shopping: suo.items }), mia)).toBe(true)
+  })
+
+  it('una correzione si riconosce confrontando l’intenzione normalizzata', () => {
+    const con = applyShoppingOps(LISTA, [metti({ ...VOCE, note: 'quello intero' })])
+    const togli: OutboxEntry = {
+      kind: 'list-edit',
+      itemId: VOCE.id,
+      fields: { note: '' },
+      entryId: 'e',
+      ts: 2,
+    }
+    const senza = applyShoppingOps(con, [togli])
+    expect(isAlreadyApplied(remoto(DATASET, { shopping: con.items }), togli)).toBe(false)
+    expect(isAlreadyApplied(remoto(DATASET, { shopping: senza.items }), togli)).toBe(true)
+  })
+
+  it('aggiunta e cancellata, la voce non torna in lista', () => {
+    /* Il fantasma di ADR-0069 su un tipo nuovo: potate una per una, le due
+       operazioni si annullano male e ogni caricamento riapplica l'aggiunta. */
+    const elimina: OutboxEntry = { kind: 'list-delete', itemId: VOCE.id, entryId: 'd', ts: 2 }
+    const pruned = pruneSettled(
+      { pending: [], settled: [metti(VOCE), elimina] },
+      remoto(DATASET, { shopping: [] }),
+      1000,
+    )
+    expect(applyShoppingOps(LISTA, pruned.settled).items).toEqual([])
+  })
+
+  /* La catena, sull'operazione più frequente: prendi e rimetti **già
+     committate** si potano insieme, o la cosa tornerebbe spuntata da sé. */
+  it('presa e rimessa in lista, già committate, escono insieme dalla coda', () => {
+    const inLista = applyShoppingOps(LISTA, [metti(VOCE)])
+    const pruned = pruneSettled(
+      {
+        pending: [],
+        settled: [
+          prendi(VOCE.id, '2026-09-03T18:00:00.000Z'),
+          rimetti(VOCE.id, '2026-09-03T18:01:00.000Z'),
+        ],
+      },
+      remoto(DATASET, { shopping: inLista.items }),
+      1000,
+    )
+    expect(pruned.settled).toEqual([])
+  })
+})
+
+describe('la coppia di spunte che non è ancora partita', () => {
+  const presa = prendi(VOCE.id, '2026-09-03T18:00:00.000Z')
+
+  /*
+   * «Una spunta si può anche togliere e quindi è come se non fosse stata mai
+   * messa», parole di Alessio. Senza questo, un dito scivolato lascerebbe nella
+   * storia pubblica «1 cosa presa, 1 cosa rimessa in lista». → ADR-0091
+   */
+  it('la rimessa in lista annulla la spunta in coda', () => {
+    const gemella = pendingTwin([presa], { kind: 'list-untake', itemId: VOCE.id, at: 'x' })
+    expect(gemella?.entryId).toBe(presa.entryId)
+  })
+
+  it('e vale nei due versi', () => {
+    const rimessa = rimetti(VOCE.id, '2026-09-03T18:00:00.000Z')
+    const gemella = pendingTwin([rimessa], { kind: 'list-take', itemId: VOCE.id, at: 'x' })
+    expect(gemella?.entryId).toBe(rimessa.entryId)
+  })
+
+  it('solo sulla stessa voce', () => {
+    expect(pendingTwin([presa], { kind: 'list-untake', itemId: 'altra', at: 'x' })).toBeUndefined()
+  })
+
+  it('e solo fra prendi e rimetti', () => {
+    /* Aggiungi e cancella **non** si annullano qui: le due non sono l'una
+       l'inversa dell'altra — cancellare una voce mai partita brucia comunque un
+       id — e la potatura per catena le gestisce già. */
+    expect(pendingTwin([metti(VOCE)], { kind: 'list-delete', itemId: VOCE.id })).toBeUndefined()
+    expect(pendingTwin([presa], { kind: 'list-edit', itemId: VOCE.id, fields: {} })).toBeUndefined()
+  })
+
+  it('non guarda quello che è già stato committato', () => {
+    /* Solo `pending`: una spunta già nel repo è storia, e si corregge con
+       un'operazione nuova che dice come stanno le cose adesso. */
+    expect(pendingTwin([], { kind: 'list-untake', itemId: VOCE.id, at: 'x' })).toBeUndefined()
+  })
+
+  it('con più operazioni in coda prende l’ultima, non la prima', () => {
+    const primaPresa = prendi(VOCE.id, '2026-09-03T18:00:00.000Z', 2)
+    const rimessa = rimetti(VOCE.id, '2026-09-03T18:01:00.000Z', 3)
+    const secondaPresa = prendi(VOCE.id, '2026-09-03T18:02:00.000Z', 4)
+    const coda = [primaPresa, rimessa, secondaPresa]
+    const gemella = pendingTwin(coda, { kind: 'list-untake', itemId: VOCE.id, at: 'x' })
+    expect(gemella?.entryId).toBe(secondaPresa.entryId)
   })
 })

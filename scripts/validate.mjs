@@ -2,7 +2,12 @@
 
 import { PATHS, exists, fail, log, readJson } from './lib/io.mjs'
 import { CATEGORIES, taxonomyFingerprint } from './lib/taxonomy.mjs'
-import { printReport, validateCards, validateDataset } from './lib/validate-core.mjs'
+import {
+  printReport,
+  validateCards,
+  validateDataset,
+  validateShopping,
+} from './lib/validate-core.mjs'
 
 try {
   const dataset = readJson(PATHS.expenses)
@@ -18,6 +23,19 @@ try {
     warnings.push(...verdetto.warnings)
     if (verdetto.errors.length === 0) {
       log(`Carte fedeltà: ${cards.cards.length}`)
+    }
+  }
+
+  /* E la lista della spesa, con la stessa forma: un file a parte, un verdetto a
+     parte, lo stesso elenco. → ADR-0088 */
+  if (exists(PATHS.shopping)) {
+    const shopping = readJson(PATHS.shopping)
+    const verdetto = validateShopping(shopping)
+    errors.push(...verdetto.errors)
+    warnings.push(...verdetto.warnings)
+    if (verdetto.errors.length === 0) {
+      const daPrendere = shopping.items.filter((item) => item.takenAt === undefined).length
+      log(`Lista della spesa: ${shopping.items.length} voci, ${daPrendere} da prendere`)
     }
   }
 
@@ -51,6 +69,14 @@ try {
     warnings.push(
       'manca github.cardsPath in data/config.json: le carte fedeltà si vedono ma non si ' +
         'aggiungono dall’app.',
+    )
+  }
+
+  /* Lo stesso per la lista. */
+  if (config.github && !config.github.shoppingPath) {
+    warnings.push(
+      'manca github.shoppingPath in data/config.json: la lista della spesa si vede ma non si ' +
+        'cambia dall’app.',
     )
   }
 

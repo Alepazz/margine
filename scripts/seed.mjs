@@ -722,6 +722,7 @@ const config = {
     dataPath: 'public/data/expenses.json.enc',
     configPath: 'public/data/config.json.enc',
     cardsPath: 'public/data/cards.json.enc',
+    shoppingPath: 'public/data/shopping.json.enc',
   },
 }
 
@@ -897,6 +898,64 @@ const cards = {
   cards: CARDS,
 }
 
+/*
+ * ── La lista della spesa ──
+ *
+ * Con **qualcosa già preso**, e non è un dettaglio: lo storico è anche il
+ * catalogo dei prodotti di casa (→ ADR-0089), e senza voci prese sarebbe una
+ * scheda che nessuno vede mai — cioè la metà del modello che resta invisibile.
+ *
+ * E la maggior parte delle voci **non ha quantità né negozio**, perché è così che
+ * si usa: «a noi basta scrivere un generico Carne». Un esempio in cui tutte le
+ * voci sono compilate darebbe l'idea sbagliata di cosa serve riempire.
+ */
+const ORA = `${TODAY}T09:00:00.000Z`
+const IERI_SERA = `${TODAY}T19:30:00.000Z`
+
+const SHOPPING_ITEMS = [
+  { id: 'lista-2026-08-30-11aa22bb', title: 'Latte', wantedAt: ORA },
+  { id: 'lista-2026-08-30-22bb33cc', title: 'Pane', wantedAt: ORA },
+  { id: 'lista-2026-08-30-77aa88bb', title: 'Frutta', wantedAt: ORA },
+  {
+    id: 'lista-2026-08-30-33cc44dd',
+    title: 'Macinato',
+    qty: 500,
+    unit: 'g',
+    note: 'quello magro',
+    wantedAt: ORA,
+  },
+  {
+    id: 'lista-2026-08-30-44dd55ee',
+    title: 'Lampadina E27',
+    qty: 2,
+    unit: 'pezzo',
+    store: 'Ferramenta D',
+    wantedAt: ORA,
+  },
+  /* Già prese, ieri sera: sono il catalogo da cui si riaggiunge. */
+  {
+    id: 'lista-2026-08-29-55ee66ff',
+    title: 'Passata di pomodoro',
+    qty: 3,
+    unit: 'pezzo',
+    wantedAt: `${TODAY}T08:00:00.000Z`,
+    takenAt: IERI_SERA,
+  },
+  {
+    id: 'lista-2026-08-29-66ff7700',
+    title: 'Caffè',
+    store: 'Supermercato A',
+    wantedAt: `${TODAY}T08:00:00.000Z`,
+    takenAt: `${TODAY}T19:31:00.000Z`,
+  },
+]
+
+const shopping = {
+  version: 1,
+  updatedAt: ORA,
+  items: SHOPPING_ITEMS,
+}
+
 const dataset = {
   version: 2,
   updatedAt: `${TODAY}T09:00:00.000Z`,
@@ -911,15 +970,18 @@ const dataset = {
 writeJson(`${PATHS.dataExample}/expenses.json`, dataset)
 writeJson(`${PATHS.dataExample}/config.json`, config)
 writeJson(`${PATHS.dataExample}/cards.json`, cards)
+writeJson(`${PATHS.dataExample}/shopping.json`, shopping)
 log(
   `✓ Dati di esempio: ${expenses.length} spese, ${TRICOUNTS.length} tricount, ` +
-    `${PRICES.length} prezzi rilevati, ${CARDS.length} carte in data-example/`,
+    `${PRICES.length} prezzi rilevati, ${CARDS.length} carte, ` +
+    `${SHOPPING_ITEMS.length} voci in lista in data-example/`,
 )
 
 if (!exists(PATHS.expenses)) {
   writeJson(PATHS.expenses, dataset)
   writeJson(PATHS.config, config)
   writeJson(PATHS.cards, cards)
+  writeJson(PATHS.shopping, shopping)
   log('✓ Copiati anche in data/ (era vuota)')
 } else {
   log('· data/ contiene già dei dati: lasciata intatta')

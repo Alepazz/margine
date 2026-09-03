@@ -19,9 +19,12 @@ export const PATHS = {
   config: join(ROOT, 'data', 'config.json'),
   /* Le carte fedeltà: un terzo file, che può non esistere. → ADR-0082 */
   cards: join(ROOT, 'data', 'cards.json'),
+  /* La lista della spesa: un quarto file, che può non esistere. → ADR-0088 */
+  shopping: join(ROOT, 'data', 'shopping.json'),
   expensesEnc: join(ROOT, 'public', 'data', 'expenses.json.enc'),
   configEnc: join(ROOT, 'public', 'data', 'config.json.enc'),
   cardsEnc: join(ROOT, 'public', 'data', 'cards.json.enc'),
+  shoppingEnc: join(ROOT, 'public', 'data', 'shopping.json.enc'),
 }
 
 export function ensureDir(path) {

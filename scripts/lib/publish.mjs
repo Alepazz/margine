@@ -1,25 +1,33 @@
 /**
  * Valida i dati in chiaro e li pubblica cifrati in `public/data/`.
  *
- * I due file usano lo stesso salt di derivazione: nell'app la chiave si calcola
- * una volta sola invece di due (600.000 iterazioni non sono gratuite su un
- * telefono).
+ * I file usano **lo stesso salt** di derivazione: nell'app la chiave si calcola
+ * una volta sola invece di quattro (600.000 iterazioni non sono gratuite su un
+ * telefono). Due dei quattro sono facoltativi — le carte e la lista della spesa
+ * — perché chi non li usa non deve averli. → ADR-0088, ADR-0082
  */
 
 import { statSync } from 'node:fs'
 
 import { deriveKey, encryptEnvelope, newKdfMeta } from './crypto-node.mjs'
 import { PATHS, ensureDir, exists, log, readJson, readPassphrase, writeJson } from './io.mjs'
-import { printReport, validateCards, validateDataset } from './validate-core.mjs'
+import { printReport, validateCards, validateDataset, validateShopping } from './validate-core.mjs'
 
 export async function publish({ silent = false } = {}) {
   const dataset = readJson(PATHS.expenses)
   const config = readJson(PATHS.config)
   /* Le carte sono facoltative: chi non le usa non ha il file, e non deve. */
   const cards = exists(PATHS.cards) ? readJson(PATHS.cards) : undefined
+  /* Come le carte: chi non la usa non ha il file, e non deve. */
+  const shopping = exists(PATHS.shopping) ? readJson(PATHS.shopping) : undefined
   const { errors, warnings, report } = validateDataset(dataset, config)
   if (cards !== undefined) {
     const verdetto = validateCards(cards)
+    errors.push(...verdetto.errors)
+    warnings.push(...verdetto.warnings)
+  }
+  if (shopping !== undefined) {
+    const verdetto = validateShopping(shopping)
     errors.push(...verdetto.errors)
     warnings.push(...verdetto.warnings)
   }
@@ -43,6 +51,9 @@ export async function publish({ silent = false } = {}) {
   if (cards !== undefined) {
     writeJson(PATHS.cardsEnc, await encryptEnvelope(cards, key, kdf))
   }
+  if (shopping !== undefined) {
+    writeJson(PATHS.shoppingEnc, await encryptEnvelope(shopping, key, kdf))
+  }
 
   if (!silent) {
     const size = (path) => `${(statSync(path).size / 1024).toFixed(1)} kB`
@@ -51,6 +62,12 @@ export async function publish({ silent = false } = {}) {
     log(`✓ public/data/config.json.enc    (${size(PATHS.configEnc)})`)
     if (cards !== undefined) {
       log(`✓ public/data/cards.json.enc     (${size(PATHS.cardsEnc)}, ${cards.cards.length} carte)`)
+    }
+    if (shopping !== undefined) {
+      log(
+        `✓ public/data/shopping.json.enc  (${size(PATHS.shoppingEnc)}, ` +
+          `${shopping.items.length} voci in lista)`,
+      )
     }
     printReport(report, log)
   }

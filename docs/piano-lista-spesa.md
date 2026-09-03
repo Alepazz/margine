@@ -4,6 +4,8 @@ Scritto il 03/09/2026, su richiesta di Alessio: «la possibilità di segnare le 
 
 Le decisioni aperte sono state prese da Alessio nell'intervista dello stesso giorno, e stanno in fondo. Il piano è chiuso e si può implementare così com'è.
 
+**Due cose di questo piano sono state rovesciate durante l'implementazione**, guardando l'interfaccia vera sul telefono, e la ragione sta in ADR-0089: le **sezioni per supermercato** non esistono (il negozio è un avviso su una voce, non una dimensione della lista, e il 99% delle voci non ne ha uno), e ciò che qui si chiama «il carrello» si chiama **lo storico** — «non è nel carrello, ma è proprio il passato». Il resto del piano è stato eseguito come scritto.
+
 ## Il modello: funziona come Bring
 
 La domanda che ha cambiato la forma del piano è cosa succede a una cosa spuntata. Alessio: «Al click su un prodotto quel prodotto viene messo nel carrello quindi esce dalla spesa. Se lo si rimuove dal carrello viene rimesso nella spesa. La lista deve essere solo un elenco di cose che vanno prese, quindi quello che c'è è tutto quello che è ancora da prendere, quello che è nel carrello è già stato preso, che sia appena stato preso oppure mesi fa. Deve funzionare come l'app Bring».

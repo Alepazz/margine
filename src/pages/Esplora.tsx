@@ -29,6 +29,7 @@ import {
   tax730ByYear,
   totalShare,
 } from '../domain/selectors'
+import { toBuy } from '../domain/shopping'
 import { tripTitleOf, tripsOf } from '../domain/types'
 import { useReadyStore } from '../data/store'
 import { useCoupleBalance, usePageData, useProjects } from './usePageData'
@@ -72,9 +73,9 @@ function HubGroup({ title, entries }: { title: string; entries: HubEntry[] }): R
 
 export function Esplora(): ReactNode {
   const { config, dataset, view, lookup, month, series, all, everyday } = usePageData()
-  /* Le carte non passano da `usePageData`: non sono spese e non sono di nessuno
-     dei due. → ADR-0082 */
-  const { cards } = useReadyStore()
+  /* Carte e lista non passano da `usePageData`: non sono spese e non sono di
+     nessuno dei due. → ADR-0088, ADR-0082 */
+  const { cards, shopping } = useReadyStore()
   const person = view.person
   const other = person === 'me' ? 'partner' : 'me'
   const { houseTricount, houseCategory, catCategory } = config
@@ -226,7 +227,20 @@ export function Esplora(): ReactNode {
    * esce da `cards.length`, quindi non pretende nessun selettore nuovo — che è
    * la condizione posta da ADR-0044 per le anteprime dell'hub.
    */
+  /* Da prendere, non il totale: è la domanda che si fa aprendo la lista, e
+     `toBuy` è lo stesso selettore che usa la pagina — un'anteprima che dicesse
+     un numero diverso da quello della sua pagina toglierebbe la ragione per cui
+     l'hub esiste. → ADR-0044 */
+  const daPrendere = toBuy(shopping).length
+
   const negozio: HubEntry[] = [
+    {
+      to: '/lista',
+      glyph: '🛒',
+      name: 'Lista della spesa',
+      value: daPrendere === 0 ? '—' : String(daPrendere),
+      hint: daPrendere === 0 ? 'niente da comprare' : daPrendere === 1 ? 'cosa da prendere' : 'cose da prendere',
+    },
     {
       to: '/carte',
       glyph: '💳',

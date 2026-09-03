@@ -8,8 +8,8 @@
  * **Prima si decifra tutto, poi si scrive.** L'ordine non è pignoleria: fino al
  * 31/08/2026 questo script scriveva le spese, poi leggeva un campo che non
  * esisteva più, e lanciava — lasciando `data/` a metà, con un messaggio che
- * sembrava un guasto della cifratura. Con i file diventati tre il rischio
- * triplica, quindi la scrittura è l'ultima cosa che succede.
+ * sembrava un guasto della cifratura. Con i file diventati quattro il rischio
+ * cresce con loro, quindi la scrittura è l'ultima cosa che succede.
  */
 
 import { assertEnvelope, decryptEnvelope, deriveKey } from './lib/crypto-node.mjs'
@@ -20,7 +20,13 @@ const force = process.argv.includes('--yes')
 try {
   if (!exists(PATHS.expensesEnc)) throw new Error(`Non trovo ${PATHS.expensesEnc}`)
 
-  if (!force && (exists(PATHS.expenses) || exists(PATHS.config) || exists(PATHS.cards))) {
+  if (
+    !force &&
+    (exists(PATHS.expenses) ||
+      exists(PATHS.config) ||
+      exists(PATHS.cards) ||
+      exists(PATHS.shopping))
+  ) {
     log('data/ contiene già dei file in chiaro.')
     log('Rilancia con --yes per sovrascriverli con quelli del repo:')
     log('  npm run decrypt -- --yes')
@@ -53,6 +59,13 @@ try {
       cards = await decryptEnvelope(envelope, await keyFor(envelope))
     }
 
+    /* La lista della spesa, come le carte: può non esserci. → ADR-0088 */
+    let shopping
+    if (exists(PATHS.shoppingEnc)) {
+      const envelope = assertEnvelope(readJson(PATHS.shoppingEnc), PATHS.shoppingEnc)
+      shopping = await decryptEnvelope(envelope, await keyFor(envelope))
+    }
+
     writeJson(PATHS.expenses, dataset)
     const viaggi = dataset.tricounts.filter((tricount) => tricount.trip).length
     log(`✓ data/expenses.json — ${dataset.expenses.length} spese, ${viaggi} viaggi`)
@@ -63,6 +76,10 @@ try {
     if (cards !== undefined) {
       writeJson(PATHS.cards, cards)
       log(`✓ data/cards.json — ${cards.cards.length} carte`)
+    }
+    if (shopping !== undefined) {
+      writeJson(PATHS.shopping, shopping)
+      log(`✓ data/shopping.json — ${shopping.items.length} voci in lista`)
     }
   }
 } catch (error) {

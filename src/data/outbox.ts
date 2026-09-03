@@ -30,6 +30,8 @@ import type {
   PersonId,
   PriceEntry,
   Settlement,
+  ShoppingFile,
+  ShoppingItem,
   Tricount,
 } from '../domain/types'
 
@@ -83,17 +85,35 @@ export type Op =
   | { kind: 'card'; card: LoyaltyCard }
   | { kind: 'card-edit'; cardId: string; fields: Partial<LoyaltyCard> }
   | { kind: 'card-delete'; cardId: string }
+  /**
+   * La lista della spesa: cinque operazioni.
+   *
+   * `list-take` e `list-untake` **non** sono un `list-edit` su `takenAt`, e
+   * sono l'operazione più frequente di tutta l'app: separarle è ciò che permette
+   * al messaggio di commit di dire «1 cosa presa» invece di «1 voce
+   * modificata», e alla campanella di tacerle (→ ADR-0091). Portano l'istante
+   * **dentro** l'operazione e non lo prendono dall'orologio al momento di
+   * applicarla: riapplicata dopo un ricaricamento darebbe un istante diverso, e
+   * l'ordine dello storico cambierebbe sotto gli occhi.
+   */
+  | { kind: 'list-add'; item: ShoppingItem }
+  | { kind: 'list-edit'; itemId: string; fields: Partial<ShoppingItem> }
+  | { kind: 'list-take'; itemId: string; at: string }
+  | { kind: 'list-untake'; itemId: string; at: string }
+  | { kind: 'list-delete'; itemId: string }
 
 /**
- * Quale dei tre file cifrati riscrive un'operazione.
+ * Quale dei **quattro** file cifrati riscrive un'operazione.
  *
- * Erano due e la domanda era un booleano (`touchesConfig`). Con le carte sono
- * tre, e il tipo è un'unione **esaustiva**: un'operazione nuova senza un file di
- * destinazione non compila, invece di finire per sbaglio nel file delle spese —
- * dove il salvataggio l'applicherebbe a un dataset che non la riguarda, non
- * troverebbe niente da fare, e la lascerebbe in coda per sempre. → ADR-0082
+ * Era un booleano (`touchesConfig`) quando i file erano due. Il tipo è un'unione
+ * **esaustiva**: un'operazione nuova senza un file di destinazione non compila,
+ * invece di finire per sbaglio nel file delle spese — dove il salvataggio
+ * l'applicherebbe a un dataset che non la riguarda, non troverebbe niente da
+ * fare, e la lascerebbe in coda per sempre. È il presidio che è cresciuto meglio
+ * di tutti: le carte e poi la lista non hanno potuto sbagliare destinazione.
+ * → ADR-0088, ADR-0082
  */
-export type FileTarget = 'data' | 'config' | 'cards'
+export type FileTarget = 'data' | 'config' | 'cards' | 'shopping'
 
 export function fileOf(entry: Op): FileTarget {
   switch (entry.kind) {
@@ -104,6 +124,12 @@ export function fileOf(entry: Op): FileTarget {
     case 'card-edit':
     case 'card-delete':
       return 'cards'
+    case 'list-add':
+    case 'list-edit':
+    case 'list-take':
+    case 'list-untake':
+    case 'list-delete':
+      return 'shopping'
     case 'patch':
     case 'create':
     case 'update':
@@ -169,6 +195,20 @@ function isEntry(value: unknown): value is OutboxEntry {
     case 'card-edit':
     case 'card-delete':
       return typeof (v as { cardId?: unknown }).cardId === 'string'
+    case 'list-add':
+      return typeof (v as { item?: { id?: unknown } }).item?.id === 'string'
+    case 'list-take':
+    case 'list-untake':
+      /* L'istante è portante come l'id: senza, applicare l'operazione
+         scriverebbe `undefined` in `takenAt` e la voce resterebbe in un terzo
+         stato che nessuno gestisce. */
+      return (
+        typeof (v as { itemId?: unknown }).itemId === 'string' &&
+        typeof (v as { at?: unknown }).at === 'string'
+      )
+    case 'list-edit':
+    case 'list-delete':
+      return typeof (v as { itemId?: unknown }).itemId === 'string'
     default:
       return false
   }
@@ -419,6 +459,112 @@ export function applyCardOps(file: CardsFile, entries: readonly OutboxEntry[]): 
 }
 
 /**
+ * Le operazioni della lista della spesa, applicate al **loro** file.
+ *
+ * Un applicatore a parte come per le carte e per la configurazione: la lista
+ * vive in un envelope cifrato suo, e mescolarla qui vorrebbe dire riscrivere
+ * ogni volta anche ciò che non è cambiato — con un IV nuovo a ogni cifratura,
+ * cioè trecentosettanta kilobyte di diff per una cosa spuntata alla cassa.
+ * → ADR-0088, ADR-0025
+ */
+export function applyShoppingOps(
+  file: ShoppingFile,
+  entries: readonly OutboxEntry[],
+): ShoppingFile {
+  /* Una copia e basta, come per le carte: sono un centinaio di voci di testo, e
+     il copy-on-write non paga il codice che costa. */
+  const items = [...file.items]
+  let touched = false
+
+  for (const entry of [...entries].sort((a, b) => a.ts - b.ts)) {
+    switch (entry.kind) {
+      case 'list-add': {
+        if (items.some((i) => i.id === entry.item.id)) break
+        items.push(normalizeShoppingItem(entry.item))
+        touched = true
+        break
+      }
+      case 'list-edit': {
+        const index = items.findIndex((i) => i.id === entry.itemId)
+        const current = items[index]
+        if (current === undefined) break
+        items[index] = normalizeShoppingItem({ ...current, ...entry.fields })
+        touched = true
+        break
+      }
+      case 'list-take': {
+        const index = items.findIndex((i) => i.id === entry.itemId)
+        const current = items[index]
+        if (current === undefined) break
+        items[index] = { ...current, takenAt: entry.at }
+        touched = true
+        break
+      }
+      case 'list-untake': {
+        const index = items.findIndex((i) => i.id === entry.itemId)
+        const current = items[index]
+        if (current === undefined) break
+        /*
+         * Torna in lista **e in cima**: `wantedAt` è quando una cosa è stata
+         * richiesta, e riprenderla dallo storico è richiederla di nuovo. Senza
+         * questo, una cosa ripresa adesso comparirebbe in fondo, fra quelle di
+         * due settimane prima. → ADR-0089
+         */
+        const { takenAt: _preso, ...resto } = current
+        items[index] = { ...resto, wantedAt: entry.at }
+        touched = true
+        break
+      }
+      case 'list-delete': {
+        const index = items.findIndex((i) => i.id === entry.itemId)
+        if (index < 0) break
+        items.splice(index, 1)
+        touched = true
+        break
+      }
+      default:
+        break
+    }
+  }
+
+  if (!touched) return file
+  return { ...file, items, updatedAt: new Date().toISOString() }
+}
+
+/**
+ * Come `normalizeCard`, con la stessa trappola e una in più.
+ *
+ * La stessa: un `list-edit` si applica come `{ ...voce, ...campi }`, quindi un
+ * campo assente vuol dire «lascia com'era», e per **togliere** una nota o un
+ * negozio si dice la stringa vuota — `undefined` non sopravvive a
+ * `JSON.stringify`, e la coda vive in `localStorage`.
+ *
+ * Quella in più: la quantità è un numero, quindi la stringa vuota non è una
+ * strada. Si toglie con **zero**, che è un valore che sopravvive al JSON e che
+ * non vuol dire niente su una cosa da comprare — «zero mele» non è una
+ * quantità. E togliendo la quantità cade anche l'unità, perché «kg di mele»
+ * senza il numero non vuol dire niente: sono un campo solo in due pezzi.
+ */
+function normalizeShoppingItem(item: ShoppingItem): ShoppingItem {
+  const next: ShoppingItem = { ...item, title: item.title.trim() }
+  if (next.store !== undefined) {
+    const store = next.store.trim()
+    if (store === '') delete next.store
+    else next.store = store
+  }
+  if (next.note !== undefined) {
+    const note = next.note.trim()
+    if (note === '') delete next.note
+    else next.note = note
+  }
+  if (next.qty === undefined || !Number.isFinite(next.qty) || next.qty <= 0) {
+    delete next.qty
+    delete next.unit
+  }
+  return next
+}
+
+/**
  * Come `normalize` per le spese, e con la stessa trappola: **un campo si
  * cancella con la stringa vuota, non con `undefined`**.
  *
@@ -548,6 +694,7 @@ export interface RemoteView {
   dataset: Dataset
   config: AppConfig | undefined
   cards: readonly LoyaltyCard[] | undefined
+  shopping: readonly ShoppingItem[] | undefined
 }
 
 /**
@@ -558,7 +705,7 @@ export interface RemoteView {
  * alle altre, e quelle voci resterebbero in coda a vita.
  */
 export function isAlreadyApplied(remote: RemoteView, entry: OutboxEntry): boolean {
-  const { dataset, config, cards } = remote
+  const { dataset, config, cards, shopping } = remote
   switch (entry.kind) {
     case 'patch': {
       const expense = dataset.expenses.find((e) => e.id === entry.expenseId)
@@ -649,6 +796,50 @@ export function isAlreadyApplied(remote: RemoteView, entry: OutboxEntry): boolea
     case 'card-delete':
       if (!cards) return false
       return !cards.some((c) => c.id === entry.cardId)
+    case 'list-add':
+      /* Come per le carte: senza il file non si può dire, e «non ancora» è la
+         risposta prudente. Capita davvero il giorno della prima voce, quando il
+         file nel repo non esiste. */
+      if (!shopping) return false
+      return shopping.some((i) => i.id === entry.item.id)
+    case 'list-edit': {
+      if (!shopping) return false
+      const item = shopping.find((i) => i.id === entry.itemId)
+      if (!item) return false
+      /* Con l'**intenzione normalizzata**, come `update`, `tricount-edit` e
+         `card-edit`: `note: ''` vuol dire «togli la nota» e `qty: 0` «togli la
+         quantità», e una voce che non le ha più soddisfa quell'operazione anche
+         se i valori grezzi non coincidono. Grezza, la voce non sarebbe mai
+         riconosciuta come applicata e resterebbe in coda quattordici giorni. */
+      const wanted = normalizeShoppingItem({ ...item, ...entry.fields })
+      return Object.keys(entry.fields).every(
+        (key) =>
+          JSON.stringify(item[key as keyof ShoppingItem]) ===
+          JSON.stringify(wanted[key as keyof ShoppingItem]),
+      )
+    }
+    /*
+     * **Si guarda lo stato, non l'istante.** Se la cosa l'ha presa anche l'altra
+     * persona, il `takenAt` nel repo è il suo e non il mio: confrontando gli
+     * istanti l'operazione non risulterebbe mai applicata e resterebbe in coda
+     * per quattordici giorni, riapplicandosi a ogni caricamento. Quello che
+     * conta è che la voce sia fra le cose prese, e ci è.
+     */
+    case 'list-take': {
+      if (!shopping) return false
+      const item = shopping.find((i) => i.id === entry.itemId)
+      if (!item) return false
+      return item.takenAt !== undefined
+    }
+    case 'list-untake': {
+      if (!shopping) return false
+      const item = shopping.find((i) => i.id === entry.itemId)
+      if (!item) return false
+      return item.takenAt === undefined
+    }
+    case 'list-delete':
+      if (!shopping) return false
+      return !shopping.some((i) => i.id === entry.itemId)
   }
 }
 
@@ -689,7 +880,53 @@ function targetOf(entry: OutboxEntry): string {
     case 'card-edit':
     case 'card-delete':
       return `carta:${entry.cardId}`
+    case 'list-add':
+      return `lista:${entry.item.id}`
+    case 'list-edit':
+    case 'list-take':
+    case 'list-untake':
+    case 'list-delete':
+      return `lista:${entry.itemId}`
   }
+}
+
+/**
+ * La voce **ancora in coda** che questa operazione annulla, se c'è.
+ *
+ * Alessio, chiedendo la lista: «una spunta si può anche togliere e quindi è come
+ * se non fosse stata mai messa». Il modo giusto di ottenerlo non è un commit di
+ * compensazione — che nella storia pubblica lascerebbe «1 cosa presa, 1 cosa
+ * rimessa in lista» per un dito scivolato — ma cancellare la coppia **prima
+ * della partenza**: se il `list-take` di una voce non è ancora stato committato
+ * e arriva il suo `list-untake`, le due si annullano e non parte nessun commit.
+ *
+ * È lecito perché il remoto non ha visto né l'una né l'altra, e lo stato che le
+ * due insieme descrivono è identico a quello di partenza: l'invariante «locale =
+ * remoto + coda» resta vera. Per questo guarda **solo `pending`** — una spunta
+ * già committata è storia, e si corregge con un'operazione nuova che dice come
+ * stanno le cose adesso.
+ *
+ * Vale solo per la coppia prendi/rimetti, che è quella che si fa per sbaglio
+ * venti volte in una spesa. Non si generalizza ad «aggiungi e cancella», che è
+ * già gestito bene dalla potatura per catena (→ ADR-0069) e dove le due
+ * operazioni **non** sono l'una l'inversa dell'altra: cancellare una voce che
+ * non è mai partita lascia comunque un id bruciato, e nessuno se ne accorge.
+ * → ADR-0091
+ */
+export function pendingTwin(
+  pending: readonly OutboxEntry[],
+  op: Op,
+): OutboxEntry | undefined {
+  if (op.kind !== 'list-take' && op.kind !== 'list-untake') return undefined
+  const opposta: Op['kind'] = op.kind === 'list-take' ? 'list-untake' : 'list-take'
+  /* Dall'ultima verso la prima: se in coda ce ne fossero due, quella che
+     descrive lo stato di adesso è l'ultima, ed è quella da annullare. */
+  for (let i = pending.length - 1; i >= 0; i -= 1) {
+    const entry = pending[i]
+    if (entry === undefined) continue
+    if (entry.kind === opposta && entry.itemId === op.itemId) return entry
+  }
+  return undefined
 }
 
 /**
@@ -778,6 +1015,14 @@ export const OP_WORDS: Record<Op['kind'], [string, string]> = {
   card: ['carta aggiunta', 'carte aggiunte'],
   'card-edit': ['carta modificata', 'carte modificate'],
   'card-delete': ['carta eliminata', 'carte eliminate'],
+  /* «cosa» perché è la parola con cui si parla di una lista della spesa, e
+     perché il titolo non entra nel messaggio: il repo è pubblico, e un commit
+     dice quante cose, non quali. → ADR-0051, ADR-0067 */
+  'list-add': ['cosa aggiunta alla lista', 'cose aggiunte alla lista'],
+  'list-edit': ['voce della lista modificata', 'voci della lista modificate'],
+  'list-take': ['cosa presa', 'cose prese'],
+  'list-untake': ['cosa rimessa in lista', 'cose rimesse in lista'],
+  'list-delete': ['voce della lista eliminata', 'voci della lista eliminate'],
 }
 
 /** Riassunto per il messaggio di commit. */

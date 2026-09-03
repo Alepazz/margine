@@ -14,9 +14,12 @@ import {
   parseChanges,
   partsOfSummary,
   phraseOf,
+  SILENT_KINDS,
   touchesExpenses,
   unseenCount,
   unseenSince,
+  CHANGE_GROUPS,
+  GROUP_LABELS,
   type Change,
   type RawCommit,
 } from './changes'
@@ -107,7 +110,7 @@ describe('quante cose ha toccato un commit', () => {
 })
 
 /*
- * La guardia che decide se vale la pena scaricare due file da 375 kB. Si
+ * La guardia che decide se vale la pena scaricare due file da 367 kB. Si
  * risponde dal **messaggio**, senza rete: è quello che la rende utile.
  * → ADR-0087
  */
@@ -134,6 +137,8 @@ describe('quali commit hanno un dettaglio da leggere', () => {
   })
 
   it('un commit che non tocca le spese no', () => {
+    expect(touchesExpenses(change('3 cose aggiunte alla lista'))).toBe(false)
+    expect(touchesExpenses(change('5 cose prese'))).toBe(false)
     expect(touchesExpenses(change('2 prezzi rilevati'))).toBe(false)
     expect(touchesExpenses(change('1 carta aggiunta'))).toBe(false)
     expect(touchesExpenses(change('categorie aggiornate'))).toBe(false)
@@ -392,5 +397,53 @@ describe('quante righe non sono ancora state guardate', () => {
   it('su un elenco vuoto fa zero comunque', () => {
     expect(unseenCount([], undefined)).toBe(0)
     expect(unseenCount([], '2026-08-27T12:00:00Z')).toBe(0)
+  })
+})
+
+/*
+ * Le spunte non sono novità: venti righe «ha preso una cosa» seppellirebbero le
+ * novità vere, e la cosa presa la si vede nella lista. Il silenzio si ottiene in
+ * `noticesOf`, così l'elenco e il pallino restano la stessa cosa. → ADR-0091
+ */
+describe('le operazioni mute', () => {
+  const senzaDettaglio = () => ({})
+
+  it('sono le due spunte, e nient’altro', () => {
+    expect([...SILENT_KINDS].sort()).toEqual(['list-take', 'list-untake'])
+  })
+
+  it('un commit di sole spunte non fa nessuna riga', () => {
+    const changes = parseChanges([
+      commit({ message: `3 cose prese, 1 cosa rimessa in lista${APP_COMMIT_SUFFIX}` }),
+    ])
+    expect(changes).toHaveLength(1)
+    expect(noticesOf(changes, senzaDettaglio)).toEqual([])
+  })
+
+  it('in un commit misto restano le righe che non sono mute', () => {
+    const changes = parseChanges([
+      commit({ message: `2 cose prese, 1 cosa aggiunta alla lista${APP_COMMIT_SUFFIX}` }),
+    ])
+    const righe = noticesOf(changes, senzaDettaglio)
+    expect(righe).toHaveLength(1)
+    expect(righe[0]?.kind === 'summary' ? righe[0].part.kind : undefined).toBe('list-add')
+  })
+
+  /* Il gruppo esiste e le cinque operazioni gli rispondono: senza, la riga non
+     avrebbe una spunta in Impostazioni che la possa spegnere. → ADR-0054 */
+  it('la lista è un gruppo suo, accanto ai prezzi', () => {
+    expect(CHANGE_GROUPS).toContain('lista')
+    expect(groupsOfSummary('1 cosa aggiunta alla lista')).toEqual(['lista'])
+    expect(groupsOfSummary('1 cosa presa')).toEqual(['lista'])
+    expect(GROUP_LABELS.lista).toMatch(/\S/)
+  })
+
+  /*
+   * Il gruppo spento filtra **il commit**, quindi anche le righe non mute
+   * sparisono: è la regola di ADR-0054, e vale per la lista come per gli altri.
+   */
+  it('col gruppo spento il commit non arriva nemmeno', () => {
+    const raw = [commit({ message: `1 cosa aggiunta alla lista${APP_COMMIT_SUFFIX}` })]
+    expect(parseChanges(raw, { groups: ['spese'] })).toEqual([])
   })
 })

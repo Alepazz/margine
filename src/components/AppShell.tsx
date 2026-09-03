@@ -23,6 +23,7 @@ import { projectsOf, type Tricount } from '../domain/types'
 import { SyncBadge, ThemeButton } from './Controls'
 import { ExpenseForm } from './ExpenseForm'
 import { CardSheet } from './CardSheet'
+import { ShoppingSheet } from './ShoppingSheet'
 import { NewsSheet } from './NewsSheet'
 import { PriceSheet } from './PriceSheet'
 
@@ -52,6 +53,8 @@ type NavItem =
 
 /** La rotta su cui il `+` registra un prezzo invece di aggiungere una spesa. */
 const PRICE_ROUTE = '/prezzi'
+/** La lista della spesa: là il `+` aggiunge una cosa da comprare. */
+const LIST_ROUTE = '/lista'
 /** Il mazzo delle carte, e le tessere aperte: là il `+` aggiunge una carta. */
 const CARDS_ROUTE = '/carte'
 const CARD_PREFIX = '/carte/'
@@ -95,6 +98,7 @@ const NAV: NavItem[] = [
   { to: '/statistiche', label: 'Statistiche', glyph: '📊', slot: 'hub', group: 'analisi' },
   { to: '/730', label: 'Spese da 730', glyph: '🧾', slot: 'hub', group: 'analisi' },
   { to: '/saldo', label: 'Saldo', glyph: '⚖️', slot: 'hub', group: 'analisi' },
+  { to: LIST_ROUTE, label: 'Lista della spesa', glyph: '🛒', slot: 'hub', group: 'negozio' },
   { to: CARDS_ROUTE, label: 'Carte', glyph: '💳', slot: 'hub', group: 'negozio' },
   { to: '/impostazioni', label: 'Impostazioni', glyph: '⚙', slot: 'header' },
 ]
@@ -194,7 +198,7 @@ function NewsButton({ onOpen }: { onOpen: () => void }): ReactNode {
 
 export function AppShell(): ReactNode {
   /** Cosa si sta aggiungendo. Il `+` è uno, i verbi sono tre. */
-  const [adding, setAdding] = useState<'expense' | 'price' | 'card' | null>(null)
+  const [adding, setAdding] = useState<'expense' | 'price' | 'card' | 'item' | null>(null)
   const [newsOpen, setNewsOpen] = useState(false)
   const { pathname } = useLocation()
   const { config, dataset } = useReadyStore()
@@ -222,12 +226,23 @@ export function AppShell(): ReactNode {
    */
   const onCards = pathname === CARDS_ROUTE || pathname.startsWith(CARD_PREFIX)
   const canWriteCards = config.github === null || Boolean(config.github.cardsPath)
-  const adds: 'expense' | 'price' | 'card' =
-    pathname === PRICE_ROUTE ? 'price' : onCards && canWriteCards ? 'card' : 'expense'
+  /* Come per le carte: senza il percorso del file una voce finirebbe in coda,
+     comparirebbe come salvata e non partirebbe mai. Là il `+` torna al verbo di
+     sempre, e la pagina spiega cosa manca. → ADR-0088, ADR-0082 */
+  const canWriteList = config.github === null || Boolean(config.github.shoppingPath)
+  const adds: 'expense' | 'price' | 'card' | 'item' =
+    pathname === PRICE_ROUTE
+      ? 'price'
+      : pathname === LIST_ROUTE && canWriteList
+        ? 'item'
+        : onCards && canWriteCards
+          ? 'card'
+          : 'expense'
   const ADD_LABEL = {
     expense: 'Aggiungi una spesa',
     price: 'Registra un prezzo',
     card: 'Aggiungi una carta',
+    item: 'Aggiungi alla lista',
   } as const
   const addLabel = ADD_LABEL[adds]
 
@@ -383,6 +398,7 @@ export function AppShell(): ReactNode {
       {adding === 'expense' ? <ExpenseForm onClose={() => setAdding(null)} /> : null}
       {adding === 'price' ? <PriceSheet onClose={() => setAdding(null)} /> : null}
       {adding === 'card' ? <CardSheet onClose={() => setAdding(null)} /> : null}
+      {adding === 'item' ? <ShoppingSheet onClose={() => setAdding(null)} /> : null}
       {newsOpen ? <NewsSheet onClose={() => setNewsOpen(false)} /> : null}
     </div>
   )

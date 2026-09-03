@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "updatedAt": "2026-08-19T09:00:00.000Z",
+  "items": [
+    {
+      "id": "lista-2026-08-30-11aa22bb",
+      "title": "Latte",
+      "wantedAt": "2026-08-19T09:00:00.000Z"
+    },
+    {
+      "id": "lista-2026-08-30-22bb33cc",
+      "title": "Pane",
+      "wantedAt": "2026-08-19T09:00:00.000Z"
+    },
+    {
+      "id": "lista-2026-08-30-77aa88bb",
+      "title": "Frutta",
+      "wantedAt": "2026-08-19T09:00:00.000Z"
+    },
+    {
+      "id": "lista-2026-08-30-33cc44dd",
+      "title": "Macinato",
+      "qty": 500,
+      "unit": "g",
+      "note": "quello magro",
+      "wantedAt": "2026-08-19T09:00:00.000Z"
+    },
+    {
+      "id": "lista-2026-08-30-44dd55ee",
+      "title": "Lampadina E27",
+      "qty": 2,
+      "unit": "pezzo",
+      "store": "Ferramenta D",
+      "wantedAt": "2026-08-19T09:00:00.000Z"
+    },
+    {
+      "id": "lista-2026-08-29-55ee66ff",
+      "title": "Passata di pomodoro",
+      "qty": 3,
+      "unit": "pezzo",
+      "wantedAt": "2026-08-19T08:00:00.000Z",
+      "takenAt": "2026-08-19T19:30:00.000Z"
+    },
+    {
+      "id": "lista-2026-08-29-66ff7700",
+      "title": "Caffè",
+      "store": "Supermercato A",
+      "wantedAt": "2026-08-19T08:00:00.000Z",
+      "takenAt": "2026-08-19T19:31:00.000Z"
+    }
+  ]
+}

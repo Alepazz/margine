@@ -405,6 +405,87 @@ export function AmountInput({
 }
 
 /**
+ * Un campo di testo con le grafie già usate sotto, tappabili.
+ *
+ * Stava dentro `PriceForm` e serve identico alla lista della spesa: riusare un
+ * suggerimento non è una comodità, è ciò che tiene unita una serie — i prezzi di
+ * un prodotto si raggruppano per nome, e nella lista «Latte» scritto in tre modi
+ * fa tre voci che nessuno riconosce come la stessa cosa.
+ *
+ * Le opzioni **arrivano già scelte** da chi chiama, e non le calcola questo
+ * componente: chi chiama sa da dove vengono (le rilevazioni, le voci della
+ * lista, i nomi delle carte) e questo resta un campo, senza sapere niente del
+ * dominio.
+ */
+export function NameWithSuggestions({
+  id,
+  label,
+  placeholder,
+  value,
+  options,
+  onChange,
+  onEnter,
+  inputRef,
+  children,
+}: {
+  id: string
+  label: string
+  placeholder: string
+  value: string
+  /** Le grafie da proporre, già filtrate. */
+  options: readonly string[]
+  onChange: (value: string) => void
+  /** Invio nel campo: nella lista della spesa aggiunge, che è il gesto del giro. */
+  onEnter?: () => void
+  inputRef?: Ref<HTMLInputElement>
+  /** Un suggerimento sotto il campo, quando chi chiama ne ha uno da dare. */
+  children?: ReactNode
+}): ReactNode {
+  return (
+    <div className="field">
+      <label className="label" htmlFor={id}>
+        {label}
+      </label>
+      <input
+        id={id}
+        className="input"
+        type="text"
+        autoComplete="off"
+        placeholder={placeholder}
+        value={value}
+        ref={inputRef}
+        onChange={(event) => onChange(event.target.value)}
+        onKeyDown={
+          onEnter
+            ? (event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  onEnter()
+                }
+              }
+            : undefined
+        }
+      />
+      {options.length > 0 ? (
+        <div className="suggest">
+          {options.map((option) => (
+            <button
+              key={option}
+              type="button"
+              className="suggest-chip"
+              onClick={() => onChange(option)}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {children}
+    </div>
+  )
+}
+
+/**
  * Icona e nome, i due campi con cui si battezza qualcosa: una categoria che
  * nasce, una che si rinomina, un viaggio. Scritti tre volte, il giorno che uno
  * cresce gli altri restano indietro.

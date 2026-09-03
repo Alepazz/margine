@@ -60,7 +60,7 @@ src/
   styles/       tokens.css (colori, raggi, vetro) · base.css · components.css
 scripts/       seed, validazione, cifratura, import mensile
 data/          master in chiaro — MAI nel repo (.gitignore)
-public/data/   i tre file cifrati (spese, configurazione, carte), questi sì nel repo
+public/data/   i quattro file cifrati (spese, configurazione, carte, lista della spesa), questi sì nel repo
 ```
 
 Regole che tengono insieme il tutto (e che è meglio non rompere per distrazione):

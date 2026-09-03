@@ -317,6 +317,7 @@
     "branch": "main",
     "dataPath": "public/data/expenses.json.enc",
     "configPath": "public/data/config.json.enc",
-    "cardsPath": "public/data/cards.json.enc"
+    "cardsPath": "public/data/cards.json.enc",
+    "shoppingPath": "public/data/shopping.json.enc"
   }
 }

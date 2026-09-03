@@ -176,11 +176,16 @@ export function filterBoard(board: readonly ProductGroup[], query: string): Prod
 
 /**
  * Le grafie già usate che somigliano a quello che si sta scrivendo, dalla più
- * recente. Serve due volte — prodotti e supermercati — perché il problema è lo
- * stesso: riusare un suggerimento è ciò che tiene unita una serie di prezzi.
+ * recente. Serve a quattro campi — prodotto e supermercato dei prezzi, cosa e
+ * negozio della lista — perché il problema è lo stesso: riusare un suggerimento
+ * è ciò che tiene unita una serie.
  *
  * «Più recente» è l'ordine dell'elenco, non la data della rilevazione: l'elenco
  * cresce per aggiunta, e quello che conta è cosa hai scritto per ultimo.
+ *
+ * **Quello che è già scritto per intero non si propone**: sarebbe un pulsante
+ * che non fa niente. Il filtro sta qui e non nei moduli perché lo vogliono
+ * tutti, e scritto fuori era già diventato due copie della stessa riga.
  */
 export function suggest(values: readonly string[], query: string): string[] {
   const needle = nameKey(query)
@@ -193,6 +198,7 @@ export function suggest(values: readonly string[], query: string): string[] {
     if (key === '' || seen.has(key)) continue
     seen.add(key)
     if (needle !== '' && !key.includes(needle)) continue
+    if (key === needle) continue
     out.push(raw.trim())
   }
   return out

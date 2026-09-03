@@ -40,6 +40,20 @@ export function newCardId(date: string): string {
   return `carta-${date}-${randomHex(4)}`
 }
 
+/**
+ * Id di una voce della lista della spesa.
+ *
+ * Quattro byte come le carte e non tre come i prezzi, e per la stessa ragione:
+ * di voci se ne aggiungono **a mazzi** nello stesso giorno — una sessione ne
+ * scrive cinque o dieci — e l'id porta la data. Con tre byte le combinazioni per
+ * data sono 4096, e a dieci voci al giorno la probabilità che due collidano è
+ * intorno all'1%; con quattro sono quattro miliardi. Due caratteri in più, e la
+ * cancellazione per id non porta via la voce sbagliata.
+ */
+export function newShoppingId(date: string): string {
+  return `lista-${date}-${randomHex(4)}`
+}
+
 /** Da un nome a uno slug leggibile: senza accenti, senza spazi, minuscolo. */
 function slugify(text: string, fallback: string, max: number): string {
   return (

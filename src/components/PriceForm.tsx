@@ -18,70 +18,13 @@
  * nome/prezzo. Chiudere lo dice chi ha finito, col suo pulsante.
  */
 
-import { useRef, useState, type ReactNode, type Ref } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 
 import { todayIso } from '../domain/dates'
 import { newPriceId } from '../domain/ids'
 import { suggest, unitOf, UNIT_CHOICE, UNIT_LABEL, PRICE_UNITS } from '../domain/prices'
-import { nameKey } from '../domain/text'
 import type { PriceEntry, PriceUnit } from '../domain/types'
-import { AmountInput, Segmented } from './ui'
-
-/** Un campo di testo con i nomi già usati sotto, tappabili. */
-function NameWithSuggestions({
-  id,
-  label,
-  placeholder,
-  value,
-  known,
-  onChange,
-  inputRef,
-}: {
-  id: string
-  label: string
-  placeholder: string
-  value: string
-  /** Tutti i valori già scritti, in ordine di inserimento. */
-  known: readonly string[]
-  onChange: (value: string) => void
-  inputRef?: Ref<HTMLInputElement>
-}): ReactNode {
-  /* Non si propone quello che è già scritto per intero: sarebbe un pulsante che
-     non fa niente. */
-  const options = suggest(known, value).filter((option) => nameKey(option) !== nameKey(value))
-
-  return (
-    <div className="field">
-      <label className="label" htmlFor={id}>
-        {label}
-      </label>
-      <input
-        id={id}
-        className="input"
-        type="text"
-        autoComplete="off"
-        placeholder={placeholder}
-        value={value}
-        ref={inputRef}
-        onChange={(event) => onChange(event.target.value)}
-      />
-      {options.length > 0 ? (
-        <div className="suggest">
-          {options.map((option) => (
-            <button
-              key={option}
-              type="button"
-              className="suggest-chip"
-              onClick={() => onChange(option)}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  )
-}
+import { AmountInput, NameWithSuggestions, Segmented } from './ui'
 
 export function PriceForm({
   prices,
@@ -165,7 +108,10 @@ export function PriceForm({
         label="Prodotto"
         placeholder="Passata di pomodoro"
         value={product}
-        known={prices.map((entry) => entry.product)}
+        options={suggest(
+          prices.map((entry) => entry.product),
+          product,
+        )}
         onChange={setProduct}
         inputRef={productRef}
       />
@@ -175,7 +121,10 @@ export function PriceForm({
         label="Supermercato"
         placeholder="Esselunga"
         value={store}
-        known={prices.map((entry) => entry.store)}
+        options={suggest(
+          prices.map((entry) => entry.store),
+          store,
+        )}
         onChange={setStore}
       />
 

@@ -12,6 +12,7 @@ import { Esplora } from './pages/Esplora'
 import { Gatto } from './pages/Gatto'
 import { Home } from './pages/Home'
 import { Impostazioni } from './pages/Impostazioni'
+import { Lista } from './pages/Lista'
 import { Prezzi } from './pages/Prezzi'
 import { Progetto } from './pages/Progetto'
 import { Saldo } from './pages/Saldo'
@@ -45,6 +46,7 @@ export function App(): ReactNode {
           <Route path="/progetto/:id" element={<Progetto />} />
           <Route path="/statistiche" element={<Statistiche />} />
           <Route path="/prezzi" element={<Prezzi />} />
+          <Route path="/lista" element={<Lista />} />
           <Route path="/carte" element={<Carte />} />
           {/* Generica come quella dei progetti: il nome del negozio sta nei
               dati, non nella rotta. Il repo è pubblico. → ADR-0082, ADR-0067 */}

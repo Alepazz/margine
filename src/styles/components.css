@@ -2247,6 +2247,144 @@ button.hero-value:focus-visible {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   LISTA DELLA SPESA
+   Una riga è un interruttore: il bersaglio è tutta la riga, perché si tocca in
+   piedi con un pollice davanti allo scaffale. La matita sta fuori dal pulsante
+   — due pulsanti annidati non sono HTML valido — e correggere è un gesto raro.
+   → ADR-0089
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.shop-line {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.shop-line:last-child {
+  border-bottom: none;
+}
+
+.shop-tap {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 4px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+}
+
+.shop-tap:hover {
+  background: var(--surface-2);
+}
+
+/* Il cerchio della spunta. Non è il bersaglio — quello è la riga — quindi può
+   essere piccolo: è un segno, non un pulsante. */
+.shop-check {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--surface);
+}
+
+.shop-line.is-taken .shop-check {
+  background: var(--good);
+  border-color: var(--good);
+}
+
+/*
+ * Una cosa già presa: barrata e spenta. `opacity` sulla riga intera, come le
+ * spese future dell'elenco (→ ADR-0077), così vale per tutto quello che
+ * contiene senza doverlo spegnere pezzo per pezzo; e non scende sotto 0,6, dove
+ * il testo secondario perderebbe il contrasto minimo.
+ */
+.shop-line.is-taken {
+  opacity: 0.6;
+}
+
+.shop-line.is-taken .list-title {
+  text-decoration: line-through;
+}
+
+.shop-line.is-taken:hover {
+  opacity: 0.85;
+}
+
+/*
+ * Titolo e quantità in una riga sola.
+ *
+ * La quantità era incolonnata a destra come gli importi, e Alessio l'ha bocciata
+ * — «quantità è lontana dal titolo» — perché così si leggono come due cose
+ * invece di una. Il titolo si accorcia con i puntini (ha già `overflow: hidden`),
+ * la quantità no: `flex: none` la tiene intera, incollata al nome.
+ * → ADR-0089
+ */
+.shop-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+/*
+ * Il negozio di una voce è un **avviso**, non un dettaglio: dice «questa non la
+ * prendere qui». Usa la pastiglia con la tinta d'avviso che esiste già, e qui
+ * dentro serve solo tenerla staccata dal fondo — la riga si accende al
+ * passaggio del mouse, e con `--surface-2` su `--surface-2` la pastiglia
+ * sparirebbe proprio mentre la si sta indicando. → ADR-0089
+ */
+.shop-line .chip.is-attenzione {
+  background: color-mix(in srgb, var(--warn) 12%, var(--surface));
+}
+
+/*
+ * La quantità: un'informazione **in più**, quindi più piccola e più chiara del
+ * titolo. Cifre tabulari ma non il monospazio degli importi, dove lo spazio è
+ * largo e «500 g» si legge come due cose staccate invece che come una misura.
+ */
+.shop-qty {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.82rem;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+/*
+ * Numero e unità sulla stessa riga, e **senza andare a capo**: un campo porta
+ * `width: 100%`, quindi in un `.row` che avvolge la tendina finisce sotto — vista
+ * al banco. Le due misure sono dichiarate qui e non in uno stile inline perché
+ * sono una coppia: la tendina è ferma, il numero prende quello che resta.
+ */
+.qty-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.qty-row .input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.qty-row .select {
+  flex: 0 0 auto;
+  width: 118px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    ERGONOMIA SU TELEFONO
    L'app si usa in piedi, con un pollice: qui i bersagli diventano grandi
    (≥44px, la misura che Apple e Google indicano come minimo tappabile), i
@@ -2257,6 +2395,12 @@ button.hero-value:focus-visible {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @media (max-width: 899px) {
+  /* Una riga della lista si tocca col pollice: 44px, la misura minima che Apple
+     e Google indicano. Il cerchio resta piccolo — non è lui il bersaglio. */
+  .shop-tap {
+    min-height: 44px;
+  }
+
   .btn {
     min-height: 46px;
     padding: 11px 18px;

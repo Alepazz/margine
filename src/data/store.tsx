@@ -44,6 +44,8 @@ import type {
   PersonId,
   PriceEntry,
   Settlement,
+  ShoppingFile,
+  ShoppingItem,
   Tricount,
 } from '../domain/types'
 import { WrongPassphraseError, decryptEnvelope, deriveKeyCached, encryptEnvelope } from './crypto'
@@ -64,10 +66,12 @@ import {
   applyCardOps,
   applyConfigOps,
   applyOps,
+  applyShoppingOps,
   describeOps,
   fileOf,
   loadOutbox,
   newEntry,
+  pendingTwin,
   pruneSettled,
   saveOutbox,
   type Op,
@@ -86,6 +90,16 @@ const CONFIG_URL = `${import.meta.env.BASE_URL}data/config.json.enc`
  * l'apertura dell'app a chi non usa le carte. → ADR-0082
  */
 const CARDS_URL = `${import.meta.env.BASE_URL}data/cards.json.enc`
+/**
+ * La lista della spesa, il quarto envelope. Come le carte **può non esserci**:
+ * finché nessuno ha scritto niente il file non esiste, e la prima voce lo crea.
+ *
+ * Questo è il file che il sito serve all'apertura. Mentre la pagina della lista
+ * è aperta se ne legge una versione più fresca **dall'API** (`refreshShopping`),
+ * perché con una spunta per commit i deploy di Pages stanno in coda e il sito
+ * resta indietro di minuti. → ADR-0090, ADR-0088
+ */
+const SHOPPING_URL = `${import.meta.env.BASE_URL}data/shopping.json.enc`
 const PASSPHRASE_KEY = 'margine.passphrase.v1'
 const PERSON_KEY = 'margine.person.v1'
 /**
@@ -175,6 +189,8 @@ interface Envelopes {
   config: Envelope
   /** Assente quando nel repo non c'è ancora nessuna carta. */
   cards?: Envelope
+  /** Assente quando nel repo non c'è ancora nessuna lista. */
+  shopping?: Envelope
 }
 
 export interface StoreApi {
@@ -189,6 +205,15 @@ export interface StoreApi {
    * differenza serve solo alla coda, e resta là. → ADR-0082
    */
   cards: LoyaltyCard[]
+  /**
+   * La lista della spesa, tutte le voci: quelle da prendere e quelle nel
+   * storico, che si distinguono per `takenAt`. **Condivisa** come le carte e i
+   * prezzi: non passa da `view.person`. Lista vuota anche quando il file non
+   * esiste, così nessuna pagina deve distinguere «niente da comprare» da «file
+   * non ancora pubblicato» — quella differenza serve solo alla coda, e resta là.
+   * → ADR-0088
+   */
+  shopping: ShoppingItem[]
   months: MonthKey[]
   month: MonthKey
   view: ViewOptions
@@ -243,6 +268,32 @@ export interface StoreApi {
   addCard: (card: LoyaltyCard) => void
   updateCard: (cardId: string, fields: Partial<LoyaltyCard>) => void
   deleteCard: (cardId: string) => void
+  /**
+   * La lista della spesa. `takeItem` e `untakeItem` sono i due gesti della
+   * cassa, e sono separati dalla modifica perché sono l'operazione più frequente
+   * dell'app: il messaggio di commit deve poter dire «1 cosa presa», e la
+   * campanella deve poterle tacere. → ADR-0088, ADR-0091
+   */
+  addItem: (item: ShoppingItem) => void
+  updateItem: (itemId: string, fields: Partial<ShoppingItem>) => void
+  takeItem: (itemId: string) => void
+  untakeItem: (itemId: string) => void
+  deleteItem: (itemId: string) => void
+  /**
+   * Rilegge la lista **dall'API**, che è aggiornata appena il commit passa.
+   *
+   * Serve perché con una spunta per commit i deploy di GitHub Pages stanno in
+   * coda uno alla volta (misurati: 31–51 s l'uno), quindi il sito resta indietro
+   * di minuti e le spunte dell'altra persona non arriverebbero. La chiama la
+   * pagina della lista finché è aperta.
+   *
+   * Torna **perché** non ha letto e non solo che non ha letto: senza token è uno
+   * stato normale di cui la spia di sincronizzazione parla già, e ripeterlo
+   * nella pagina sarebbe rumore; una lettura **fallita** invece è una cosa che
+   * chi guarda deve sapere, perché quello che vede può essere vecchio.
+   * → ADR-0090
+   */
+  refreshShopping: () => Promise<ProbeResult>
   syncNow: () => Promise<void>
   reload: () => void
   /**
@@ -262,6 +313,9 @@ export interface StoreApi {
   /** Com'è andata la richiesta del dettaglio. `undefined` = non ancora chiesto. */
   newsDetail: (sha: string) => NewsDetail | undefined
 }
+
+/** Com'è andata la sonda della lista: `no-token` è uno stato normale, non un guasto. */
+export type ProbeResult = 'ok' | 'no-token' | 'failed'
 
 export type NewsDetail =
   | { state: 'loading' }
@@ -376,18 +430,19 @@ async function fetchOptionalEnvelope(url: string): Promise<Envelope | undefined>
 }
 
 /**
- * I tre file cifrati, insieme: è ciò che l'avvio e la rilettura periodica
- * scaricano, e va scritto una volta perché il terzo è **facoltativo** — la chiave
- * `cards` c'è solo se il file esiste, e due copie di questa regola sarebbero
- * due occasioni di dimenticarla.
+ * I quattro file cifrati, insieme: è ciò che l'avvio e la rilettura periodica
+ * scaricano, e va scritto una volta perché due dei quattro sono **facoltativi**
+ * — le chiavi `cards` e `shopping` ci sono solo se i file esistono, e due copie
+ * di questa regola sarebbero due occasioni di dimenticarla.
  */
 async function fetchAllEnvelopes(): Promise<Envelopes> {
-  const [data, config, cards] = await Promise.all([
+  const [data, config, cards, shopping] = await Promise.all([
     fetchEnvelope(DATA_URL),
     fetchEnvelope(CONFIG_URL),
     fetchOptionalEnvelope(CARDS_URL),
+    fetchOptionalEnvelope(SHOPPING_URL),
   ])
-  return { data, config, ...(cards ? { cards } : {}) }
+  return { data, config, ...(cards ? { cards } : {}), ...(shopping ? { shopping } : {}) }
 }
 
 /** Le carte decifrate, o `undefined` quando il file non c'è. */
@@ -408,6 +463,25 @@ function emptyCardsFile(): CardsFile {
 /** Come `normaliseDataset`: il tipo deve dire la verità da qui in avanti. */
 function normaliseCards(raw: CardsFile): CardsFile {
   return { ...raw, cards: Array.isArray(raw.cards) ? raw.cards : [] }
+}
+
+/** La lista decifrata, o `undefined` quando il file non c'è. */
+async function decryptShopping(
+  envelope: Envelope | undefined,
+  passphrase: string,
+): Promise<ShoppingFile | undefined> {
+  if (!envelope) return undefined
+  const key = await deriveKeyCached(passphrase, envelope.kdf)
+  return normaliseShopping(await decryptEnvelope<ShoppingFile>(envelope, key))
+}
+
+/** Una lista appena nata: è quella che la prima voce scrive. */
+function emptyShoppingFile(): ShoppingFile {
+  return { version: 1, updatedAt: new Date().toISOString(), items: [] }
+}
+
+function normaliseShopping(raw: ShoppingFile): ShoppingFile {
+  return { ...raw, items: Array.isArray(raw.items) ? raw.items : [] }
 }
 
 function describeError(error: unknown): string {
@@ -515,6 +589,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
    * ricevono comunque una lista, da `api`.
    */
   const [cards, setCards] = useState<CardsFile | undefined>()
+  const [shopping, setShopping] = useState<ShoppingFile | undefined>()
   const [month, setMonth] = useState<MonthKey>(currentMonthKey())
   const [identity, setIdentity] = useState<PersonId | undefined>(readIdentity)
   const [identitySince, setIdentitySince] = useState<string | undefined>(readIdentitySince)
@@ -693,6 +768,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
           const target = fileOf(entry)
           if (target === 'config') return !github.configPath
           if (target === 'cards') return !github.cardsPath
+          if (target === 'shopping') return !github.shoppingPath
           return false
         }
         const bloccate = outboxRef.current.pending.filter(senzaPercorso)
@@ -716,6 +792,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
         const withData = entries.some((entry) => fileOf(entry) === 'data')
         const withConfig = entries.some((entry) => fileOf(entry) === 'config')
         const withCards = entries.some((entry) => fileOf(entry) === 'cards')
+        const withShopping = entries.some((entry) => fileOf(entry) === 'shopping')
 
         /* La versione su cui si legge **e** su cui si committa: una sola. */
         const parent = await headSha(github, token)
@@ -790,6 +867,34 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
           files.push({ path: github.cardsPath, text: `${JSON.stringify(envelope, null, 2)}\n` })
         }
 
+        /*
+         * La lista, con la stessa forma delle carte e per le stesse ragioni: il
+         * file può non esistere, un `404` non è un errore da mostrare (sarebbe
+         * «fai un primo push della lista», cioè una sessione al Mac per segnare
+         * il latte), e la `kdf` da riusare quando il file nasce è quella del
+         * dataset — i quattro file condividono il salt di proposito, così l'app
+         * deriva una chiave sola invece di quattro. → ADR-0088, ADR-0082
+         */
+        let mergedShopping: ShoppingFile | undefined
+        if (withShopping && github.shoppingPath) {
+          const remoteShopping = await getFile(github, token, github.shoppingPath, parent)
+          const base = remoteShopping ? (JSON.parse(remoteShopping.text) as unknown) : undefined
+          if (base !== undefined && !isEnvelope(base)) {
+            throw new Error('La lista nel repo non è un file cifrato di Margine.')
+          }
+          const kdf = base?.kdf ?? kdfRef.current
+          if (!kdf) {
+            throw new Error('Non conosco i parametri di cifratura: ricarica la pagina.')
+          }
+          const shoppingKey = await deriveKeyCached(passphrase, kdf)
+          const current = base
+            ? normaliseShopping(await decryptEnvelope<ShoppingFile>(base, shoppingKey))
+            : emptyShoppingFile()
+          mergedShopping = applyShoppingOps(current, entries)
+          const envelope = await encryptEnvelope(mergedShopping, shoppingKey, kdf)
+          files.push({ path: github.shoppingPath, text: `${JSON.stringify(envelope, null, 2)}\n` })
+        }
+
         try {
           await commitFiles(github, token, { files, message: commitMessage(entries), parent })
         } catch (putError) {
@@ -818,6 +923,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
           setConfig(withLocal)
         }
         if (mergedCards) setCards(applyCardOps(mergedCards, remaining))
+        if (mergedShopping) setShopping(applyShoppingOps(mergedShopping, remaining))
         setSync(
           remaining.length === 0
             ? { phase: 'idle', pending: 0, lastSyncAt: Date.now() }
@@ -899,7 +1005,12 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
 
   // ── Sblocco ─────────────────────────────────────────────────────────────
   const applyUnlocked = useCallback(
-    (nextConfig: AppConfig, rawDataset: Dataset, rawCards: CardsFile | undefined) => {
+    (
+      nextConfig: AppConfig,
+      rawDataset: Dataset,
+      rawCards: CardsFile | undefined,
+      rawShopping: ShoppingFile | undefined,
+    ) => {
       const box = loadOutbox()
       const queued = [...box.settled, ...box.pending]
       const withLocal = applyOps(rawDataset, queued)
@@ -911,9 +1022,18 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
          cassa **subito**, non quando il commit atterra. Il file può non esserci
          ancora, e allora l'overlay parte da un file vuoto. */
       const cardsWithLocal = applyCardOps(rawCards ?? emptyCardsFile(), queued)
+      /* E la lista: una cosa spuntata alla cassa deve restare spuntata anche se
+         il commit è ancora in volo, o l'elenco la rimetterebbe fra quelle da
+         prendere davanti alla cassiera. */
+      const shoppingWithLocal = applyShoppingOps(rawShopping ?? emptyShoppingFile(), queued)
       const pruned = pruneSettled(
         box,
-        { dataset: rawDataset, config: nextConfig, cards: rawCards?.cards },
+        {
+          dataset: rawDataset,
+          config: nextConfig,
+          cards: rawCards?.cards,
+          shopping: rawShopping?.items,
+        },
         Date.now(),
       )
       persistOutbox(pruned)
@@ -922,6 +1042,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       setConfig(configWithLocal)
       setDataset(withLocal)
       setCards(cardsWithLocal)
+      setShopping(shoppingWithLocal)
 
       const available = monthsOf(withLocal.expenses)
       const today = currentMonthKey()
@@ -946,6 +1067,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
           await deriveKeyCached(passphrase, envs.config.kdf),
         )
         const rawCards = await decryptCards(envs.cards, passphrase)
+        const rawShopping = await decryptShopping(envs.shopping, passphrase)
 
         passphraseRef.current = passphrase
         kdfRef.current = envs.data.kdf
@@ -957,7 +1079,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
             // niente storage: la passphrase resta solo in memoria
           }
         }
-        applyUnlocked(nextConfig, rawDataset, rawCards)
+        applyUnlocked(nextConfig, rawDataset, rawCards, rawShopping)
       } catch (unlockError) {
         if (unlockError instanceof WrongPassphraseError) {
           try {
@@ -1040,6 +1162,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       lastRemote.current = rawDataset
 
       const rawCards = await decryptCards(envs.cards, passphrase)
+      const rawShopping = await decryptShopping(envs.shopping, passphrase)
 
       const box = loadOutbox()
       const queued = [...box.settled, ...box.pending]
@@ -1051,8 +1174,63 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       setConfig(mergedConfig)
       setDataset(merged)
       setCards(applyCardOps(rawCards ?? emptyCardsFile(), queued))
+      setShopping(applyShoppingOps(rawShopping ?? emptyShoppingFile(), queued))
     } catch {
       /* Rilettura fallita: si tiene ciò che c'è. Non è un guasto da mostrare. */
+    }
+  }, [])
+
+  /**
+   * Rilegge la lista **dall'API di GitHub**, non dal sito.
+   *
+   * Perché serve: con una spunta per commit i deploy di Pages stanno in coda uno
+   * alla volta (misurati il 03/09/2026: 31–51 s l'uno, `concurrency` con
+   * `cancel-in-progress: false`), quindi durante una spesa il sito resta
+   * indietro di minuti e le spunte dell'altra persona non arriverebbero. Le
+   * proprie si vedono comunque, perché la coda locale si riapplica sopra: a
+   * mancare è solo ciò che ha fatto l'altro, che è esattamente il caso per cui
+   * una lista condivisa esiste. → ADR-0090
+   *
+   * Non sostituisce niente: all'apertura i quattro envelope arrivano dal sito
+   * come sempre. Questa è una freschezza **in più**, che la pagina della lista
+   * chiede finché è aperta.
+   */
+  const refreshShopping = useCallback(async (): Promise<ProbeResult> => {
+    const github = configRef.current?.github
+    const passphrase = passphraseRef.current
+    /* Senza repo o senza passphrase non c'è niente da sondare, e non è un
+       guasto: sono gli stessi stati in cui l'app non scrive. */
+    if (!github?.shoppingPath || passphrase === undefined) return 'no-token'
+    const token = loadToken()
+    /*
+     * **Senza token non si sonda.** Il limite senza autenticazione è di sessanta
+     * richieste all'ora per indirizzo IP, e la campanella già le consuma:
+     * finirle la rende muta senza poterlo spiegare, che è il difetto di
+     * ADR-0053. Meglio una lista vecchia di qualche minuto che una campanella
+     * spenta — e la pagina lo dice, invece di lasciar credere a un aggiornamento
+     * che non avviene.
+     */
+    if (!token) return 'no-token'
+    try {
+      const file = await getFile(github, token, github.shoppingPath)
+      /* Il file non c'è ancora: è lo stato normale finché nessuno ha scritto
+         niente, e non c'è niente da aggiornare. La sonda è andata bene. */
+      if (!file) return 'ok'
+      const parsed: unknown = JSON.parse(file.text)
+      if (!isEnvelope(parsed)) return 'failed'
+      const key = await deriveKeyCached(passphrase, parsed.kdf)
+      const remote = normaliseShopping(await decryptEnvelope<ShoppingFile>(parsed, key))
+      const box = loadOutbox()
+      setShopping(applyShoppingOps(remote, [...box.settled, ...box.pending]))
+      return 'ok'
+    } catch {
+      /*
+       * Una sonda fallita **non svuota la lista**: si tiene ciò che si ha. Un
+       * elenco vuoto per una lettura andata male è indistinguibile da uno vuoto
+       * perché non c'è niente da comprare, e la seconda cosa è rassicurante
+       * mentre la prima non lo è. → ADR-0053
+       */
+      return 'failed'
     }
   }, [])
 
@@ -1174,7 +1352,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
     }
     /*
      * **Un commit che non tocca le spese non ha un dettaglio da leggere.**
-     * Uscire prima è tutta la cura: due file da 375 kB per un confronto vuoto
+     * Uscire prima è tutta la cura: due file da 367 kB per un confronto vuoto
      * per costruzione. Non è un guasto, quindi non si scrive nessuno stato —
      * `noticesOf` non produce righe di spesa per un commit così, quindi nessuna
      * riga resta ad aspettare. → ADR-0087
@@ -1397,8 +1575,27 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
   const enqueue = useCallback(
     (op: Op) => {
       const entry = newEntry(op, Date.now())
+      /*
+       * **Due spunte che non sono ancora partite si annullano.** Toccare una cosa
+       * e ritoccarla è il gesto sbagliato più frequente della cassa, e senza
+       * questo lascerebbe nella storia pubblica «1 cosa presa, 1 cosa rimessa in
+       * lista» per un dito scivolato. La regola sta in `pendingTwin`, con i suoi
+       * test: qui si applica solo la sua risposta. → ADR-0091
+       */
+      /*
+       * **Non mentre un commit vola.** `flushOnce` fa la sua fotografia della
+       * coda e poi vola per uno o quattro secondi: togliere da `pending` una
+       * voce che sta in quel commit vorrebbe dire che nel repo la cosa resta
+       * presa, sul telefono no, e che non esiste più nessuna operazione che
+       * rimetta le due parti d'accordo — alla rilettura successiva la cosa
+       * torna fra le cose prese da sé. Con un commit in volo si accoda
+       * normalmente: nella storia compare la coppia, che è la verità.
+       */
+      const gemella = flushing.current ? undefined : pendingTwin(outboxRef.current.pending, op)
       const next: OutboxState = {
-        pending: [...outboxRef.current.pending, entry],
+        pending: gemella
+          ? outboxRef.current.pending.filter((e) => e.entryId !== gemella.entryId)
+          : [...outboxRef.current.pending, entry],
         settled: outboxRef.current.settled,
       }
       persistOutbox(next)
@@ -1408,6 +1605,16 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
            salvataggio lo crea nel repo. Senza, la carta appena aggiunta non
            comparirebbe fino al commit. */
         setCards((current) => applyCardOps(current ?? emptyCardsFile(), [entry]))
+      }
+      if (fileOf(entry) === 'shopping') {
+        /*
+         * Lo stato locale si muove **anche quando la coda si annulla**: la vista
+         * era avanti di una spunta, e l'annullamento la riporta dov'era il
+         * remoto — che è esattamente ciò che questa riga fa applicando
+         * l'operazione appena arrivata. Il file può non esistere ancora: la
+         * prima voce lo inventa qui, e il salvataggio lo crea nel repo.
+         */
+        setShopping((current) => applyShoppingOps(current ?? emptyShoppingFile(), [entry]))
       }
       if (fileOf(entry) === 'config') {
         setConfig((current) => {
@@ -1498,6 +1705,37 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
     (cardId: string) => enqueue({ kind: 'card-delete', cardId }),
     [enqueue],
   )
+
+  // ── La lista della spesa ──────────────────────────────────────────────────
+  const addItem = useCallback((item: ShoppingItem) => enqueue({ kind: 'list-add', item }), [enqueue])
+
+  const updateItem = useCallback(
+    (itemId: string, fields: Partial<ShoppingItem>) =>
+      enqueue({ kind: 'list-edit', itemId, fields }),
+    [enqueue],
+  )
+
+  /*
+   * L'istante lo mette **chi accoda**, non chi applica: un'operazione che
+   * leggesse l'orologio al momento di essere applicata darebbe un `takenAt`
+   * diverso a ogni ricaricamento, e l'ordine dello storico cambierebbe sotto gli
+   * occhi. → ADR-0088
+   */
+  const takeItem = useCallback(
+    (itemId: string) => enqueue({ kind: 'list-take', itemId, at: new Date().toISOString() }),
+    [enqueue],
+  )
+
+  const untakeItem = useCallback(
+    (itemId: string) => enqueue({ kind: 'list-untake', itemId, at: new Date().toISOString() }),
+    [enqueue],
+  )
+
+  const deleteItem = useCallback(
+    (itemId: string) => enqueue({ kind: 'list-delete', itemId }),
+    [enqueue],
+  )
+
 
   /*
    * Si scrive una volta e non si riscrive. Il controllo guarda `localStorage` e
@@ -1633,6 +1871,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       config,
       dataset,
       cards: cards?.cards ?? [],
+      shopping: shopping?.items ?? [],
       months,
       month,
       view,
@@ -1680,6 +1919,12 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       addCard,
       updateCard,
       deleteCard,
+      addItem,
+      updateItem,
+      takeItem,
+      untakeItem,
+      deleteItem,
+      refreshShopping,
       syncNow: flush,
       reload,
       markNewsRead,
@@ -1710,6 +1955,13 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       addSettlement,
       addTricount,
       cards,
+      shopping,
+      addItem,
+      updateItem,
+      takeItem,
+      untakeItem,
+      deleteItem,
+      refreshShopping,
       deleteCard,
       deletePrice,
       updateCard,

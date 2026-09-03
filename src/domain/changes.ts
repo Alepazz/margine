@@ -26,11 +26,14 @@ import type { ExpenseDelta } from './diff'
  */
 export const APP_COMMIT_SUFFIX = ' (da Margine)'
 
-export type ChangeGroup = 'spese' | 'prezzi' | 'carte' | 'tricount' | 'config'
+export type ChangeGroup = 'spese' | 'prezzi' | 'lista' | 'carte' | 'tricount' | 'config'
 
 export const CHANGE_GROUPS: readonly ChangeGroup[] = [
   'spese',
   'prezzi',
+  /* Accanto ai prezzi, che è dove sta anche nell'app: le due cose che si fanno
+     in negozio. → ADR-0088 */
+  'lista',
   'carte',
   'tricount',
   'config',
@@ -39,6 +42,7 @@ export const CHANGE_GROUPS: readonly ChangeGroup[] = [
 export const GROUP_LABELS: Record<ChangeGroup, string> = {
   spese: 'Spese',
   prezzi: 'Prezzi',
+  lista: 'Lista della spesa',
   carte: 'Carte fedeltà',
   tricount: 'Tricount e rimborsi',
   config: 'Categorie ed entrate',
@@ -55,6 +59,11 @@ const GROUP_OF: Record<Op['kind'], ChangeGroup> = {
   card: 'carte',
   'card-edit': 'carte',
   'card-delete': 'carte',
+  'list-add': 'lista',
+  'list-edit': 'lista',
+  'list-take': 'lista',
+  'list-untake': 'lista',
+  'list-delete': 'lista',
   tricount: 'tricount',
   'tricount-edit': 'tricount',
   settle: 'tricount',
@@ -158,6 +167,28 @@ export const EXPENSE_KINDS: ReadonlySet<Op['kind']> = new Set<Op['kind']>([
 ])
 
 /**
+ * Le operazioni che **non fanno una riga** nella campanella.
+ *
+ * Spuntare una cosa alla cassa e rimetterla in lista sono i gesti più frequenti
+ * di tutta l'app: una spesa sono venti spunte, e venti righe «ha preso una cosa»
+ * non sono novità, sono rumore — e sarebbero il rumore che seppellisce le
+ * novità vere. Del resto la cosa presa la si vede nella lista, che è il posto
+ * dove serve saperlo.
+ *
+ * Il silenzio si ottiene **qui dentro**, in `noticesOf`, e non nel foglio che
+ * disegna: il numero sul pallino è la lunghezza di questo elenco (→ ADR-0052),
+ * quindi filtrare altrove farebbe promettere al pallino righe che il foglio non
+ * mostra — è già successo, misurato 23 contro 21.
+ *
+ * Aggiungere una cosa alla lista invece **è** una novità: è una richiesta, e
+ * l'altra persona la deve vedere. → ADR-0091
+ */
+export const SILENT_KINDS: ReadonlySet<Op['kind']> = new Set<Op['kind']>([
+  'list-take',
+  'list-untake',
+])
+
+/**
  * Vero se in questo commit c'è almeno un'operazione su una spesa.
  *
  * Serve a **non scaricare niente** per i commit che non ne hanno: il dettaglio
@@ -203,6 +234,14 @@ export const PHRASES: Record<Op['kind'], [string, string]> = {
   unsettle: ['ha annullato un rimborso', 'ha annullato {n} rimborsi'],
   price: ['ha rilevato un prezzo', 'ha rilevato {n} prezzi'],
   'price-delete': ['ha eliminato una rilevazione', 'ha eliminato {n} rilevazioni'],
+  'list-add': ['ha aggiunto una cosa alla lista', 'ha aggiunto {n} cose alla lista'],
+  'list-edit': ['ha modificato una voce della lista', 'ha modificato {n} voci della lista'],
+  /* Ci sono e non si vedono: `SILENT_KINDS` le tiene fuori dalla campanella. La
+     frase esiste perché il vocabolario dev'essere completo — `git log` si legge
+     — e perché il giorno che si volesse mostrarle, il testo c'è già. */
+  'list-take': ['ha preso una cosa', 'ha preso {n} cose'],
+  'list-untake': ['ha rimesso in lista una cosa', 'ha rimesso in lista {n} cose'],
+  'list-delete': ['ha eliminato una voce della lista', 'ha eliminato {n} voci della lista'],
   card: ['ha aggiunto una carta', 'ha aggiunto {n} carte'],
   'card-edit': ['ha modificato una carta', 'ha modificato {n} carte'],
   'card-delete': ['ha eliminato una carta', 'ha eliminato {n} carte'],
@@ -371,6 +410,9 @@ export function noticesOf(
     const base = { sha: change.sha, at: change.at, who: change.who }
 
     for (const part of change.parts) {
+      /* I muti non fanno riga, e siccome il pallino conta le righe non fanno
+         nemmeno numero: è la stessa cosa detta una volta. → ADR-0091 */
+      if (SILENT_KINDS.has(part.kind)) continue
       if (EXPENSE_KINDS.has(part.kind) && deltas !== undefined) continue
       out.push({
         kind: 'summary',

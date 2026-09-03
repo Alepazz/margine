@@ -145,6 +145,20 @@ describe('suggest', () => {
   it('salta i valori vuoti', () => {
     expect(suggest(['   ', 'Coop'], '')).toEqual(['Coop'])
   })
+
+  /*
+   * Quello che è già scritto per intero non si propone: sarebbe un pulsante che
+   * non fa niente. Il filtro sta dentro `suggest` e non nei moduli perché lo
+   * vogliono tutti e quattro i campi che la usano — scritto fuori era già
+   * diventato due copie della stessa riga.
+   */
+  it('non propone quello che è già scritto per intero', () => {
+    /* «Coop Extra» resta, perché contiene la ricerca senza esserle uguale: è la
+       differenza fra questo filtro e quello per sottostringa. */
+    expect(suggest(['Coop', 'Coop Extra'], 'Coop')).toEqual(['Coop Extra'])
+    /* La stessa cosa scritta diversamente **è** la stessa cosa: `nameKey`. */
+    expect(suggest(['Coop'], '  coop ')).toEqual([])
+  })
 })
 
 describe('unitOf', () => {
