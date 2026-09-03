@@ -23,6 +23,7 @@ import {
   noticesOf,
   unseenCount,
   parseChanges,
+  touchesExpenses,
   unseenSince,
   type Change,
   type ChangeGroup,
@@ -1171,6 +1172,14 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
     const fail = (reason: string) => {
       putDetail(change.sha, { state: 'failed', reason })
     }
+    /*
+     * **Un commit che non tocca le spese non ha un dettaglio da leggere.**
+     * Uscire prima è tutta la cura: due file da 375 kB per un confronto vuoto
+     * per costruzione. Non è un guasto, quindi non si scrive nessuno stato —
+     * `noticesOf` non produce righe di spesa per un commit così, quindi nessuna
+     * riga resta ad aspettare. → ADR-0087
+     */
+    if (!touchesExpenses(change)) return
     if (!github) return fail('Manca la configurazione del repo.')
     if (passphrase === undefined) return fail('I dati sono bloccati: serve la passphrase.')
     if (change.parent === null) return fail('È il primo commit: non c’è niente con cui confrontarlo.')
@@ -1603,7 +1612,10 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
     if (status !== 'ready') return
     let cancelled = false
     void (async () => {
-      for (const change of daLeggere.slice(0, MAX_AUTO_DETAIL)) {
+      /* Filtrato **prima** dello slice: contando anche i commit senza spese,
+         cinque novità di lista consumerebbero tutto il budget e il dettaglio
+         della spesa vera non partirebbe. → ADR-0087 */
+      for (const change of daLeggere.filter(touchesExpenses).slice(0, MAX_AUTO_DETAIL)) {
         if (cancelled) return
         if (detailCache.current.has(change.sha)) continue
         await loadDetail(change)

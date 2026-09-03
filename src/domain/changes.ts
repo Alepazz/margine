@@ -158,6 +158,29 @@ export const EXPENSE_KINDS: ReadonlySet<Op['kind']> = new Set<Op['kind']>([
 ])
 
 /**
+ * Vero se in questo commit c'è almeno un'operazione su una spesa.
+ *
+ * Serve a **non scaricare niente** per i commit che non ne hanno: il dettaglio
+ * di una novità costa due file cifrati da 367 kB (→ ADR-0051), e per un commit
+ * di sola lista, prezzi, carte, tricount o configurazione il confronto fra le
+ * due versioni è vuoto **per costruzione** — non perché non ci sia niente, ma
+ * perché quel file non è stato toccato.
+ *
+ * Il difetto era preesistente e costava poco finché l'app scriveva tre commit
+ * al giorno. Con la lista della spesa, dove ogni cosa presa è un commit, una
+ * spesa di venti voci fa scaricare qualche megabyte per non dire niente e morde
+ * le sessanta richieste all'ora che GitHub concede senza token — che è il modo
+ * in cui la campanella diventa muta senza poterlo spiegare (→ ADR-0053). Le
+ * cifre misurate stanno nell'ADR.
+ *
+ * Sta qui e non nello store perché è una domanda sul **messaggio**: si risponde
+ * senza rete, ed è quello che la rende utile. → ADR-0087
+ */
+export function touchesExpenses(change: Change): boolean {
+  return change.parts.some((part) => EXPENSE_KINDS.has(part.kind))
+}
+
+/**
  * Il verbo, per scriverci una frase invece di un'etichetta.
  *
  * `OP_WORDS` dice «spesa aggiunta», che va bene in un messaggio di commit e

@@ -14,8 +14,10 @@ import {
   parseChanges,
   partsOfSummary,
   phraseOf,
+  touchesExpenses,
   unseenCount,
   unseenSince,
+  type Change,
   type RawCommit,
 } from './changes'
 
@@ -101,6 +103,54 @@ describe('quante cose ha toccato un commit', () => {
 
   it('le operazioni sulle spese sono quelle che hanno un dettaglio', () => {
     expect([...EXPENSE_KINDS].sort()).toEqual(['create', 'delete', 'patch', 'update'])
+  })
+})
+
+/*
+ * La guardia che decide se vale la pena scaricare due file da 375 kB. Si
+ * risponde dal **messaggio**, senza rete: è quello che la rende utile.
+ * → ADR-0087
+ */
+describe('quali commit hanno un dettaglio da leggere', () => {
+  /*
+   * Costruita a mano e non con `parseChanges`, che scarta i commit senza gruppi
+   * accesi: un messaggio che non si riconosce non arriverebbe mai fino qui, e
+   * la guardia deve dire la sua anche su quello.
+   */
+  const change = (summary: string): Change => ({
+    sha: 'abc123',
+    at: '2026-09-03T10:00:00.000Z',
+    who: 'Federica',
+    summary,
+    groups: groupsOfSummary(summary),
+    parent: 'parent0',
+    count: countOfSummary(summary),
+    parts: partsOfSummary(summary),
+  })
+
+  it('un commit di spese sì', () => {
+    expect(touchesExpenses(change('2 spese aggiunte'))).toBe(true)
+    expect(touchesExpenses(change('1 annotazione'))).toBe(true)
+  })
+
+  it('un commit che non tocca le spese no', () => {
+    expect(touchesExpenses(change('2 prezzi rilevati'))).toBe(false)
+    expect(touchesExpenses(change('1 carta aggiunta'))).toBe(false)
+    expect(touchesExpenses(change('categorie aggiornate'))).toBe(false)
+  })
+
+  /* Il caso che impedisce di trasformare la guardia in «il commit è tutto di
+     lista?»: un salvataggio può portare le due cose insieme, e allora il
+     dettaglio serve. */
+  it('un commit misto sì', () => {
+    expect(touchesExpenses(change('1 prezzo rilevato, 1 spesa aggiunta'))).toBe(true)
+  })
+
+  /* Un messaggio che non si riconosce non ha parti, quindi non ha spese: senza
+     questo ramo il ripiego sarebbe «scarica», cioè il difetto di prima per
+     qualunque messaggio scritto a mano che finisse per caso col suffisso. */
+  it('un messaggio che non si riconosce no', () => {
+    expect(touchesExpenses(change('3 rane cotte'))).toBe(false)
   })
 })
 
