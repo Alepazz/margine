@@ -16,6 +16,7 @@
     "encrypt": "node scripts/encrypt.mjs",
     "decrypt": "node scripts/decrypt.mjs",
     "import": "node scripts/import.mjs",
+    "import-cards": "node scripts/import-cards.mjs",
     "globe": "node scripts/make-globe.mjs"
   },
   "dependencies": {
@@ -31,10 +32,12 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.0.5",
+    "sharp": "^0.35.4",
     "topojson-client": "^3.1.0",
     "typescript": "^7.0.2",
     "vite": "^8.2.1",
     "vitest": "^3.2.7",
-    "world-atlas": "^2.0.2"
+    "world-atlas": "^2.0.2",
+    "zxing-wasm": "^3.1.3"
   }
 }

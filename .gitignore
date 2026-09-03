@@ -18,6 +18,9 @@ dist/
 
 # Artefatti del browser di prova: non sono del progetto.
 .playwright-mcp/
+# Il banco: serve l'app sui dati di ESEMPIO da una cartella fuori dal repo, così
+# public/data/ (i dati veri cifrati) non si tocca. Scaffolding, non progetto.
+vite.bench*.config.mts
 
 # Review di sicurezza e note con cifre vere: fuori dal repo pubblico.
 /docs/private/

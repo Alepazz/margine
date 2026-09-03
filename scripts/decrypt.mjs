@@ -2,8 +2,14 @@
  * Ricostruisce i dati in chiaro dai file cifrati.
  *
  * Serve in due casi: hai cambiato Mac e vuoi ripartire dal repo, oppure l'app ha
- * scritto annotazioni 730 che il tuo master locale non ha ancora.
+ * scritto qualcosa che il tuo master locale non ha ancora.
  * Sovrascrive `data/` solo con `--yes`.
+ *
+ * **Prima si decifra tutto, poi si scrive.** L'ordine non è pignoleria: fino al
+ * 31/08/2026 questo script scriveva le spese, poi leggeva un campo che non
+ * esisteva più, e lanciava — lasciando `data/` a metà, con un messaggio che
+ * sembrava un guasto della cifratura. Con i file diventati tre il rischio
+ * triplica, quindi la scrittura è l'ultima cosa che succede.
  */
 
 import { assertEnvelope, decryptEnvelope, deriveKey } from './lib/crypto-node.mjs'
@@ -14,34 +20,49 @@ const force = process.argv.includes('--yes')
 try {
   if (!exists(PATHS.expensesEnc)) throw new Error(`Non trovo ${PATHS.expensesEnc}`)
 
-  if (!force && (exists(PATHS.expenses) || exists(PATHS.config))) {
+  if (!force && (exists(PATHS.expenses) || exists(PATHS.config) || exists(PATHS.cards))) {
     log('data/ contiene già dei file in chiaro.')
     log('Rilancia con --yes per sovrascriverli con quelli del repo:')
     log('  npm run decrypt -- --yes')
     process.exitCode = 1
   } else {
     const passphrase = readPassphrase()
+
     const datasetEnvelope = assertEnvelope(readJson(PATHS.expensesEnc), PATHS.expensesEnc)
     const key = await deriveKey(passphrase, datasetEnvelope.kdf)
+    /* La chiave si riusa quando i parametri coincidono, che è il caso normale:
+       `publish.mjs` cifra i file con lo stesso salt apposta. */
+    const keyFor = async (envelope) =>
+      envelope.kdf.salt === datasetEnvelope.kdf.salt &&
+      envelope.kdf.iterations === datasetEnvelope.kdf.iterations
+        ? key
+        : deriveKey(passphrase, envelope.kdf)
+
     const dataset = await decryptEnvelope(datasetEnvelope, key)
+
+    let config
+    if (exists(PATHS.configEnc)) {
+      const envelope = assertEnvelope(readJson(PATHS.configEnc), PATHS.configEnc)
+      config = await decryptEnvelope(envelope, await keyFor(envelope))
+    }
+
+    /* Le carte possono non esserci: chi non le usa non ha il file. → ADR-0082 */
+    let cards
+    if (exists(PATHS.cardsEnc)) {
+      const envelope = assertEnvelope(readJson(PATHS.cardsEnc), PATHS.cardsEnc)
+      cards = await decryptEnvelope(envelope, await keyFor(envelope))
+    }
+
     writeJson(PATHS.expenses, dataset)
-    /* `dataset.trips` non esiste più da ADR-0037: i viaggi sono i tricount che
-       hanno un `trip`. La riga vecchia lanciava **dopo** aver scritto le spese e
-       **prima** della configurazione, quindi `npm run decrypt` lasciava `data/`
-       a metà e sembrava un guasto della cifratura. Rotto dal 21/08/2026 e visto
-       solo il 31, la prima volta che qualcuno l'ha rilanciato. */
     const viaggi = dataset.tricounts.filter((tricount) => tricount.trip).length
     log(`✓ data/expenses.json — ${dataset.expenses.length} spese, ${viaggi} viaggi`)
-
-    if (exists(PATHS.configEnc)) {
-      const configEnvelope = assertEnvelope(readJson(PATHS.configEnc), PATHS.configEnc)
-      const configKey =
-        configEnvelope.kdf.salt === datasetEnvelope.kdf.salt &&
-        configEnvelope.kdf.iterations === datasetEnvelope.kdf.iterations
-          ? key
-          : await deriveKey(passphrase, configEnvelope.kdf)
-      writeJson(PATHS.config, await decryptEnvelope(configEnvelope, configKey))
+    if (config !== undefined) {
+      writeJson(PATHS.config, config)
       log('✓ data/config.json')
+    }
+    if (cards !== undefined) {
+      writeJson(PATHS.cards, cards)
+      log(`✓ data/cards.json — ${cards.cards.length} carte`)
     }
   }
 } catch (error) {

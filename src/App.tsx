@@ -5,6 +5,8 @@ import { AppShell } from './components/AppShell'
 import { Gate } from './components/Gate'
 import { IdentityGate } from './components/IdentityGate'
 import { useStore } from './data/store'
+import { Carta } from './pages/Carta'
+import { Carte } from './pages/Carte'
 import { Casa } from './pages/Casa'
 import { Esplora } from './pages/Esplora'
 import { Gatto } from './pages/Gatto'
@@ -43,6 +45,10 @@ export function App(): ReactNode {
           <Route path="/progetto/:id" element={<Progetto />} />
           <Route path="/statistiche" element={<Statistiche />} />
           <Route path="/prezzi" element={<Prezzi />} />
+          <Route path="/carte" element={<Carte />} />
+          {/* Generica come quella dei progetti: il nome del negozio sta nei
+              dati, non nella rotta. Il repo è pubblico. → ADR-0082, ADR-0067 */}
+          <Route path="/carte/:id" element={<Carta />} />
           <Route path="/730" element={<Tax730 />} />
           <Route path="/saldo" element={<Saldo />} />
           <Route path="/impostazioni" element={<Impostazioni />} />

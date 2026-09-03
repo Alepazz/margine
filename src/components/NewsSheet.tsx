@@ -23,7 +23,7 @@ import { formatDate, todayIso } from '../domain/dates'
 import { changedFields, type ExpenseDelta } from '../domain/diff'
 import { formatEuro } from '../domain/money'
 import { tricountTitleOf, type Category, type Tricount } from '../domain/types'
-import { Notice, useScrollLock } from './ui'
+import { Notice, useEscape, useScrollLock } from './ui'
 
 
 
@@ -97,12 +97,8 @@ export function NewsSheet({ onClose }: { onClose: () => void }): ReactNode {
 
   useEffect(() => {
     sheetRef.current?.focus()
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') chiudi()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [chiudi])
+  }, [])
+  useEscape(chiudi)
 
   const other = config.people[view.person === 'me' ? 'partner' : 'me']
   const today = todayIso()

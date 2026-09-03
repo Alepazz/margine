@@ -1,15 +1,29 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  applyCardOps,
   applyConfigOps,
   applyOps,
   describeOps,
+  fileOf,
   isAlreadyApplied,
   pruneSettled,
-  touchesConfig,
   type OutboxEntry,
+  type RemoteView,
 } from './outbox'
-import type { AppConfig, Dataset, Expense, PriceEntry } from '../domain/types'
+import type { AppConfig, CardsFile, Dataset, Expense, LoyaltyCard, PriceEntry } from '../domain/types'
+
+/**
+ * Il termine di confronto della coda, con i file che il caso non guarda a
+ * `undefined`.
+ *
+ * `undefined` e non una lista vuota: sono due cose diverse, e la differenza è
+ * ciò che impedisce a un `card-delete` di risultare applicato prima di essere
+ * partito.
+ */
+function remoto(dataset: Dataset, over: Partial<RemoteView> = {}): RemoteView {
+  return { dataset, config: undefined, cards: undefined, ...over }
+}
 
 const DATASET: Dataset = {
   version: 1,
@@ -162,8 +176,8 @@ describe('creare, correggere, eliminare', () => {
       entryId: 'u2',
       ts: 4,
     }
-    expect(isAlreadyApplied(spento, undefined, spegni)).toBe(true)
-    expect(isAlreadyApplied(capitale, undefined, spegni)).toBe(false)
+    expect(isAlreadyApplied(remoto(spento), spegni)).toBe(true)
+    expect(isAlreadyApplied(remoto(capitale), spegni)).toBe(false)
   })
 
   it('elimina una spesa', () => {
@@ -212,24 +226,24 @@ describe('creare, correggere, eliminare', () => {
 describe('coda già pubblicata', () => {
   it('riconosce quando il dato scaricato contiene già l’annotazione', () => {
     const applied = applyOps(DATASET, [patch({ tax730: true })])
-    expect(isAlreadyApplied(applied, undefined, patch({ tax730: true }))).toBe(true)
-    expect(isAlreadyApplied(DATASET, undefined, patch({ tax730: true }))).toBe(false)
+    expect(isAlreadyApplied(remoto(applied), patch({ tax730: true }))).toBe(true)
+    expect(isAlreadyApplied(remoto(DATASET), patch({ tax730: true }))).toBe(false)
   })
 
   it('riconosce una creazione già pubblicata, e un\'eliminazione già avvenuta', () => {
     const crea: OutboxEntry = { kind: 'create', expense: NUOVA, entryId: 'c', ts: 1 }
     const elimina: OutboxEntry = { kind: 'delete', expenseId: 'a', entryId: 'd', ts: 1 }
-    expect(isAlreadyApplied(DATASET, undefined, crea)).toBe(false)
-    expect(isAlreadyApplied(applyOps(DATASET, [crea]), undefined, crea)).toBe(true)
-    expect(isAlreadyApplied(DATASET, undefined, elimina)).toBe(false)
-    expect(isAlreadyApplied(applyOps(DATASET, [elimina]), undefined, elimina)).toBe(true)
+    expect(isAlreadyApplied(remoto(DATASET), crea)).toBe(false)
+    expect(isAlreadyApplied(remoto(applyOps(DATASET, [crea])), crea)).toBe(true)
+    expect(isAlreadyApplied(remoto(DATASET), elimina)).toBe(false)
+    expect(isAlreadyApplied(remoto(applyOps(DATASET, [elimina])), elimina)).toBe(true)
   })
 
   it('scarta dalla coda le catene già pubblicate per intero', () => {
     const applied = applyOps(DATASET, [patch({ tax730: true }), patch({ notes: 'altro' }, 2)])
     const state = { pending: [], settled: [patch({ tax730: true }), patch({ notes: 'altro' }, 2)] }
     // `now` vicino ai timestamp delle voci: nessuna è ancora scaduta per tempo
-    expect(pruneSettled(state, applied, undefined, 1000).settled).toHaveLength(0)
+    expect(pruneSettled(state, remoto(applied), 1000).settled).toHaveLength(0)
   })
 
   it('tiene la catena intera se l’ultima non è ancora arrivata', () => {
@@ -239,7 +253,7 @@ describe('coda già pubblicata', () => {
        qui sotto descrive. */
     const applied = applyOps(DATASET, [patch({ tax730: true })])
     const state = { pending: [], settled: [patch({ tax730: true }), patch({ notes: 'altro' }, 2)] }
-    const pruned = pruneSettled(state, applied, undefined, 1000)
+    const pruned = pruneSettled(state, remoto(applied), 1000)
     expect(pruned.settled.map((e) => e.entryId)).toEqual(['e1', 'e2'])
   })
 
@@ -262,7 +276,7 @@ describe('coda già pubblicata', () => {
     it('una spesa aggiunta e cancellata non torna', () => {
       /* `DATASET` è il remoto dopo che entrambe sono state committate: la spesa
          non c'è. */
-      const pruned = pruneSettled({ pending: [], settled: [crea, elimina] }, DATASET, undefined, 1000)
+      const pruned = pruneSettled({ pending: [], settled: [crea, elimina] }, remoto(DATASET), 1000)
       expect(pruned.settled).toHaveLength(0)
       expect(applyOps(DATASET, pruned.settled).expenses.map((e) => e.id)).not.toContain(NUOVA.id)
     })
@@ -270,12 +284,11 @@ describe('coda già pubblicata', () => {
     it('e non torna nemmeno al giro dopo', () => {
       /* Il difetto vero era qui: ricancellarla produceva un commit a vuoto, la
          nuova `delete` veniva potata come «già applicata» e il `create` restava. */
-      const primo = pruneSettled({ pending: [], settled: [crea, elimina] }, DATASET, undefined, 1000)
+      const primo = pruneSettled({ pending: [], settled: [crea, elimina] }, remoto(DATASET), 1000)
       const ancora: OutboxEntry = { kind: 'delete', expenseId: NUOVA.id, entryId: 'd2', ts: 3 }
       const secondo = pruneSettled(
         { pending: [], settled: [...primo.settled, ancora] },
-        DATASET,
-        undefined,
+        remoto(DATASET),
         1000,
       )
       expect(applyOps(DATASET, secondo.settled).expenses.map((e) => e.id)).not.toContain(NUOVA.id)
@@ -285,7 +298,7 @@ describe('coda già pubblicata', () => {
       const rimborso = { id: 'r1', date: '2026-08-28', from: 'partner' as const, to: 'me' as const, amount: 40 }
       const registra: OutboxEntry = { kind: 'settle', settlement: rimborso, entryId: 's', ts: 1 }
       const annulla: OutboxEntry = { kind: 'unsettle', settlementId: 'r1', entryId: 'u', ts: 2 }
-      const pruned = pruneSettled({ pending: [], settled: [registra, annulla] }, DATASET, undefined, 1000)
+      const pruned = pruneSettled({ pending: [], settled: [registra, annulla] }, remoto(DATASET), 1000)
       expect(applyOps(DATASET, pruned.settled).settlements ?? []).toHaveLength(0)
     })
 
@@ -293,23 +306,31 @@ describe('coda già pubblicata', () => {
       const accendi = patch({ tax730: true })
       const spegni = patch({ tax730: false }, 2)
       /* Il remoto con entrambe applicate: `normalize` cancella il flag falso. */
-      const remoto = applyOps(DATASET, [accendi, spegni])
-      const pruned = pruneSettled({ pending: [], settled: [accendi, spegni] }, remoto, undefined, 1000)
-      expect(applyOps(remoto, pruned.settled).expenses[0]).not.toHaveProperty('tax730')
+      const pubblicato = applyOps(DATASET, [accendi, spegni])
+      const pruned = pruneSettled(
+        { pending: [], settled: [accendi, spegni] },
+        remoto(pubblicato),
+        1000,
+      )
+      expect(applyOps(pubblicato, pruned.settled).expenses[0]).not.toHaveProperty('tax730')
     })
 
     it('un importo corretto due volte mostra la correzione buona', () => {
       const dieci: OutboxEntry = { kind: 'update', expenseId: 'a', fields: { amount: 10, shares: { me: 5, partner: 5 } }, entryId: 'u1', ts: 1 }
       const dodici: OutboxEntry = { kind: 'update', expenseId: 'a', fields: { amount: 12, shares: { me: 6, partner: 6 } }, entryId: 'u2', ts: 2 }
-      const remoto = applyOps(DATASET, [dieci, dodici])
-      const pruned = pruneSettled({ pending: [], settled: [dieci, dodici] }, remoto, undefined, 1000)
-      expect(applyOps(remoto, pruned.settled).expenses[0]?.amount).toBe(12)
+      const pubblicato = applyOps(DATASET, [dieci, dodici])
+      const pruned = pruneSettled(
+        { pending: [], settled: [dieci, dodici] },
+        remoto(pubblicato),
+        1000,
+      )
+      expect(applyOps(pubblicato, pruned.settled).expenses[0]?.amount).toBe(12)
     })
   })
 
   it('dimentica le voci troppo vecchie per essere ancora in volo', () => {
     const old = patch({ notes: 'vecchia' }, 1)
-    const pruned = pruneSettled({ pending: [], settled: [old] }, DATASET, undefined, 40 * 24 * 60 * 60 * 1000)
+    const pruned = pruneSettled({ pending: [], settled: [old] }, remoto(DATASET), 40 * 24 * 60 * 60 * 1000)
     expect(pruned.settled).toHaveLength(0)
   })
 })
@@ -398,10 +419,10 @@ describe('rilevazioni di prezzo', () => {
     }
     const con = applyOps(DATASET, [aggiunta])
 
-    expect(isAlreadyApplied(DATASET, undefined, aggiunta)).toBe(false)
-    expect(isAlreadyApplied(con, undefined, aggiunta)).toBe(true)
-    expect(isAlreadyApplied(con, undefined, cancellazione)).toBe(false)
-    expect(isAlreadyApplied(DATASET, undefined, cancellazione)).toBe(true)
+    expect(isAlreadyApplied(remoto(DATASET), aggiunta)).toBe(false)
+    expect(isAlreadyApplied(remoto(con), aggiunta)).toBe(true)
+    expect(isAlreadyApplied(remoto(con), cancellazione)).toBe(false)
+    expect(isAlreadyApplied(remoto(DATASET), cancellazione)).toBe(true)
   })
 
   it('sopravvive al giro in localStorage', () => {
@@ -411,8 +432,8 @@ describe('rilevazioni di prezzo', () => {
   })
 
   it('non riscrive la configurazione', () => {
-    expect(touchesConfig({ kind: 'price', entry: RILEVAZIONE })).toBe(false)
-    expect(touchesConfig({ kind: 'price-delete', priceId: RILEVAZIONE.id })).toBe(false)
+    expect(fileOf({ kind: 'price', entry: RILEVAZIONE })).toBe('data')
+    expect(fileOf({ kind: 'price-delete', priceId: RILEVAZIONE.id })).toBe('data')
   })
 
   /* I file cifrati scritti prima di ADR-0041 non hanno il campo: la coda non
@@ -473,8 +494,8 @@ describe('togliere un campo con un update', () => {
 
   it('e una volta applicata non resta in coda per sempre', () => {
     const applied = applyOps(CON_VACANZA, [uscita])
-    expect(isAlreadyApplied(applied, undefined, uscita)).toBe(true)
-    expect(isAlreadyApplied(CON_VACANZA, undefined, uscita)).toBe(false)
+    expect(isAlreadyApplied(remoto(applied), uscita)).toBe(true)
+    expect(isAlreadyApplied(remoto(CON_VACANZA), uscita)).toBe(false)
   })
 })
 
@@ -510,8 +531,8 @@ describe('il flag «concluso» di un tricount', () => {
   /* Senza questo, l'operazione resterebbe in coda a vita: «tricount» guarda solo
      se l'id esiste, e per una modifica l'id esiste già sempre. */
   it('e si riconosce come già pubblicata, cosa che «tricount» non saprebbe fare', () => {
-    expect(isAlreadyApplied(VIAGGI, undefined, chiudi)).toBe(false)
-    expect(isAlreadyApplied(applyOps(VIAGGI, [chiudi]), undefined, chiudi)).toBe(true)
+    expect(isAlreadyApplied(remoto(VIAGGI), chiudi)).toBe(false)
+    expect(isAlreadyApplied(remoto(applyOps(VIAGGI, [chiudi])), chiudi)).toBe(true)
   })
 
   it('riaprire un tricount non lascia «closed: false» nei dati', () => {
@@ -529,9 +550,9 @@ describe('il flag «concluso» di un tricount', () => {
        l'intenzione normalizzata. → ADR-0069 */
     const riapri: OutboxEntry = { ...chiudi, fields: { closed: false }, entryId: 'r2', ts: 2 }
     const riaperto = applyOps(applyOps(VIAGGI, [chiudi]), [riapri])
-    expect(isAlreadyApplied(riaperto, undefined, riapri)).toBe(true)
+    expect(isAlreadyApplied(remoto(riaperto), riapri)).toBe(true)
     expect(
-      pruneSettled({ pending: [], settled: [riapri] }, riaperto, undefined, 1000).settled,
+      pruneSettled({ pending: [], settled: [riapri] }, remoto(riaperto), 1000).settled,
     ).toHaveLength(0)
   })
 })
@@ -554,8 +575,8 @@ describe('spostare le spese di una categoria', () => {
   })
 
   it('a categoria già vuota è un’operazione già applicata', () => {
-    expect(isAlreadyApplied(CON_VACANZA, undefined, sposta)).toBe(false)
-    expect(isAlreadyApplied(applyOps(CON_VACANZA, [sposta]), undefined, sposta)).toBe(true)
+    expect(isAlreadyApplied(remoto(CON_VACANZA), sposta)).toBe(false)
+    expect(isAlreadyApplied(remoto(applyOps(CON_VACANZA, [sposta])), sposta)).toBe(true)
   })
 })
 
@@ -623,18 +644,147 @@ describe('categorie ed entrate', () => {
    * danno, una buttata via è perduta.
    */
   it('senza configurazione si dice «non ancora», non «sì»', () => {
-    expect(isAlreadyApplied(DATASET, undefined, categorie)).toBe(false)
+    expect(isAlreadyApplied(remoto(DATASET), categorie)).toBe(false)
   })
 
   it('con la configurazione si riconoscono, e non restano in coda a vita', () => {
     const applied = applyConfigOps(CONFIG, [categorie])
-    expect(isAlreadyApplied(DATASET, CONFIG, categorie)).toBe(false)
-    expect(isAlreadyApplied(DATASET, applied, categorie)).toBe(true)
+    expect(isAlreadyApplied(remoto(DATASET, { config: CONFIG }), categorie)).toBe(false)
+    expect(isAlreadyApplied(remoto(DATASET, { config: applied }), categorie)).toBe(true)
   })
 
   it('e solo loro riscrivono la configurazione', () => {
-    expect(touchesConfig(categorie)).toBe(true)
-    expect(touchesConfig({ kind: 'delete', expenseId: 'a' })).toBe(false)
-    expect(touchesConfig({ kind: 'recategorize', from: 'a', to: 'b' })).toBe(false)
+    expect(fileOf(categorie)).toBe('config')
+    expect(fileOf({ kind: 'delete', expenseId: 'a' })).toBe('data')
+    expect(fileOf({ kind: 'recategorize', from: 'a', to: 'b' })).toBe('data')
+  })
+})
+
+// ─────────────────────────── le carte fedeltà ───────────────────────────
+
+const CARTA: LoyaltyCard = {
+  id: 'carta-2026-09-02-a1b2c3d4',
+  name: 'Supermercato A',
+  code: '0999888777664',
+  format: 'ean13',
+  addedAt: '2026-09-02',
+  note: 'Numero cliente 4471',
+}
+
+const CARTE: CardsFile = { version: 1, updatedAt: '2026-09-02T09:00:00.000Z', cards: [] }
+
+function aggiungi(card: LoyaltyCard, ts = 1): OutboxEntry {
+  return { kind: 'card', card, entryId: `c${String(ts)}`, ts }
+}
+
+describe('le carte fedeltà', () => {
+  it('vanno nel loro file, non fra le spese né nella configurazione', () => {
+    /* Un'operazione col bersaglio sbagliato non dà errore: viene applicata a un
+       file che non la riguarda, non trova niente da fare, e resta in coda per
+       sempre. → ADR-0082 */
+    expect(fileOf({ kind: 'card', card: CARTA })).toBe('cards')
+    expect(fileOf({ kind: 'card-edit', cardId: CARTA.id, fields: {} })).toBe('cards')
+    expect(fileOf({ kind: 'card-delete', cardId: CARTA.id })).toBe('cards')
+  })
+
+  it('si aggiunge, e due volte la stessa non fa due carte', () => {
+    const next = applyCardOps(CARTE, [aggiungi(CARTA), aggiungi(CARTA, 2)])
+    expect(next.cards).toHaveLength(1)
+    expect(next.cards[0]?.name).toBe('Supermercato A')
+  })
+
+  it('non tocca il file quando non c’è niente da fare', () => {
+    /* Stessa identità dell'oggetto: è ciò che evita di riscrivere un envelope
+       (con un IV nuovo) per un'operazione che non cambia niente. */
+    expect(applyCardOps(CARTE, [{ kind: 'card-delete', cardId: 'ignoto', entryId: 'x', ts: 1 }])).toBe(
+      CARTE,
+    )
+  })
+
+  it('si corregge, e un campo si cancella con la stringa vuota', () => {
+    const con = applyCardOps(CARTE, [aggiungi(CARTA)])
+    const senzaNota = applyCardOps(con, [
+      { kind: 'card-edit', cardId: CARTA.id, fields: { note: '' }, entryId: 'e1', ts: 2 },
+    ])
+    expect(senzaNota.cards[0]).not.toHaveProperty('note')
+  })
+
+  it('alza le minuscole di un Code 39, perché il lettore le alzerebbe comunque', () => {
+    /* Conservandole, il numero a schermo direbbe una cosa e la cassa ne
+       leggerebbe un'altra: sbagliato invece che assente. → ADR-0083 */
+    const next = applyCardOps(CARTE, [aggiungi({ ...CARTA, code: 'fd44 71', format: 'code39' })])
+    expect(next.cards[0]?.code).toBe('FD44 71')
+  })
+
+  it('non tocca le minuscole di un Code 128, che le sa scrivere', () => {
+    const next = applyCardOps(CARTE, [aggiungi({ ...CARTA, code: 'ab-12', format: 'code128' })])
+    expect(next.cards[0]?.code).toBe('ab-12')
+  })
+
+  it('ripulisce gli spazi del nome e del codice', () => {
+    /* Uno spazio in coda al codice lo renderebbe non disegnabile, e il perché
+       non si vedrebbe guardando il campo. */
+    const next = applyCardOps(CARTE, [
+      aggiungi({ ...CARTA, name: '  Supermercato A ', code: ' 0999888777664 ' }),
+    ])
+    expect(next.cards[0]?.name).toBe('Supermercato A')
+    expect(next.cards[0]?.code).toBe('0999888777664')
+  })
+
+  it('sopravvive al giro in localStorage, immagine compresa', () => {
+    const conFaccia = aggiungi({ ...CARTA, image: 'data:image/png;base64,iVBORw0KGgo=' })
+    const round = JSON.parse(JSON.stringify(conFaccia)) as OutboxEntry
+    expect(round).toEqual(conFaccia)
+    expect(applyCardOps(CARTE, [round]).cards[0]?.image).toBe('data:image/png;base64,iVBORw0KGgo=')
+  })
+
+  it('senza il file delle carte si dice «non ancora», non «sì»', () => {
+    /* `undefined` non è una lista vuota: prima che il file esista, un
+       `card-delete` risulterebbe applicato e uscirebbe dalla coda senza essere
+       mai partito. */
+    expect(isAlreadyApplied(remoto(DATASET), aggiungi(CARTA))).toBe(false)
+    expect(
+      isAlreadyApplied(remoto(DATASET), { kind: 'card-delete', cardId: CARTA.id, entryId: 'd', ts: 1 }),
+    ).toBe(false)
+  })
+
+  it('una volta pubblicata non resta in coda per sempre', () => {
+    const con = applyCardOps(CARTE, [aggiungi(CARTA)])
+    expect(isAlreadyApplied(remoto(DATASET, { cards: con.cards }), aggiungi(CARTA))).toBe(true)
+    expect(isAlreadyApplied(remoto(DATASET, { cards: [] }), aggiungi(CARTA))).toBe(false)
+  })
+
+  it('una correzione si riconosce confrontando l’intenzione normalizzata', () => {
+    /* Grezzo, `note: ''` non coinciderebbe mai con una carta che la nota non ce
+       l'ha più, e quella voce resterebbe in coda quattordici giorni
+       riapplicandosi a ogni caricamento. */
+    const con = applyCardOps(CARTE, [aggiungi(CARTA)])
+    const togli: OutboxEntry = {
+      kind: 'card-edit',
+      cardId: CARTA.id,
+      fields: { note: '' },
+      entryId: 'e1',
+      ts: 2,
+    }
+    const senza = applyCardOps(con, [togli])
+    expect(isAlreadyApplied(remoto(DATASET, { cards: con.cards }), togli)).toBe(false)
+    expect(isAlreadyApplied(remoto(DATASET, { cards: senza.cards }), togli)).toBe(true)
+  })
+
+  it('aggiunta e cancellata, la carta non torna a schermo', () => {
+    /*
+     * Il fantasma di ADR-0069, su un tipo nuovo. Potate una per una, le due
+     * operazioni si annullano male: il remoto non ha la carta, quindi il
+     * `delete` risulta applicato e viene scartato mentre il `card` risulta non
+     * applicato e viene tenuto — e ogni caricamento riapplica l'aggiunta.
+     */
+    const crea = aggiungi(CARTA)
+    const elimina: OutboxEntry = { kind: 'card-delete', cardId: CARTA.id, entryId: 'd', ts: 2 }
+    const pruned = pruneSettled(
+      { pending: [], settled: [crea, elimina] },
+      remoto(DATASET, { cards: [] }),
+      1000,
+    )
+    expect(applyCardOps(CARTE, pruned.settled).cards).toEqual([])
   })
 })

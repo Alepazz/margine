@@ -2505,3 +2505,340 @@ button.hero-value:focus-visible {
     font-size: 1.25rem;
   }
 }
+
+/* ═══════════════════════ le carte fedeltà ═══════════════════════ */
+
+/*
+ * La griglia del mazzo: due colonne, come un portafoglio aperto.
+ *
+ * `minmax(0, 1fr)` e non `1fr`: il minimo implicito di `1fr` è il min-content, e
+ * un nome di negozio non comprimibile allargherebbe **tutte** le righe, che
+ * condividono le tracce. È lo stesso difetto di ADR-0033 in un vestito nuovo.
+ * → ADR-0044, ADR-0033
+ */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.card-tile {
+  display: block;
+  min-width: 0;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.card-tile:hover {
+  text-decoration: none;
+}
+
+.card-tile:hover .card-face {
+  /* Il segno di essere tappabile sta sulla tessera, non sul nome. */
+  transform: translateY(-2px);
+}
+
+.card-tile:focus-visible {
+  outline: none;
+}
+
+.card-tile:focus-visible .card-face {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/*
+ * La faccia della tessera.
+ *
+ * `aspect-ratio: 1.585` è il rapporto di una carta di credito vera (85,6 × 54
+ * mm): è la forma che la mano riconosce, e sono le proporzioni con cui gli
+ * screenshot da cui le facce arrivano sono già ritagliati.
+ */
+.card-face {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1.585;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.15s var(--ease);
+}
+
+.card-face img {
+  width: 100%;
+  height: 100%;
+  /* Copre: un ritaglio un po' diverso non lascia bande vuote ai lati. */
+  object-fit: cover;
+  display: block;
+}
+
+/*
+ * Nessuna tinta: la superficie del tema con un bordo, cioè una tessera bianca.
+ */
+.card-face.is-plain {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+
+/*
+ * Il nome **dentro** la faccia, e solo quando non c'è un'immagine.
+ *
+ * La griglia è di sole facce (→ ADR-0086): con l'immagine è l'insegna a dire di
+ * chi è la tessera, senza è questa parola. L'inchiostro segue la tinta come nella
+ * fascia della tessera aperta; su una faccia neutra è quello del tema.
+ */
+.card-face-name {
+  padding: 0 12px;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+
+/* ── la tessera aperta ── */
+
+/*
+ * Il primo piano: l'app sparisce e resta la tessera. → ADR-0085
+ *
+ * Il fondo è scuro **in entrambi i temi** e quasi opaco: non è un velo sopra la
+ * pagina, è la pagina che se ne va. Sta sopra testata e isola (`z-index: 40`,
+ * il livello dei fogli) e non sopra i messaggi (50). Il contenuto si centra in
+ * colonna; la tessera prende tutta la larghezza fino a un tetto, perché un
+ * codice a barre largo quanto lo schermo è la cosa più facile da leggere che un
+ * telefono possa offrire a un lettore.
+ */
+.card-focus {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px 16px calc(env(safe-area-inset-bottom) + 24px);
+  background: var(--card-focus);
+  animation: sheet-fade 0.2s ease;
+}
+
+.card-focus .card-open {
+  width: 100%;
+  max-width: 440px;
+}
+
+/* In primo piano le barre sono più alte: un lettore tenuto storto le trova meglio. */
+.card-focus .barcode {
+  height: 160px;
+}
+
+.card-focus .card-number {
+  font-size: 1.5rem;
+}
+
+.card-focus-close {
+  min-height: 44px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.82);
+  font: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.card-focus-close:hover {
+  color: #ffffff;
+}
+
+.card-open {
+  overflow: hidden;
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-card);
+  /* Il fondo è quello della faccia: fra la fascia e le barre non deve comparire
+     una striscia del colore del tema. */
+  background: var(--card-face);
+}
+
+.card-open-band {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 64px;
+  padding: 10px 12px;
+  background: var(--ink);
+}
+
+.card-open-logo {
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  /* Un anello chiaro stacca il logo dalla fascia quando sono della stessa tinta. */
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.card-open-name {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.card-open-details {
+  flex: none;
+  min-height: 38px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  color: inherit;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.card-open-details:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.card-open-band.is-plain {
+  background: var(--surface-2);
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+}
+
+.card-open-band.is-plain .card-open-details {
+  background: rgba(16, 24, 32, 0.12);
+}
+
+/*
+ * L'inchiostro sopra una tinta lo sceglie `inkOn`, e vale in due posti: la
+ * faccia senza immagine nella griglia e la fascia della tessera aperta. Una
+ * regola per tutti e due, o le due smetterebbero di dire la stessa cosa.
+ */
+.card-face.is-ink-chiaro,
+.card-open-band.is-ink-chiaro {
+  color: #ffffff;
+}
+
+.card-face.is-ink-scuro,
+.card-open-band.is-ink-scuro {
+  color: var(--card-face-ink);
+}
+
+/*
+ * Una fascia chiara sopra la faccia bianca ha bisogno di un filo che la separi:
+ * la tessera Pam è bianca, e senza il filo fascia e faccia sono un rettangolo
+ * solo. È la stessa riga sottile che disegna Klarna.
+ */
+.card-open-band.is-ink-scuro {
+  border-bottom: 1px solid var(--line);
+}
+
+.card-open-band.is-ink-scuro .card-open-details {
+  background: rgba(16, 24, 32, 0.12);
+}
+
+.card-open-band.is-ink-scuro .card-open-details:hover {
+  background: rgba(16, 24, 32, 0.2);
+}
+
+/*
+ * La faccia bianca, dove sta il codice.
+ *
+ * Il bianco non segue il tema di proposito: lo legge un lettore ottico, non una
+ * persona. → ADR-0084
+ */
+.card-open-face {
+  padding: 26px 18px 20px;
+  background: var(--card-face);
+  text-align: center;
+}
+
+.barcode {
+  display: block;
+  width: 100%;
+  /*
+   * L'altezza in `px` e non in `rem`: è una misura per una macchina, e gli
+   * standard la vogliono almeno un quarto della larghezza. Con la manopola
+   * della scala su telefono in `rem` crescerebbe con il testo, senza motivo.
+   */
+  height: 132px;
+}
+
+.card-number {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin-top: 14px;
+  color: var(--card-face-ink);
+  overflow-wrap: anywhere;
+}
+
+.card-number.is-small {
+  font-size: 1rem;
+  margin-top: 8px;
+}
+
+.card-open-nobarcode {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 0.88rem;
+}
+
+/* ── nel modulo ── */
+
+/* L'anteprima del codice mentre si scrive: è il controllo finale. */
+.card-preview {
+  padding: 12px 10px 8px;
+  border-radius: var(--r-md);
+  background: var(--card-face);
+  border: 1px solid var(--line);
+}
+
+.card-preview .barcode {
+  height: 84px;
+}
+
+.card-face-thumb {
+  width: 84px;
+  height: 53px;
+  flex: none;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  object-fit: cover;
+  display: block;
+}
+
+.card-face-thumb.is-empty {
+  display: block;
+}
+
+.hint.is-warn {
+  color: var(--warn-text);
+}
+
+@media (min-width: 700px) {
+  /* Su schermo largo tre colonne: due tessere da 300px sono più grandi di una
+     carta vera, e la griglia sembra ingrandita per sbaglio. */
+  .card-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .card-open {
+    max-width: 520px;
+  }
+}

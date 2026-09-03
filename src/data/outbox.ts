@@ -21,10 +21,12 @@ import { toCents } from '../domain/money'
 import type {
   Annotation,
   AppConfig,
+  CardsFile,
   Category,
   Dataset,
   Expense,
   IncomeProfile,
+  LoyaltyCard,
   PersonId,
   PriceEntry,
   Settlement,
@@ -70,10 +72,51 @@ export type Op =
   /** Le spese di una categoria passano a un'altra: è la controparte di una cancellazione. */
   | { kind: 'recategorize'; from: string; to: string }
   | { kind: 'income'; person: PersonId; profile: IncomeProfile }
+  /**
+   * Una carta fedeltà: si aggiunge, si corregge e si elimina.
+   *
+   * Il `card-edit` c'è, a differenza dei prezzi, perché una carta è uno **stato**
+   * e non un fatto osservato in un giorno: il nome si corregge, la faccia si
+   * sostituisce, la nota cambia. Un prezzo di ieri invece è quanto costava ieri,
+   * e correggerlo sarebbe riscrivere il passato. → ADR-0082, ADR-0041
+   */
+  | { kind: 'card'; card: LoyaltyCard }
+  | { kind: 'card-edit'; cardId: string; fields: Partial<LoyaltyCard> }
+  | { kind: 'card-delete'; cardId: string }
 
-/** Le operazioni che riscrivono `config.json.enc` invece di `expenses.json.enc`. */
-export function touchesConfig(entry: Op): boolean {
-  return entry.kind === 'categories' || entry.kind === 'income'
+/**
+ * Quale dei tre file cifrati riscrive un'operazione.
+ *
+ * Erano due e la domanda era un booleano (`touchesConfig`). Con le carte sono
+ * tre, e il tipo è un'unione **esaustiva**: un'operazione nuova senza un file di
+ * destinazione non compila, invece di finire per sbaglio nel file delle spese —
+ * dove il salvataggio l'applicherebbe a un dataset che non la riguarda, non
+ * troverebbe niente da fare, e la lascerebbe in coda per sempre. → ADR-0082
+ */
+export type FileTarget = 'data' | 'config' | 'cards'
+
+export function fileOf(entry: Op): FileTarget {
+  switch (entry.kind) {
+    case 'categories':
+    case 'income':
+      return 'config'
+    case 'card':
+    case 'card-edit':
+    case 'card-delete':
+      return 'cards'
+    case 'patch':
+    case 'create':
+    case 'update':
+    case 'delete':
+    case 'tricount':
+    case 'tricount-edit':
+    case 'settle':
+    case 'unsettle':
+    case 'price':
+    case 'price-delete':
+    case 'recategorize':
+      return 'data'
+  }
 }
 
 export type OutboxEntry = Op & { entryId: string; ts: number }
@@ -121,6 +164,11 @@ function isEntry(value: unknown): value is OutboxEntry {
     }
     case 'income':
       return typeof (v as { profile?: { netMonthly?: unknown } }).profile?.netMonthly === 'number'
+    case 'card':
+      return typeof (v as { card?: { id?: unknown } }).card?.id === 'string'
+    case 'card-edit':
+    case 'card-delete':
+      return typeof (v as { cardId?: unknown }).cardId === 'string'
     default:
       return false
   }
@@ -324,6 +372,85 @@ export function applyConfigOps(config: AppConfig, entries: readonly OutboxEntry[
 }
 
 /**
+ * Le operazioni sulle carte, applicate al **loro** file.
+ *
+ * Un applicatore a parte per la stessa ragione di `applyConfigOps`: le carte
+ * vivono in un envelope cifrato loro, e mescolarle qui vorrebbe dire riscrivere
+ * ogni volta anche ciò che non è cambiato — con un IV nuovo a ogni cifratura,
+ * cioè un file diverso a ogni salvataggio anche senza modifiche. → ADR-0082,
+ * ADR-0025
+ */
+export function applyCardOps(file: CardsFile, entries: readonly OutboxEntry[]): CardsFile {
+  /* Una copia e basta: sono poche decine di carte, e il copy-on-write non paga.
+     `touched` serve solo a restituire lo stesso oggetto quando niente è cambiato. */
+  const cards = [...file.cards]
+  let touched = false
+
+  for (const entry of [...entries].sort((a, b) => a.ts - b.ts)) {
+    switch (entry.kind) {
+      case 'card': {
+        if (cards.some((c) => c.id === entry.card.id)) break
+        cards.push(normalizeCard(entry.card))
+        touched = true
+        break
+      }
+      case 'card-edit': {
+        const index = cards.findIndex((c) => c.id === entry.cardId)
+        const current = cards[index]
+        if (current === undefined) break
+        cards[index] = normalizeCard({ ...current, ...entry.fields })
+        touched = true
+        break
+      }
+      case 'card-delete': {
+        const index = cards.findIndex((c) => c.id === entry.cardId)
+        if (index < 0) break
+        cards.splice(index, 1)
+        touched = true
+        break
+      }
+      default:
+        break
+    }
+  }
+
+  if (!touched) return file
+  return { ...file, cards, updatedAt: new Date().toISOString() }
+}
+
+/**
+ * Come `normalize` per le spese, e con la stessa trappola: **un campo si
+ * cancella con la stringa vuota, non con `undefined`**.
+ *
+ * Un `card-edit` si applica come `{ ...carta, ...campi }`, quindi un campo
+ * assente vuol dire «lascia com'era»; e `JSON.stringify` butta via le chiavi
+ * `undefined`, mentre la coda vive in `localStorage`. Con `undefined` bastava un
+ * ricaricamento perché una nota cancellata tornasse. Vale per `note`, `image` e
+ * `color` — i tre campi che si possono togliere.
+ */
+function normalizeCard(card: LoyaltyCard): LoyaltyCard {
+  const code = card.code.trim()
+  const next: LoyaltyCard = {
+    ...card,
+    name: card.name.trim(),
+    /*
+     * Il Code 39 **non ha le minuscole**, e il disegnatore le alza da sé. Se il
+     * dato le conservasse, il lettore alla cassa restituirebbe un testo diverso
+     * da quello salvato: il numero a schermo dice `ab12`, la cassa legge
+     * `AB12`. È il difetto peggiore possibile qui — sbagliato invece che
+     * assente — e si chiude alzandole nel dato, che è anche la verità: quel
+     * codice **è** maiuscolo. → ADR-0083
+     */
+    code: card.format === 'code39' ? code.toUpperCase() : code,
+  }
+  if (next.note !== undefined && next.note.trim() === '') delete next.note
+  else if (next.note !== undefined) next.note = next.note.trim()
+  if (!next.image) delete next.image
+  if (!next.color) delete next.color
+  return next
+}
+
+/**
  * Come `normalize` per le spese: il testo arriva ripulito e una nota vuota non
  * si scrive. Il trim non è cosmetico — `nameKey` normalizza in lettura, ma la
  * grafia salvata è quella che poi si vede nei suggerimenti e nei titoli.
@@ -404,17 +531,34 @@ function sameLinks(a: readonly string[] | undefined, b: readonly string[] | unde
 }
 
 /**
+ * Il contenuto remoto con cui si confronta la coda: **tutti e tre i file**.
+ *
+ * Le chiavi sono obbligatorie anche quando il valore può essere `undefined`, e
+ * non è pedanteria: un file nuovo aggiunto qui rompe la compilazione di ogni
+ * chiamante, che è l'unico modo di non dimenticarne uno. Dimenticarlo non darebbe
+ * un errore ma un fantasma — le operazioni su quel file risulterebbero «non
+ * ancora applicate» per sempre e `pruneSettled` le riapplicherebbe a ogni
+ * caricamento, riportando a schermo una carta cancellata. → ADR-0082, ADR-0069
+ *
+ * `undefined` vuol dire «non lo so», e la risposta prudente è «non ancora
+ * applicata»: una voce di troppo si riapplica senza danno, una buttata via è
+ * persa.
+ */
+export interface RemoteView {
+  dataset: Dataset
+  config: AppConfig | undefined
+  cards: readonly LoyaltyCard[] | undefined
+}
+
+/**
  * true quando ciò che è stato scaricato riflette già questa operazione.
  *
- * Vuole **entrambi** i file: da quando la coda tocca anche le categorie e le
- * entrate, guardare solo il dataset direbbe «non ancora applicata» per sempre a
- * un'operazione sulla configurazione, e quella voce resterebbe in coda a vita.
+ * Vuole **tutti** i file: da quando la coda tocca anche le categorie, le entrate
+ * e le carte, guardare solo il dataset direbbe «non ancora applicata» per sempre
+ * alle altre, e quelle voci resterebbero in coda a vita.
  */
-export function isAlreadyApplied(
-  dataset: Dataset,
-  config: AppConfig | undefined,
-  entry: OutboxEntry,
-): boolean {
+export function isAlreadyApplied(remote: RemoteView, entry: OutboxEntry): boolean {
+  const { dataset, config, cards } = remote
   switch (entry.kind) {
     case 'patch': {
       const expense = dataset.expenses.find((e) => e.id === entry.expenseId)
@@ -480,6 +624,31 @@ export function isAlreadyApplied(
       if (!config) return false
       return JSON.stringify(config.income[entry.person]) === JSON.stringify(entry.profile)
     }
+    case 'card':
+      /* Senza il file delle carte non si può dire: «non ancora», come per la
+         configurazione. Capita davvero, e non solo prima che sia scaricato — il
+         file può non esistere ancora nel repo, il giorno della prima carta. */
+      if (!cards) return false
+      return cards.some((c) => c.id === entry.card.id)
+    case 'card-edit': {
+      if (!cards) return false
+      const card = cards.find((c) => c.id === entry.cardId)
+      if (!card) return false
+      /* Come per `update` e `tricount-edit`: si confronta con l'**intenzione
+         normalizzata**. `note: ''` vuol dire «togli la nota», e una carta che
+         non ce l'ha più soddisfa quell'operazione anche se le stringhe non
+         coincidono. Grezzo, quella voce non sarebbe mai riconosciuta come
+         applicata e resterebbe in coda quattordici giorni. */
+      const wanted = normalizeCard({ ...card, ...entry.fields })
+      return Object.keys(entry.fields).every(
+        (key) =>
+          JSON.stringify(card[key as keyof LoyaltyCard]) ===
+          JSON.stringify(wanted[key as keyof LoyaltyCard]),
+      )
+    }
+    case 'card-delete':
+      if (!cards) return false
+      return !cards.some((c) => c.id === entry.cardId)
   }
 }
 
@@ -515,6 +684,11 @@ function targetOf(entry: OutboxEntry): string {
       return 'config:categorie'
     case 'income':
       return `config:entrate:${entry.person}`
+    case 'card':
+      return `carta:${entry.card.id}`
+    case 'card-edit':
+    case 'card-delete':
+      return `carta:${entry.cardId}`
   }
 }
 
@@ -543,12 +717,7 @@ function targetOf(entry: OutboxEntry): string {
  * riapplicare le precedenti in ordine è innocuo (`applyOps` le ordina e le
  * operazioni superate non trovano niente da fare).
  */
-export function pruneSettled(
-  state: OutboxState,
-  dataset: Dataset,
-  config: AppConfig | undefined,
-  now: number,
-): OutboxState {
+export function pruneSettled(state: OutboxState, remote: RemoteView, now: number): OutboxState {
   const fresh = state.settled.filter((entry) => now - entry.ts < SETTLED_TTL_MS)
 
   const chains = new Map<string, OutboxEntry[]>()
@@ -564,7 +733,7 @@ export function pruneSettled(
     /* L'ultima per `ts`, non l'ultima inserita: la coda vive in localStorage e
        due schede possono averci scritto in ordine diverso da quello del tempo. */
     const last = chain.reduce((a, b) => (b.ts >= a.ts ? b : a))
-    if (!isAlreadyApplied(dataset, config, last)) {
+    if (!isAlreadyApplied(remote, last)) {
       for (const entry of chain) keep.add(entry.entryId)
     }
   }
@@ -586,7 +755,7 @@ export function pendingCount(state: OutboxState): number {
  * devono restare d'accordo: scriverle due volte vorrebbe dire che il giorno in
  * cui si aggiunge un'operazione la campanella smette di riconoscerla — in
  * silenzio, mostrando una riga senza gruppo invece di un errore. C'è un test di
- * parità che percorre il giro completo per tutti e tredici i tipi.
+ * parità che percorre il giro completo per tutti i tipi.
  *
  * Prima e seconda voce: singolare e plurale. Coincidono dove la lingua non
  * distingue («categorie aggiornate»), ed è lecito: la mappa inversa cerca in
@@ -606,6 +775,9 @@ export const OP_WORDS: Record<Op['kind'], [string, string]> = {
   categories: ['categorie aggiornate', 'categorie aggiornate'],
   recategorize: ['categoria svuotata', 'categorie svuotate'],
   income: ['entrate aggiornate', 'entrate aggiornate'],
+  card: ['carta aggiunta', 'carte aggiunte'],
+  'card-edit': ['carta modificata', 'carte modificate'],
+  'card-delete': ['carta eliminata', 'carte eliminate'],
 }
 
 /** Riassunto per il messaggio di commit. */

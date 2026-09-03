@@ -27,8 +27,13 @@ const PAYERS = new Set(['me', 'partner', 'others'])
  * La forma non basta: `2026-02-31` supera la regex e non esiste. Il calendario
  * lo sa solo `Date`, quindi si costruisce la data e si controlla che non sia
  * stata riportata avanti da sé.
+ *
+ * Esportata perché la usano anche le carte fedeltà (`cards.ts`): è la stessa
+ * regola di `isDate` in `validate-core.mjs`, e va tenuta in un posto solo per
+ * lato — o una data che l'app accetta e la pubblicazione rifiuta bloccherebbe
+ * `npm run encrypt` per tutti i file.
  */
-function isRealDate(value: string): boolean {
+export function isRealDate(value: string): boolean {
   if (!DATE_RE.test(value)) return false
   const [year, month, day] = value.split('-').map(Number) as [number, number, number]
   const date = new Date(Date.UTC(year, month - 1, day))

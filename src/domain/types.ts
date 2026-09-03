@@ -320,6 +320,13 @@ export interface GithubConfig {
    * committa. → ADR-0024
    */
   configPath?: string
+  /**
+   * Percorso del file cifrato delle carte fedeltà. Facoltativo per la stessa
+   * ragione di `configPath`, e con la stessa conseguenza: senza, le carte si
+   * vedono e non si modificano, e l'app lo dice invece di indovinare un
+   * percorso su cui poi committerebbe. → ADR-0082, ADR-0024
+   */
+  cardsPath?: string
 }
 
 export interface AppConfig {
@@ -447,6 +454,81 @@ export interface PriceEntry {
   /** ISO `YYYY-MM-DD`: quando è stato visto quel prezzo. */
   date: string
   note?: string
+}
+
+/**
+ * In che forma è stampato il codice di una carta fedeltà.
+ *
+ * Non è una preferenza grafica: è **il fatto** che decide se il lettore alla
+ * cassa legge o non legge. Lo stesso numero disegnato come Code 128 invece che
+ * come EAN-13 produce barre diverse, e alla cassa non passa — quindi il formato
+ * si conserva come lo dichiara il decodificatore che ha letto la carta, e non si
+ * indovina.
+ *
+ * `text` è la carta **senza codice a barre**: quelle che si danno a voce o col
+ * numero di telefono. Non è un ripiego per un formato che non sappiamo
+ * disegnare, è un caso vero, e la tessera aperta mostra il numero grande.
+ *
+ * `qr` esiste nel tipo e **non si può ancora disegnare**: un QR vuole
+ * Reed-Solomon, cioè una libreria, e finché nessuna carta ne ha bisogno
+ * aggiungerla sarebbe peso per niente. La pagina lo dice invece di mostrare un
+ * riquadro vuoto. → ADR-0083
+ */
+export type CardFormat = 'ean13' | 'ean8' | 'code128' | 'code39' | 'itf' | 'qr' | 'text'
+
+/**
+ * Una carta fedeltà: quello che serve per farla leggere alla cassa.
+ *
+ * **È condivisa**, come una rilevazione di prezzo e per la stessa ragione: la
+ * carta del supermercato non è di nessuno dei due, è di casa. La pagina ignora
+ * `view.person`, e i due telefoni vedono lo stesso mazzo. → ADR-0082, ADR-0041
+ *
+ * Non è una spesa e non ne diventa mai una: nessuna quota, nessun tricount,
+ * fuori da margine, saldo e statistiche.
+ */
+export interface LoyaltyCard {
+  id: string
+  /** Come la chiama chi la usa: è quello che si legge sulla tessera e nell'elenco. */
+  name: string
+  /**
+   * Il testo del codice **così come è stampato**, non un numero: un Code 128 può
+   * contenere lettere, e uno zero iniziale in un EAN-13 conta. In `number` si
+   * perderebbe.
+   */
+  code: string
+  format: CardFormat
+  /**
+   * La faccia della tessera, come data URI: è il ritaglio della tessera vera —
+   * logo e colore del marchio insieme — non un logo su trasparente.
+   *
+   * Sta **dentro il dato cifrato** e non fra i file del sito perché il repo è
+   * pubblico, e l'elenco delle carte fedeltà di due persone dice dove fanno la
+   * spesa. Facoltativa: senza, la tessera è un rettangolo col nome. → ADR-0082
+   */
+  image?: string
+  /** Il colore dominante della faccia: tinge la fascia della tessera aperta. */
+  color?: string
+  /** Numero cliente, PIN, «chiedere alla cassa». */
+  note?: string
+  /** ISO `YYYY-MM-DD`. */
+  addedAt: string
+}
+
+/**
+ * Il file delle carte: un envelope cifrato suo, accanto a spese e configurazione.
+ *
+ * Perché un terzo file e non un campo di `Dataset`, dove stanno i prezzi: le
+ * facce delle tessere pesano, e il file delle spese viene **decifrato due volte
+ * per ogni novità** dalla campanella (→ ADR-0051); e `import.mjs` ricostruisce
+ * il master da zero, quindi tutto ciò che nasce nell'app e vive in `Dataset` va
+ * ricopiato a mano o la sessione mensile lo cancella. Un file separato l'import
+ * non lo tocca: il problema non esiste invece di andare ricordato. → ADR-0082
+ */
+export interface CardsFile {
+  version: number
+  /** ISO datetime dell'ultimo aggiornamento. */
+  updatedAt: string
+  cards: LoyaltyCard[]
 }
 
 export interface Dataset {

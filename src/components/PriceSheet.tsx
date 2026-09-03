@@ -17,7 +17,7 @@ import { useReadyStore } from '../data/store'
 import { formatEuro } from '../domain/money'
 import { UNIT_LABEL } from '../domain/prices'
 import { PriceForm } from './PriceForm'
-import { useScrollLock, useToast } from './ui'
+import { useEscape, useScrollLock, useToast } from './ui'
 
 export function PriceSheet({ onClose }: { onClose: () => void }): ReactNode {
   const { dataset, addPrice } = useReadyStore()
@@ -33,12 +33,8 @@ export function PriceSheet({ onClose }: { onClose: () => void }): ReactNode {
        modale. Sul foglio e non sul campo prodotto, perché dare il fuoco a un
        campo di testo fa saltare su la tastiera e coprire metà schermo. */
     sheetRef.current?.focus()
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [])
+  useEscape(onClose)
 
   return (
     <div

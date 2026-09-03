@@ -34,17 +34,19 @@ import { DEFAULT_VIEW, monthsOf, type ViewOptions } from '../domain/selectors'
 import type {
   Annotation,
   AppConfig,
+  CardsFile,
   Category,
   Dataset,
   Expense,
   IncomeProfile,
+  LoyaltyCard,
   PersonId,
   PriceEntry,
   Settlement,
   Tricount,
 } from '../domain/types'
 import { WrongPassphraseError, decryptEnvelope, deriveKeyCached, encryptEnvelope } from './crypto'
-import { isEnvelope, type Envelope } from './envelope'
+import { isEnvelope, type Envelope, type KdfMeta } from './envelope'
 import {
   GithubError,
   commitFiles,
@@ -58,14 +60,15 @@ import {
 } from './github'
 import {
   EMPTY_OUTBOX,
+  applyCardOps,
   applyConfigOps,
   applyOps,
   describeOps,
+  fileOf,
   loadOutbox,
   newEntry,
   pruneSettled,
   saveOutbox,
-  touchesConfig,
   type Op,
   type OutboxEntry,
   type OutboxState,
@@ -73,6 +76,15 @@ import {
 
 const DATA_URL = `${import.meta.env.BASE_URL}data/expenses.json.enc`
 const CONFIG_URL = `${import.meta.env.BASE_URL}data/config.json.enc`
+/**
+ * Le carte fedeltà, il terzo envelope.
+ *
+ * **Può non esserci**, e non è un guasto: finché nessuno ha pubblicato una carta
+ * il file non esiste, e il primo salvataggio lo crea. Un `404` qui vale «nessuna
+ * carta», non «dati illeggibili» — trattarlo come gli altri due avrebbe impedito
+ * l'apertura dell'app a chi non usa le carte. → ADR-0082
+ */
+const CARDS_URL = `${import.meta.env.BASE_URL}data/cards.json.enc`
 const PASSPHRASE_KEY = 'margine.passphrase.v1'
 const PERSON_KEY = 'margine.person.v1'
 /**
@@ -98,8 +110,28 @@ const HIDE_INCOME_KEY = 'margine.hideIncome.v1'
  */
 const NEWS_SEEN_KEY = 'margine.news.seenAt.v1'
 const NEWS_READ_KEY = 'margine.news.readAt.v1'
-/* Quali gruppi di eventi contano. Preferenza del dispositivo, non dei dati. */
-const NEWS_GROUPS_KEY = 'margine.news.groups.v1'
+/*
+ * Quali gruppi di eventi **non** contano. Preferenza del dispositivo, non dei dati.
+ *
+ * Si salvano gli **spenti**, e la v1 salvava gli accesi: è la differenza fra un
+ * gruppo nuovo che nasce acceso e uno che nasce spento in silenzio. Con la v1,
+ * un dispositivo che aveva già toccato le spunte teneva solo i gruppi presenti
+ * nella lista salvata, quindi «carte» — che allora non esisteva — non compariva:
+ * niente riga nella campanella e niente pallino, senza un errore e senza un modo
+ * di accorgersene. È la trappola di ADR-0054 vista dall'altro lato.
+ */
+const NEWS_GROUPS_KEY = 'margine.news.offGroups.v2'
+/* La chiave vecchia, letta una volta per non perdere le spunte già scelte. */
+const NEWS_GROUPS_KEY_V1 = 'margine.news.groups.v1'
+/**
+ * I gruppi che esistevano quando la v1 è stata scritta.
+ *
+ * Serve alla conversione e **non è `CHANGE_GROUPS`**: per sapere quali gruppi
+ * qualcuno aveva spento bisogna sapere fra quali stava scegliendo. Con l'elenco
+ * di oggi, un gruppo aggiunto dopo risulterebbe «spento a mano» — che è
+ * esattamente il difetto da cui si scappa. Questa lista non si aggiorna mai.
+ */
+const NEWS_GROUPS_V1: readonly ChangeGroup[] = ['spese', 'prezzi', 'tricount', 'config']
 /* Non più di una rilettura al minuto: passare fra le app non è un evento. */
 const REFRESH_EVERY_MS = 60_000
 /**
@@ -140,6 +172,8 @@ export interface SyncState {
 interface Envelopes {
   data: Envelope
   config: Envelope
+  /** Assente quando nel repo non c'è ancora nessuna carta. */
+  cards?: Envelope
 }
 
 export interface StoreApi {
@@ -147,6 +181,13 @@ export interface StoreApi {
   error?: string
   config?: AppConfig
   dataset?: Dataset
+  /**
+   * Le carte fedeltà. **Condivise**: non passano da `view.person`, come i
+   * prezzi. Lista vuota anche quando il file non esiste, così nessuna pagina
+   * deve distinguere «nessuna carta» da «file non ancora pubblicato»: quella
+   * differenza serve solo alla coda, e resta là. → ADR-0082
+   */
+  cards: LoyaltyCard[]
   months: MonthKey[]
   month: MonthKey
   view: ViewOptions
@@ -194,6 +235,13 @@ export interface StoreApi {
   /** Una rilevazione di prezzo. Si aggiunge e si elimina: non si modifica. → ADR-0041 */
   addPrice: (entry: PriceEntry) => void
   deletePrice: (priceId: string) => void
+  /**
+   * Una carta fedeltà. Si modifica, a differenza di un prezzo: una carta è uno
+   * stato — il nome si corregge, la faccia si sostituisce. → ADR-0082
+   */
+  addCard: (card: LoyaltyCard) => void
+  updateCard: (cardId: string, fields: Partial<LoyaltyCard>) => void
+  deleteCard: (cardId: string) => void
   syncNow: () => Promise<void>
   reload: () => void
   /**
@@ -293,6 +341,74 @@ function normaliseDataset(raw: Dataset & { trips?: unknown }): Dataset {
   }
 }
 
+/**
+ * Come `fetchEnvelope`, ma un file che non c'è non è un errore.
+ *
+ * Serve al solo file delle carte: prima della prima carta non esiste, e l'app
+ * deve aprirsi comunque. Un file **illeggibile** invece resta un guasto e si
+ * vede, altrimenti un problema di rete diventerebbe un elenco vuoto e
+ * rassicurante — la lezione di ADR-0053 applicata a un file invece che a una
+ * lettura di commit.
+ *
+ * «Non c'è» si riconosce in **due** modi, e il secondo l'ha insegnato il banco:
+ *
+ * - un `404`, che è quello che risponde GitHub Pages in produzione;
+ * - una risposta `200` il cui corpo è **HTML**, che è quello che risponde il
+ *   server di sviluppo — che per un percorso sconosciuto serve `index.html`,
+ *   il ripiego per le rotte di una SPA. Senza questo ramo `npm run dev` non
+ *   apriva l'app affatto: `response.json()` inciampava sulla pagina e l'errore
+ *   diventava «non riesco a leggere i dati cifrati», cioè un guasto grave al
+ *   posto di «nessuna carta». Una pagina HTML al posto di un envelope non è
+ *   ambigua: un file cifrato non comincia mai per `<`.
+ */
+async function fetchOptionalEnvelope(url: string): Promise<Envelope | undefined> {
+  const response = await fetch(url, { cache: 'no-store' })
+  if (response.status === 404) return undefined
+  if (!response.ok) throw new Error(`${url} → HTTP ${String(response.status)}`)
+  const text = await response.text()
+  if (text.trimStart().startsWith('<')) return undefined
+  /* Da qui in poi si pretende un envelope: `JSON.parse` che lancia e un envelope
+     che non lo è sono guasti, e li si dice. */
+  const parsed: unknown = JSON.parse(text)
+  if (!isEnvelope(parsed)) throw new Error(`${url} non è un file cifrato di Margine.`)
+  return parsed
+}
+
+/**
+ * I tre file cifrati, insieme: è ciò che l'avvio e la rilettura periodica
+ * scaricano, e va scritto una volta perché il terzo è **facoltativo** — la chiave
+ * `cards` c'è solo se il file esiste, e due copie di questa regola sarebbero
+ * due occasioni di dimenticarla.
+ */
+async function fetchAllEnvelopes(): Promise<Envelopes> {
+  const [data, config, cards] = await Promise.all([
+    fetchEnvelope(DATA_URL),
+    fetchEnvelope(CONFIG_URL),
+    fetchOptionalEnvelope(CARDS_URL),
+  ])
+  return { data, config, ...(cards ? { cards } : {}) }
+}
+
+/** Le carte decifrate, o `undefined` quando il file non c'è. */
+async function decryptCards(
+  envelope: Envelope | undefined,
+  passphrase: string,
+): Promise<CardsFile | undefined> {
+  if (!envelope) return undefined
+  const key = await deriveKeyCached(passphrase, envelope.kdf)
+  return normaliseCards(await decryptEnvelope<CardsFile>(envelope, key))
+}
+
+/** Un file delle carte appena nato: è quello che il primo salvataggio scrive. */
+function emptyCardsFile(): CardsFile {
+  return { version: 1, updatedAt: new Date().toISOString(), cards: [] }
+}
+
+/** Come `normaliseDataset`: il tipo deve dire la verità da qui in avanti. */
+function normaliseCards(raw: CardsFile): CardsFile {
+  return { ...raw, cards: Array.isArray(raw.cards) ? raw.cards : [] }
+}
+
 function describeError(error: unknown): string {
   if (error instanceof Error) return error.message
   return 'Errore sconosciuto.'
@@ -312,18 +428,33 @@ function readMark(key: string): string | undefined {
 }
 
 /**
- * I gruppi accesi. Senza niente in memoria sono **tutti**: una campanella che
- * parte muta si direbbe rotta, e chi non vuole un gruppo lo spegne.
+ * I gruppi accesi: tutti tranne quelli spenti a mano.
+ *
+ * Senza niente in memoria sono **tutti** — una campanella che parte muta si
+ * direbbe rotta — e un gruppo che nessuno ha mai spento è acceso, anche se è
+ * nato dopo l'ultima volta che si sono toccate le spunte.
  */
 function readNewsGroups(): ChangeGroup[] {
+  const off = readOffGroups()
+  return CHANGE_GROUPS.filter((group) => !off.includes(group))
+}
+
+/** I gruppi spenti, dalla chiave nuova o convertiti da quella vecchia. */
+function readOffGroups(): ChangeGroup[] {
   try {
     const raw = localStorage.getItem(NEWS_GROUPS_KEY)
-    if (raw === null) return [...CHANGE_GROUPS]
-    const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return [...CHANGE_GROUPS]
-    return CHANGE_GROUPS.filter((group) => parsed.includes(group))
+    if (raw !== null) {
+      const parsed: unknown = JSON.parse(raw)
+      if (Array.isArray(parsed)) return CHANGE_GROUPS.filter((group) => parsed.includes(group))
+      return []
+    }
+    /* Niente v2: si legge la v1, che elencava gli **accesi** fra i gruppi di
+       allora. Spento = era fra quelli e non c'è. */
+    const legacy: unknown = JSON.parse(localStorage.getItem(NEWS_GROUPS_KEY_V1) ?? 'null')
+    if (!Array.isArray(legacy)) return []
+    return NEWS_GROUPS_V1.filter((group) => !legacy.includes(group))
   } catch {
-    return [...CHANGE_GROUPS]
+    return []
   }
 }
 
@@ -376,6 +507,13 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
   const [envelopes, setEnvelopes] = useState<Envelopes | undefined>()
   const [config, setConfig] = useState<AppConfig | undefined>()
   const [dataset, setDataset] = useState<Dataset | undefined>()
+  /*
+   * `undefined` = il file delle carte non c'è (o non è ancora arrivato), che è
+   * un'informazione diversa da «zero carte» e serve alla coda: senza di essa un
+   * `card-delete` risulterebbe applicato prima di essere partito. Le pagine
+   * ricevono comunque una lista, da `api`.
+   */
+  const [cards, setCards] = useState<CardsFile | undefined>()
   const [month, setMonth] = useState<MonthKey>(currentMonthKey())
   const [identity, setIdentity] = useState<PersonId | undefined>(readIdentity)
   const [identitySince, setIdentitySince] = useState<string | undefined>(readIdentitySince)
@@ -447,6 +585,16 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
   const [hideIncome, setHideIncome] = useState(readHideIncomeDefault)
 
   const passphraseRef = useRef<string | undefined>(undefined)
+  /**
+   * I parametri di derivazione dei file già letti.
+   *
+   * Servono a **creare** il file delle carte la prima volta: `publish.mjs` cifra
+   * i file con lo stesso salt di proposito, così l'app deriva una chiave sola
+   * invece di tre — e 600.000 iterazioni su un telefono non sono gratis.
+   * Generarne uno nuovo per il file nuovo funzionerebbe, e costerebbe una
+   * derivazione in più a ogni sblocco, per sempre. → ADR-0082
+   */
+  const kdfRef = useRef<KdfMeta | undefined>(undefined)
   const configRef = useRef<AppConfig | undefined>(undefined)
   const outboxRef = useRef<OutboxState>(EMPTY_OUTBOX)
   const flushTimer = useRef<number | undefined>(undefined)
@@ -482,6 +630,14 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
    * perché non si chiude quando salva — spariva senza essere mai stato scritto.
    * → ADR-0070
    */
+  /**
+   * Il salvataggio, per il file che l'operazione tocca.
+   *
+   * Le tre strade fanno la stessa cosa — leggi il remoto a quella versione,
+   * decifra, applica la coda, ricifra — e sono scritte una volta a testa perché
+   * ognuna ha un tipo suo. Ciò che **non** si ripete è la regola: si riscrive
+   * solo il file che qualcosa ha toccato, e lo dice `fileOf`.
+   */
   const flushOnce = useCallback(async (): Promise<void> => {
     const pending = outboxRef.current.pending
     if (pending.length === 0) {
@@ -515,7 +671,40 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
     setSync({ phase: 'syncing', pending: pending.length })
     try {
       for (let attempt = 0; attempt < 2; attempt += 1) {
-        const entries = outboxRef.current.pending
+        /*
+         * **Una voce che non si potrà mai committare non blocca le altre.**
+         *
+         * Il percorso di un file può mancare in `config.json` — è la regola di
+         * ADR-0024, non si indovina un percorso su cui poi si committa, e per le
+         * carte c'è un'aggravante: quel file può non esistere, quindi un percorso
+         * sbagliato lo **creerebbe** invece di dare errore. Ma il modo in cui la
+         * mancanza si faceva sentire era un `throw` sull'intero lotto, ed era un
+         * difetto grave: la voce impossibile restava in coda, ogni salvataggio
+         * successivo ricostruiva lo stesso lotto, e **niente ripartiva più** —
+         * né spese, né prezzi, né rimborsi. L'unica via d'uscita era svuotare i
+         * dati del sito, cioè perdere la coda.
+         *
+         * Quindi si separa: si committa ciò che si può, e ciò che non si può si
+         * dice. Le voci impossibili restano in attesa — il percorso può comparire
+         * in `config.json` domani, e allora partiranno.
+         */
+        const senzaPercorso = (entry: OutboxEntry): boolean => {
+          const target = fileOf(entry)
+          if (target === 'config') return !github.configPath
+          if (target === 'cards') return !github.cardsPath
+          return false
+        }
+        const bloccate = outboxRef.current.pending.filter(senzaPercorso)
+        const entries = outboxRef.current.pending.filter((entry) => !senzaPercorso(entry))
+        if (entries.length === 0) {
+          setSync({
+            phase: 'error',
+            pending: bloccate.length,
+            lastError: `${describeOps(bloccate)}: manca il percorso del file in config.json, quindi non possono partire.`,
+          })
+          return
+        }
+
         /*
          * Si riscrive **solo** ciò che qualcosa ha toccato, e vale nei due versi:
          * ogni cifratura usa un IV nuovo, quindi riscrivere un file per abitudine
@@ -523,14 +712,9 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
          * 350 kB di diff per un rinomino di categoria, o un diff sulla
          * configurazione per ogni spesa aggiunta.
          */
-        const withConfig = entries.some(touchesConfig)
-        const withData = entries.some((entry) => !touchesConfig(entry))
-        if (withConfig && !github.configPath) {
-          throw new GithubError(
-            400,
-            'Per salvare categorie ed entrate serve `github.configPath` in config.json.',
-          )
-        }
+        const withData = entries.some((entry) => fileOf(entry) === 'data')
+        const withConfig = entries.some((entry) => fileOf(entry) === 'config')
+        const withCards = entries.some((entry) => fileOf(entry) === 'cards')
 
         /* La versione su cui si legge **e** su cui si committa: una sola. */
         const parent = await headSha(github, token)
@@ -570,6 +754,41 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
           files.push({ path: github.configPath, text: `${JSON.stringify(envelope, null, 2)}\n` })
         }
 
+        let mergedCards: CardsFile | undefined
+        if (withCards && github.cardsPath) {
+          const remoteCards = await getFile(github, token, github.cardsPath, parent)
+          /*
+           * **Il file può non esistere, e la prima carta lo crea.** È l'unico dei
+           * tre a poter mancare: le spese e la configurazione ci sono da prima
+           * dell'app. Un `404` qui non è un errore da mostrare — sarebbe «fai un
+           * primo push delle carte», cioè una sessione al Mac per aggiungere una
+           * tessera dal telefono. `getFile` torna `null` **solo** su un 404 e
+           * lancia su tutto il resto, quindi non si rischia di sostituire un file
+           * esistente con uno vuoto per un guasto di rete.
+           *
+           * La chiave si deriva allora da `kdf` **del dataset**, che è l'unico
+           * modo di scegliere: `publish.mjs` cifra i file con lo stesso salt
+           * apposta, così l'app deriva una chiave sola invece di tre (600.000
+           * iterazioni su un telefono non sono gratis). Alla lettura successiva
+           * il file avrà la sua `kdf` e sarà quella a valere.
+           */
+          const base = remoteCards ? (JSON.parse(remoteCards.text) as unknown) : undefined
+          if (base !== undefined && !isEnvelope(base)) {
+            throw new Error('Il file delle carte nel repo non è un file cifrato di Margine.')
+          }
+          const kdf = base?.kdf ?? kdfRef.current
+          if (!kdf) {
+            throw new Error('Non conosco i parametri di cifratura: ricarica la pagina.')
+          }
+          const cardsKey = await deriveKeyCached(passphrase, kdf)
+          const current = base
+            ? normaliseCards(await decryptEnvelope<CardsFile>(base, cardsKey))
+            : emptyCardsFile()
+          mergedCards = applyCardOps(current, entries)
+          const envelope = await encryptEnvelope(mergedCards, cardsKey, kdf)
+          files.push({ path: github.cardsPath, text: `${JSON.stringify(envelope, null, 2)}\n` })
+        }
+
         try {
           await commitFiles(github, token, { files, message: commitMessage(entries), parent })
         } catch (putError) {
@@ -597,6 +816,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
           configRef.current = withLocal
           setConfig(withLocal)
         }
+        if (mergedCards) setCards(applyCardOps(mergedCards, remaining))
         setSync(
           remaining.length === 0
             ? { phase: 'idle', pending: 0, lastSyncAt: Date.now() }
@@ -678,7 +898,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
 
   // ── Sblocco ─────────────────────────────────────────────────────────────
   const applyUnlocked = useCallback(
-    (nextConfig: AppConfig, rawDataset: Dataset) => {
+    (nextConfig: AppConfig, rawDataset: Dataset, rawCards: CardsFile | undefined) => {
       const box = loadOutbox()
       const queued = [...box.settled, ...box.pending]
       const withLocal = applyOps(rawDataset, queued)
@@ -686,12 +906,21 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
          creata deve esistere già mentre il commit è ancora in volo, altrimenti
          le spese che le assegni puntano a un id che l'app non conosce. */
       const configWithLocal = applyConfigOps(nextConfig, queued)
-      const pruned = pruneSettled(box, rawDataset, nextConfig, Date.now())
+      /* E anche le carte: una carta appena aggiunta si deve poter aprire alla
+         cassa **subito**, non quando il commit atterra. Il file può non esserci
+         ancora, e allora l'overlay parte da un file vuoto. */
+      const cardsWithLocal = applyCardOps(rawCards ?? emptyCardsFile(), queued)
+      const pruned = pruneSettled(
+        box,
+        { dataset: rawDataset, config: nextConfig, cards: rawCards?.cards },
+        Date.now(),
+      )
       persistOutbox(pruned)
 
       configRef.current = configWithLocal
       setConfig(configWithLocal)
       setDataset(withLocal)
+      setCards(cardsWithLocal)
 
       const available = monthsOf(withLocal.expenses)
       const today = currentMonthKey()
@@ -715,8 +944,10 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
           envs.config,
           await deriveKeyCached(passphrase, envs.config.kdf),
         )
+        const rawCards = await decryptCards(envs.cards, passphrase)
 
         passphraseRef.current = passphrase
+        kdfRef.current = envs.data.kdf
         if (remember) {
           try {
             localStorage.setItem(PASSPHRASE_KEY, passphrase)
@@ -725,7 +956,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
             // niente storage: la passphrase resta solo in memoria
           }
         }
-        applyUnlocked(nextConfig, rawDataset)
+        applyUnlocked(nextConfig, rawDataset, rawCards)
       } catch (unlockError) {
         if (unlockError instanceof WrongPassphraseError) {
           try {
@@ -778,8 +1009,10 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
     lastRefresh.current = now
 
     try {
-      const [data, cfg] = await Promise.all([fetchEnvelope(DATA_URL), fetchEnvelope(CONFIG_URL)])
-      setEnvelopes({ data, config: cfg })
+      const envs = await fetchAllEnvelopes()
+      const { data, config: cfg } = envs
+      setEnvelopes(envs)
+      kdfRef.current = data.kdf
 
       const key = await deriveKeyCached(passphrase, data.kdf)
       const rawDataset = normaliseDataset(await decryptEnvelope<Dataset>(data, key))
@@ -805,6 +1038,8 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       const previousRemote = lastRemote.current
       lastRemote.current = rawDataset
 
+      const rawCards = await decryptCards(envs.cards, passphrase)
+
       const box = loadOutbox()
       const queued = [...box.settled, ...box.pending]
       const merged = applyOps(rawDataset, queued)
@@ -814,6 +1049,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       configRef.current = mergedConfig
       setConfig(mergedConfig)
       setDataset(merged)
+      setCards(applyCardOps(rawCards ?? emptyCardsFile(), queued))
     } catch {
       /* Rilettura fallita: si tiene ciò che c'è. Non è un guasto da mostrare. */
     }
@@ -1043,7 +1279,10 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       const next = CHANGE_GROUPS.filter((group) => groups.includes(group))
       setNewsGroupsState(next)
       try {
-        localStorage.setItem(NEWS_GROUPS_KEY, JSON.stringify(next))
+        /* Si scrivono gli **spenti**: così un gruppo aggiunto domani nasce
+           acceso invece di mancare da una lista scritta oggi. */
+        const off = CHANGE_GROUPS.filter((group) => !next.includes(group))
+        localStorage.setItem(NEWS_GROUPS_KEY, JSON.stringify(off))
       } catch {
         /* la preferenza vale per questa sessione */
       }
@@ -1091,9 +1330,8 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
     setError(undefined)
     void (async () => {
       try {
-        const [data, cfg] = await Promise.all([fetchEnvelope(DATA_URL), fetchEnvelope(CONFIG_URL)])
+        const envs = await fetchAllEnvelopes()
         if (cancelled) return
-        const envs: Envelopes = { data, config: cfg }
         setEnvelopes(envs)
         let stored: string | null = null
         try {
@@ -1138,6 +1376,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
     setHasStoredPassphrase(false)
     setConfig(undefined)
     setDataset(undefined)
+    setCards(undefined)
     setStatus('locked')
   }, [])
 
@@ -1155,7 +1394,13 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       }
       persistOutbox(next)
       setDataset((current) => (current ? applyOps(current, [entry]) : current))
-      if (touchesConfig(entry)) {
+      if (fileOf(entry) === 'cards') {
+        /* Il file può non esistere ancora: la prima carta lo inventa qui e il
+           salvataggio lo crea nel repo. Senza, la carta appena aggiunta non
+           comparirebbe fino al commit. */
+        setCards((current) => applyCardOps(current ?? emptyCardsFile(), [entry]))
+      }
+      if (fileOf(entry) === 'config') {
         setConfig((current) => {
           if (!current) return current
           const nextConfig = applyConfigOps(current, [entry])
@@ -1230,6 +1475,18 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
 
   const deletePrice = useCallback(
     (priceId: string) => enqueue({ kind: 'price-delete', priceId }),
+    [enqueue],
+  )
+
+  const addCard = useCallback((card: LoyaltyCard) => enqueue({ kind: 'card', card }), [enqueue])
+
+  const updateCard = useCallback(
+    (cardId: string, fields: Partial<LoyaltyCard>) => enqueue({ kind: 'card-edit', cardId, fields }),
+    [enqueue],
+  )
+
+  const deleteCard = useCallback(
+    (cardId: string) => enqueue({ kind: 'card-delete', cardId }),
     [enqueue],
   )
 
@@ -1363,6 +1620,7 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       error,
       config,
       dataset,
+      cards: cards?.cards ?? [],
       months,
       month,
       view,
@@ -1407,6 +1665,9 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       removeSettlement,
       addPrice,
       deletePrice,
+      addCard,
+      updateCard,
+      deleteCard,
       syncNow: flush,
       reload,
       markNewsRead,
@@ -1431,11 +1692,15 @@ export function StoreProvider({ children }: { children: ReactNode }): ReactNode 
       markNewsRead,
       markNewsSeen,
       setNewsGroups,
+      addCard,
       addExpense,
       addPrice,
       addSettlement,
       addTricount,
+      cards,
+      deleteCard,
       deletePrice,
+      updateCard,
       updateTricount,
       setCategories,
       recategorize,

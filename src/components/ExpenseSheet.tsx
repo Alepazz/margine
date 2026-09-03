@@ -20,7 +20,7 @@ import { tricountLabel } from '../domain/expense-rules'
 import { soleMemberOf, type Expense } from '../domain/types'
 import { ExpenseForm } from './ExpenseForm'
 import { LedgerSelect } from './LedgerSelect'
-import { useScrollLock, useToast } from './ui'
+import { useEscape, useScrollLock, useToast } from './ui'
 
 /**
  * Un'etichetta che si accende e si spegne: titolo, cosa comporta adesso, e il
@@ -238,12 +238,8 @@ export function ExpenseSheet({
 
   useEffect(() => {
     sheetRef.current?.focus()
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [])
+  useEscape(onClose)
 
   const links = expense.receiptLinks ?? []
   const notesDirty = notes.trim() !== (expense.notes ?? '')

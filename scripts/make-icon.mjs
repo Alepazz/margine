@@ -4,16 +4,17 @@
  * Serve un PNG perché iOS non accetta SVG per l'icona della home, e sul Mac non
  * c'è un convertitore SVG→PNG installato. Il disegno sono quattro rettangoli
  * (il filo rosso del margine e tre righe di quaderno), quindi si può dipingere a
- * mano su un buffer RGBA e comprimere con lo zlib di Node: nessuna dipendenza.
+ * mano su un buffer RGBA; la codifica PNG la fa `lib/png.mjs`, lo stesso encoder
+ * delle facce di tessera del seed. Nessuna dipendenza.
  *
  * È un'icona «maskable»: fondo a tutto campo, motivo dentro l'80% centrale, così
  * qualunque maschera (cerchio, quadrato stondato) non taglia niente.
  */
 
-import { deflateSync } from 'node:zlib'
+import { writeFileSync } from 'node:fs'
 
 import { PATHS, ensureDir, log } from './lib/io.mjs'
-import { writeFileSync } from 'node:fs'
+import { png } from './lib/png.mjs'
 
 const SIZE = 512
 
@@ -66,56 +67,16 @@ rect(0.4, 0.29, 0.32, 0.065, PAPER, 0.032)
 rect(0.4, 0.4525, 0.235, 0.065, MUTED, 0.032)
 rect(0.4, 0.615, 0.15, 0.065, MUTED, 0.032, 190)
 
-// ─────────────────────────── codifica PNG ───────────────────────────
-
-const CRC_TABLE = (() => {
-  const table = new Int32Array(256)
-  for (let n = 0; n < 256; n += 1) {
-    let c = n
-    for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
-    table[n] = c
-  }
-  return table
-})()
-
-function crc32(buffer) {
-  let crc = -1
-  for (const byte of buffer) crc = CRC_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8)
-  return (crc ^ -1) >>> 0
-}
-
-function chunk(type, data) {
-  const length = Buffer.alloc(4)
-  length.writeUInt32BE(data.length)
-  const body = Buffer.concat([Buffer.from(type, 'ascii'), data])
-  const crc = Buffer.alloc(4)
-  crc.writeUInt32BE(crc32(body))
-  return Buffer.concat([length, body, crc])
-}
-
-const ihdr = Buffer.alloc(13)
-ihdr.writeUInt32BE(SIZE, 0)
-ihdr.writeUInt32BE(SIZE, 4)
-ihdr[8] = 8 // bit depth
-ihdr[9] = 6 // RGBA
-ihdr[10] = 0 // deflate
-ihdr[11] = 0 // filtro adattivo
-ihdr[12] = 0 // non interlacciato
-
-// Ogni riga va preceduta dal byte di filtro (0 = nessun filtro).
-const raw = Buffer.alloc(SIZE * (SIZE * 4 + 1))
-for (let y = 0; y < SIZE; y += 1) {
-  raw[y * (SIZE * 4 + 1)] = 0
-  pixels.copy(raw, y * (SIZE * 4 + 1) + 1, y * SIZE * 4, (y + 1) * SIZE * 4)
-}
-
-const png = Buffer.concat([
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-  chunk('IHDR', ihdr),
-  chunk('IDAT', deflateSync(raw, { level: 9 })),
-  chunk('IEND', Buffer.alloc(0)),
-])
+const bytes = png(
+  SIZE,
+  SIZE,
+  (x, y) => {
+    const i = (y * SIZE + x) * 4
+    return [pixels[i], pixels[i + 1], pixels[i + 2], pixels[i + 3]]
+  },
+  { alpha: true },
+)
 
 ensureDir(`${PATHS.root}/public`)
-writeFileSync(`${PATHS.root}/public/icon-512.png`, png)
-log(`✓ public/icon-512.png (${(png.length / 1024).toFixed(1)} kB)`)
+writeFileSync(`${PATHS.root}/public/icon-512.png`, bytes)
+log(`✓ public/icon-512.png (${(bytes.length / 1024).toFixed(1)} kB)`)

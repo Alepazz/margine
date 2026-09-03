@@ -30,6 +30,7 @@ import {
   totalShare,
 } from '../domain/selectors'
 import { tripTitleOf, tripsOf } from '../domain/types'
+import { useReadyStore } from '../data/store'
 import { useCoupleBalance, usePageData, useProjects } from './usePageData'
 
 interface HubEntry {
@@ -71,6 +72,9 @@ function HubGroup({ title, entries }: { title: string; entries: HubEntry[] }): R
 
 export function Esplora(): ReactNode {
   const { config, dataset, view, lookup, month, series, all, everyday } = usePageData()
+  /* Le carte non passano da `usePageData`: non sono spese e non sono di nessuno
+     dei due. → ADR-0082 */
+  const { cards } = useReadyStore()
   const person = view.person
   const other = person === 'me' ? 'partner' : 'me'
   const { houseTricount, houseCategory, catCategory } = config
@@ -217,6 +221,21 @@ export function Esplora(): ReactNode {
     },
   ]
 
+  /*
+   * Le carte, con il loro numero già in vista come chiedono le altre schede:
+   * esce da `cards.length`, quindi non pretende nessun selettore nuovo — che è
+   * la condizione posta da ADR-0044 per le anteprime dell'hub.
+   */
+  const negozio: HubEntry[] = [
+    {
+      to: '/carte',
+      glyph: '💳',
+      name: 'Carte',
+      value: String(cards.length),
+      hint: cards.length === 1 ? 'carta fedeltà' : 'carte fedeltà',
+    },
+  ]
+
   return (
     <>
       <div className="page-head">
@@ -231,6 +250,7 @@ export function Esplora(): ReactNode {
       <div className="stack">
         <HubGroup title="Raccolte" entries={raccolte} />
         <HubGroup title="Analisi" entries={analisi} />
+        <HubGroup title="In negozio" entries={negozio} />
       </div>
     </>
   )

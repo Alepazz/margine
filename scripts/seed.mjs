@@ -12,6 +12,8 @@
  */
 
 import { PATHS, exists, log, writeJson } from './lib/io.mjs'
+import { cardFaceDataUri } from './lib/png.mjs'
+import { eanChecksum } from './lib/validate-core.mjs'
 import {
   CATEGORIES as TAXONOMY,
   CAT_CATEGORY,
@@ -719,6 +721,7 @@ const config = {
     branch: 'main',
     dataPath: 'public/data/expenses.json.enc',
     configPath: 'public/data/config.json.enc',
+    cardsPath: 'public/data/cards.json.enc',
   },
 }
 
@@ -816,6 +819,84 @@ const PRICES = [
   { id: 'prezzo-2026-08-18-b8d1f3', product: 'Latte intero', store: 'Supermercato B', unit: 'l', price: 1.09, date: '2026-08-18', note: 'In offerta' },
 ]
 
+/**
+ * Carte fedeltà di esempio. → ADR-0082
+ *
+ * Sei, scelte per coprire **tutti i modi in cui una tessera si disegna**: due
+ * con la faccia (il caso normale, che senza un'immagine nei dati non si vedrebbe
+ * mai), una con il colore ma senza faccia, una senza né l'una né l'altro, e una
+ * senza codice a barre — quelle che alla cassa si danno a voce. I formati sono
+ * quattro diversi di proposito: un EAN-13, un Code 128 con le lettere, un Code
+ * 39 e un ITF.
+ *
+ * I nomi sono inventati come tutto il resto del seed: il repo è pubblico, e i
+ * negozi in cui due persone fanno la spesa sono roba loro (→ ADR-0067).
+ *
+ * La cifra di controllo la calcola `eanChecksum` invece di essere scritta a
+ * mano: sbagliata, la validazione rifiuterebbe di pubblicare i dati di esempio.
+ */
+const ean13 = (twelve) => `${twelve}${eanChecksum(twelve)}`
+
+const CARDS = [
+  {
+    id: 'carta-2026-08-01-1a2b3c4d',
+    name: 'Supermercato A',
+    code: ean13('204700112233'),
+    format: 'ean13',
+    image: cardFaceDataUri('#1d4ed8'),
+    color: '#1d4ed8',
+    note: 'Numero cliente 4471',
+    addedAt: '2026-08-01',
+  },
+  {
+    id: 'carta-2026-08-01-2b3c4d5e',
+    name: 'Supermercato B',
+    code: ean13('204700998877'),
+    format: 'ean13',
+    image: cardFaceDataUri('#b91c1c'),
+    color: '#b91c1c',
+    addedAt: '2026-08-01',
+  },
+  {
+    id: 'carta-2026-08-02-3c4d5e6f',
+    name: 'Libreria C',
+    code: 'LC-4471-XZ',
+    format: 'code128',
+    image: cardFaceDataUri('#15803d'),
+    color: '#15803d',
+    addedAt: '2026-08-02',
+  },
+  {
+    id: 'carta-2026-08-02-4d5e6f70',
+    name: 'Ferramenta D',
+    code: 'FD447102',
+    format: 'code39',
+    color: '#b45309',
+    addedAt: '2026-08-02',
+  },
+  {
+    id: 'carta-2026-08-05-5e6f7081',
+    name: 'Palestra E',
+    code: '10029384756612',
+    format: 'itf',
+    addedAt: '2026-08-05',
+  },
+  {
+    id: 'carta-2026-08-11-6f708192',
+    name: 'Farmacia F',
+    code: '333 1234567',
+    format: 'text',
+    note: 'Alla cassa basta il numero di telefono',
+    addedAt: '2026-08-11',
+  },
+]
+
+const cards = {
+  version: 1,
+  updatedAt: `${TODAY}T09:00:00.000Z`,
+  cards: CARDS,
+}
+
 const dataset = {
   version: 2,
   updatedAt: `${TODAY}T09:00:00.000Z`,
@@ -829,14 +910,16 @@ const dataset = {
 
 writeJson(`${PATHS.dataExample}/expenses.json`, dataset)
 writeJson(`${PATHS.dataExample}/config.json`, config)
+writeJson(`${PATHS.dataExample}/cards.json`, cards)
 log(
   `✓ Dati di esempio: ${expenses.length} spese, ${TRICOUNTS.length} tricount, ` +
-    `${PRICES.length} prezzi rilevati in data-example/`,
+    `${PRICES.length} prezzi rilevati, ${CARDS.length} carte in data-example/`,
 )
 
 if (!exists(PATHS.expenses)) {
   writeJson(PATHS.expenses, dataset)
   writeJson(PATHS.config, config)
+  writeJson(PATHS.cards, cards)
   log('✓ Copiati anche in data/ (era vuota)')
 } else {
   log('· data/ contiene già dei dati: lasciata intatta')

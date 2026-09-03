@@ -13,7 +13,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
-import { Card, DeltaLabel, Notice, useScrollLock, useToast } from '../components/ui'
+import { Card, DeltaLabel, Notice, useEscape, useScrollLock, useToast } from '../components/ui'
 import { PriceSheet } from '../components/PriceSheet'
 import { useReadyStore } from '../data/store'
 import { formatDate } from '../domain/dates'
@@ -55,12 +55,8 @@ function HistorySheet({
 
   useEffect(() => {
     sheetRef.current?.focus()
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [])
+  useEscape(onClose)
 
   return (
     <div

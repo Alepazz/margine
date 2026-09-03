@@ -41,6 +41,7 @@ Per provarla dal telefono sulla rete di casa: `npm run dev -- --host` e apri l'i
 | `npm run seed` | Rigenera i dati di esempio in `data-example/` (copia in `data/` solo se è vuota) |
 | `npm run from-tricount` | Converte gli export JSON in `data/raw/` in file per `data/incoming/`, e stampa le voci che nessuna regola ha categorizzato (`-- --dry-run` per non scrivere) |
 | `npm run validate` | Controlla i dati in chiaro e stampa i totali per mese, da riconciliare con Tricount |
+| `npm run import-cards` | Importa le carte fedeltà dagli screenshot in `data/incoming/cards/` |
 | `npm run import` | Fonde `data/incoming/*.json` nel master, valida e ripubblica cifrato. Le voci che sembrano già presenti (stesso importo, data a meno di un giorno) restano fuori e vengono elencate: `-- --doppie` le importa comunque |
 | `npm run encrypt` | Cifra `data/` in `public/data/` |
 | `npm run decrypt -- --yes` | Ricostruisce `data/` dai file cifrati (dopo un cambio di Mac, o per riprendere le annotazioni scritte dall'app) |
@@ -59,7 +60,7 @@ src/
   styles/       tokens.css (colori, raggi, vetro) · base.css · components.css
 scripts/       seed, validazione, cifratura, import mensile
 data/          master in chiaro — MAI nel repo (.gitignore)
-public/data/   i due file cifrati, questi sì nel repo
+public/data/   i tre file cifrati (spese, configurazione, carte), questi sì nel repo
 ```
 
 Regole che tengono insieme il tutto (e che è meglio non rompere per distrazione):

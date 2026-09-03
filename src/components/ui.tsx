@@ -53,6 +53,89 @@ export function useScrollLock(): void {
   }, [])
 }
 
+/**
+ * Chiude con Esc finché il componente è montato.
+ *
+ * Era lo stesso effetto di cinque righe copiato in ogni foglio — e al sesto
+ * (la tessera a tutto schermo) è diventato un gancio. Chi lo chiama passa una
+ * funzione **stabile** (`useCallback`) o il listener si riattacca a ogni
+ * disegno: non è un guasto, è lavoro inutile.
+ */
+export function useEscape(onClose: () => void): void {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [onClose])
+}
+
+/**
+ * Tiene lo schermo acceso finché il componente è montato.
+ *
+ * **È il sostituto della luminosità**, ed è bene sapere perché non c'è di
+ * meglio: nessun browser espone un modo di alzare la luminosità dello schermo.
+ * La proposta esiste dal 2020 (`Screen.requestBrightnessIncrease()`), la prova
+ * di concetto in Chromium è stata abbandonata nel 2022, e nemmeno un'app
+ * aggiunta alla schermata Home su iOS può farlo. Non è una cosa che «un giorno
+ * si farà»: nessuno la sta facendo. Quello che si può fare, e che i lettori
+ * ottici apprezzano quasi quanto, è **una faccia bianca** e **uno schermo che
+ * non si spegne** mentre la tessera è aperta. → ADR-0084
+ *
+ * Tre cose che il codice deve sapere:
+ * - **Il permesso si perde andando in secondo piano.** Il blocco è legato a una
+ *   pagina visibile: passare a un'altra app lo rilascia, e tornare qui non lo
+ *   ripristina da sé. Quindi si richiede a ogni `visibilitychange`, che è
+ *   esattamente il gesto della cassa — apri la tessera, guardi il telefono
+ *   della persona davanti, torni.
+ * - **Può non esserci.** Safari lo ha dal 16.4 nel browser, ma nell'app
+ *   aggiunta alla Home **solo dal 18.4**: prima, la richiesta falliva in
+ *   silenzio. Quindi è facoltativo per costruzione e non si dice niente a
+ *   nessuno: uno schermo che si spegne dopo trenta secondi è il comportamento
+ *   normale di un telefono, non un guasto da annunciare.
+ * - **Il rilascio può fallire** su un blocco già perso, e quel `catch` vuoto è
+ *   voluto: non c'è niente da fare e niente da dire.
+ */
+export function useWakeLock(): void {
+  useEffect(() => {
+    /* `in` invece di un cast: su iOS 17 l'oggetto non c'è, e leggerlo con un
+       tipo che lo promette porterebbe a chiamare un metodo inesistente. */
+    if (!('wakeLock' in navigator)) return
+
+    let sentinel: WakeLockSentinel | undefined
+    let dismissed = false
+
+    const acquire = async (): Promise<void> => {
+      if (dismissed || document.visibilityState !== 'visible') return
+      if (sentinel !== undefined && !sentinel.released) return
+      try {
+        sentinel = await navigator.wakeLock.request('screen')
+        /* Smontato mentre la richiesta era in volo: si rilascia subito, o lo
+           schermo resterebbe acceso dopo aver chiuso la tessera. */
+        if (dismissed) void sentinel.release().catch(() => undefined)
+      } catch {
+        /* Non concesso (batteria scarica, versione vecchia, permesso negato):
+           la tessera funziona comunque. */
+      }
+    }
+
+    const onVisible = (): void => {
+      void acquire()
+    }
+
+    void acquire()
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      dismissed = true
+      document.removeEventListener('visibilitychange', onVisible)
+      void sentinel?.release().catch(() => undefined)
+    }
+  }, [])
+}
+
 // ─────────────────────────── scheda ───────────────────────────
 
 export function Card({

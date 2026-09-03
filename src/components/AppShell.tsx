@@ -22,11 +22,12 @@ import { badgeLabel } from '../domain/changes'
 import { projectsOf, type Tricount } from '../domain/types'
 import { SyncBadge, ThemeButton } from './Controls'
 import { ExpenseForm } from './ExpenseForm'
+import { CardSheet } from './CardSheet'
 import { NewsSheet } from './NewsSheet'
 import { PriceSheet } from './PriceSheet'
 
-/** I due gruppi dell'hub e della colonna. Le voci di barra non ne hanno. */
-type NavGroup = 'raccolte' | 'analisi'
+/** I gruppi dell'hub e della colonna. Le voci di barra non ne hanno. */
+type NavGroup = 'raccolte' | 'analisi' | 'negozio'
 
 interface NavBase {
   to: string
@@ -51,6 +52,9 @@ type NavItem =
 
 /** La rotta su cui il `+` registra un prezzo invece di aggiungere una spesa. */
 const PRICE_ROUTE = '/prezzi'
+/** Il mazzo delle carte, e le tessere aperte: là il `+` aggiunge una carta. */
+const CARDS_ROUTE = '/carte'
+const CARD_PREFIX = '/carte/'
 /** L'hub: il `+` non la guarda, ma la barra e il link di ritorno sì. */
 const HUB_ROUTE = '/esplora'
 /**
@@ -91,6 +95,7 @@ const NAV: NavItem[] = [
   { to: '/statistiche', label: 'Statistiche', glyph: '📊', slot: 'hub', group: 'analisi' },
   { to: '/730', label: 'Spese da 730', glyph: '🧾', slot: 'hub', group: 'analisi' },
   { to: '/saldo', label: 'Saldo', glyph: '⚖️', slot: 'hub', group: 'analisi' },
+  { to: CARDS_ROUTE, label: 'Carte', glyph: '💳', slot: 'hub', group: 'negozio' },
   { to: '/impostazioni', label: 'Impostazioni', glyph: '⚙', slot: 'header' },
 ]
 
@@ -101,7 +106,25 @@ const HUB_ROUTES = new Set(HUB.map((item) => item.to))
 
 /** Sei dentro «Esplora»? I progetti ci stanno, anche se non sono in `NAV`. */
 function inHub(pathname: string): boolean {
-  return HUB_ROUTES.has(pathname) || pathname.startsWith(PROJECT_PREFIX)
+  return (
+    HUB_ROUTES.has(pathname) ||
+    pathname.startsWith(PROJECT_PREFIX) ||
+    pathname.startsWith(CARD_PREFIX)
+  )
+}
+
+/**
+ * Serve il link «‹ Esplora» in cima?
+ *
+ * **Non è la stessa domanda di `inHub`**, e distinguerle è la ragione per cui
+ * sono due funzioni. Dentro una tessera aperta la voce «Esplora» deve restare
+ * accesa — sei lì dentro — ma la via del ritorno porta **al mazzo delle carte**,
+ * non all'hub: da lì si è arrivati, e alla cassa si passa da una tessera
+ * all'altra. Quel link lo mette la pagina, che sa dove torna; qui basta non
+ * metterne un secondo che dice un'altra cosa.
+ */
+function showsHubBack(pathname: string): boolean {
+  return inHub(pathname) && !pathname.startsWith(CARD_PREFIX)
 }
 
 /* L'ordine dei gruppi vive qui e solo qui: la colonna li scorre da questo
@@ -109,6 +132,9 @@ function inHub(pathname: string): boolean {
 const GROUPS: [NavGroup, string][] = [
   ['raccolte', 'Raccolte'],
   ['analisi', 'Analisi'],
+  /* Le carte: quello che si usa **in negozio**, come i prezzi. Un gruppo suo e
+     non dentro «Raccolte», che raccoglie spese. → ADR-0082 */
+  ['negozio', 'In negozio'],
 ]
 
 /*
@@ -167,8 +193,8 @@ function NewsButton({ onOpen }: { onOpen: () => void }): ReactNode {
 }
 
 export function AppShell(): ReactNode {
-  /** Cosa si sta aggiungendo. Il `+` è uno, i verbi sono due. */
-  const [adding, setAdding] = useState<'expense' | 'price' | null>(null)
+  /** Cosa si sta aggiungendo. Il `+` è uno, i verbi sono tre. */
+  const [adding, setAdding] = useState<'expense' | 'price' | 'card' | null>(null)
   const [newsOpen, setNewsOpen] = useState(false)
   const { pathname } = useLocation()
   const { config, dataset } = useReadyStore()
@@ -184,8 +210,26 @@ export function AppShell(): ReactNode {
   const named = (item: NavItem): NavItem =>
     item.to === HOUSE_ROUTE && houseName ? { ...item, label: houseName } : item
 
-  const addsPrice = pathname === PRICE_ROUTE
-  const addLabel = addsPrice ? 'Registra un prezzo' : 'Aggiungi una spesa'
+  /*
+   * Il `+` aggiunge **la cosa della pagina in cui sei** (→ ADR-0044). Le carte
+   * sono la terza: sul mazzo e dentro una tessera si aggiunge una carta, perché
+   * è là che ci si accorge che una manca.
+   *
+   * Tranne quando una carta **non si potrebbe salvare**: senza
+   * `github.cardsPath` finirebbe in coda, comparirebbe a schermo come salvata e
+   * non partirebbe mai. Là il `+` torna al verbo di sempre, e la pagina spiega
+   * cosa manca. → ADR-0082
+   */
+  const onCards = pathname === CARDS_ROUTE || pathname.startsWith(CARD_PREFIX)
+  const canWriteCards = config.github === null || Boolean(config.github.cardsPath)
+  const adds: 'expense' | 'price' | 'card' =
+    pathname === PRICE_ROUTE ? 'price' : onCards && canWriteCards ? 'card' : 'expense'
+  const ADD_LABEL = {
+    expense: 'Aggiungi una spesa',
+    price: 'Registra un prezzo',
+    card: 'Aggiungi una carta',
+  } as const
+  const addLabel = ADD_LABEL[adds]
 
   const tab = (item: NavItem): ReactNode => {
     /* «Esplora» resta acceso anche dentro le sue sei viste: sei lì dentro, e una
@@ -306,7 +350,7 @@ export function AppShell(): ReactNode {
             si arriva dalla colonna, e un «indietro» punterebbe a una pagina che
             non si è attraversata.
           */}
-          {inHub(pathname) ? (
+          {showsHubBack(pathname) ? (
             <NavLink to={HUB_ROUTE} className="hub-back">
               <span aria-hidden="true">‹</span> Esplora
             </NavLink>
@@ -327,7 +371,7 @@ export function AppShell(): ReactNode {
         <button
           type="button"
           className="tabbar-add"
-          onClick={() => setAdding(addsPrice ? 'price' : 'expense')}
+          onClick={() => setAdding(adds)}
           aria-label={addLabel}
           title={addLabel}
         >
@@ -338,6 +382,7 @@ export function AppShell(): ReactNode {
 
       {adding === 'expense' ? <ExpenseForm onClose={() => setAdding(null)} /> : null}
       {adding === 'price' ? <PriceSheet onClose={() => setAdding(null)} /> : null}
+      {adding === 'card' ? <CardSheet onClose={() => setAdding(null)} /> : null}
       {newsOpen ? <NewsSheet onClose={() => setNewsOpen(false)} /> : null}
     </div>
   )

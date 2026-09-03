@@ -28,6 +28,18 @@ export function newPriceId(date: string): string {
   return `prezzo-${date}-${randomHex(3)}`
 }
 
+/**
+ * Id di una carta fedeltà.
+ *
+ * Quattro byte come le spese e non tre come i prezzi, e la ragione è che di
+ * carte se ne aggiungono **a mazzi**: la migrazione da Klarna ne scrive una
+ * dozzina nello stesso giorno, e l'id porta la data. Con quattro byte le
+ * combinazioni per data sono quattro miliardi; il costo sono due caratteri.
+ */
+export function newCardId(date: string): string {
+  return `carta-${date}-${randomHex(4)}`
+}
+
 /** Da un nome a uno slug leggibile: senza accenti, senza spazi, minuscolo. */
 function slugify(text: string, fallback: string, max: number): string {
   return (

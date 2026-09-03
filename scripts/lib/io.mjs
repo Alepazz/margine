@@ -17,8 +17,11 @@ export const PATHS = {
   passphraseFile: join(ROOT, '.secrets', 'passphrase'),
   expenses: join(ROOT, 'data', 'expenses.json'),
   config: join(ROOT, 'data', 'config.json'),
+  /* Le carte fedeltà: un terzo file, che può non esistere. → ADR-0082 */
+  cards: join(ROOT, 'data', 'cards.json'),
   expensesEnc: join(ROOT, 'public', 'data', 'expenses.json.enc'),
   configEnc: join(ROOT, 'public', 'data', 'config.json.enc'),
+  cardsEnc: join(ROOT, 'public', 'data', 'cards.json.enc'),
 }
 
 export function ensureDir(path) {

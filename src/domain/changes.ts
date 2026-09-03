@@ -26,13 +26,20 @@ import type { ExpenseDelta } from './diff'
  */
 export const APP_COMMIT_SUFFIX = ' (da Margine)'
 
-export type ChangeGroup = 'spese' | 'prezzi' | 'tricount' | 'config'
+export type ChangeGroup = 'spese' | 'prezzi' | 'carte' | 'tricount' | 'config'
 
-export const CHANGE_GROUPS: readonly ChangeGroup[] = ['spese', 'prezzi', 'tricount', 'config']
+export const CHANGE_GROUPS: readonly ChangeGroup[] = [
+  'spese',
+  'prezzi',
+  'carte',
+  'tricount',
+  'config',
+]
 
 export const GROUP_LABELS: Record<ChangeGroup, string> = {
   spese: 'Spese',
   prezzi: 'Prezzi',
+  carte: 'Carte fedeltà',
   tricount: 'Tricount e rimborsi',
   config: 'Categorie ed entrate',
 }
@@ -45,6 +52,9 @@ const GROUP_OF: Record<Op['kind'], ChangeGroup> = {
   patch: 'spese',
   price: 'prezzi',
   'price-delete': 'prezzi',
+  card: 'carte',
+  'card-edit': 'carte',
+  'card-delete': 'carte',
   tricount: 'tricount',
   'tricount-edit': 'tricount',
   settle: 'tricount',
@@ -170,6 +180,9 @@ export const PHRASES: Record<Op['kind'], [string, string]> = {
   unsettle: ['ha annullato un rimborso', 'ha annullato {n} rimborsi'],
   price: ['ha rilevato un prezzo', 'ha rilevato {n} prezzi'],
   'price-delete': ['ha eliminato una rilevazione', 'ha eliminato {n} rilevazioni'],
+  card: ['ha aggiunto una carta', 'ha aggiunto {n} carte'],
+  'card-edit': ['ha modificato una carta', 'ha modificato {n} carte'],
+  'card-delete': ['ha eliminato una carta', 'ha eliminato {n} carte'],
   categories: ['ha aggiornato le categorie', 'ha aggiornato le categorie'],
   recategorize: ['ha svuotato una categoria', 'ha svuotato {n} categorie'],
   income: ['ha aggiornato le entrate', 'ha aggiornato le entrate'],

@@ -457,6 +457,127 @@ function checkBalanceGroups(dataset, config, errors, warnings) {
 }
 
 /** Totali per mese e per origine: sono i numeri da confrontare con Tricount. */
+// ─────────────────────────── le carte fedeltà ───────────────────────────
+
+const CARD_FORMATS = ['ean13', 'ean8', 'code128', 'code39', 'itf', 'qr', 'text']
+const CARD_IMAGE_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/
+const CARD_COLOR_RE = /^#[0-9a-f]{6}$/i
+/** Lo stesso tetto di `src/domain/cards.ts`: le due copie devono concordare, e
+    il test di parità lo presidia. Esportato perché lo usi anche l'import delle
+    carte, invece di portarsi una terza copia. */
+export const MAX_IMAGE_CHARS = 28_000
+
+/**
+ * La cifra di controllo di un EAN: pesi 1 e 3 alternati dalla fine.
+ *
+ * Esportata perché la usa anche il seed, per non scrivere a mano dei codici
+ * d'esempio con la cifra sbagliata — che poi la validazione rifiuterebbe.
+ */
+export function eanChecksum(digits) {
+  let sum = 0
+  for (let i = 0; i < digits.length; i += 1) {
+    const digit = Number(digits[digits.length - 1 - i])
+    sum += i % 2 === 0 ? digit * 3 : digit
+  }
+  return (10 - (sum % 10)) % 10
+}
+
+/**
+ * Le carte fedeltà del file `data/cards.json`.
+ *
+ * Sono la seconda implementazione delle regole di `src/domain/cards.ts`, come
+ * per le spese: `scripts/lib/cards-parity.test.mjs` prova che concordano, e la
+ * garanzia è in una direzione — ciò che l'app accetta, qui non è un errore.
+ * Un controllo nuovo va aggiunto ai due lati **e** al test. → ADR-0082, ADR-0018
+ */
+export function validateCards(file) {
+  const errors = []
+  const warnings = []
+
+  if (!file || typeof file !== 'object') {
+    return { errors: ['Il file delle carte non è un oggetto.'], warnings }
+  }
+  if (!Array.isArray(file.cards)) {
+    return { errors: ['Nel file delle carte manca l\'elenco `cards`.'], warnings }
+  }
+
+  const seen = new Set()
+  const seenCodes = new Map()
+  for (const card of file.cards) {
+    const where = `carta ${card.id ?? '(senza id)'} «${card.name ?? ''}»`
+
+    if (!card.id) errors.push(`${where}: manca l'id.`)
+    else if (seen.has(card.id)) errors.push(`id di carta duplicato: ${card.id}.`)
+    else seen.add(card.id)
+
+    if (typeof card.name !== 'string' || card.name.trim() === '') {
+      errors.push(`${where}: manca il nome.`)
+    }
+    if (typeof card.code !== 'string' || card.code.trim() === '') {
+      errors.push(`${where}: manca il codice.`)
+    }
+    if (!CARD_FORMATS.includes(card.format)) {
+      errors.push(`${where}: formato sconosciuto (${card.format}).`)
+    }
+
+    /*
+     * La cifra di controllo di un EAN si verifica **qui**, non solo nell'app: è
+     * la sola differenza fra una tessera che passa alla cassa e una che non
+     * passa, e la sessione al Mac è l'ultimo posto in cui accorgersene prima di
+     * pubblicare. Il disegno non lo rifacciamo — quello è dell'app — ma questa
+     * regola è il codice, non il disegno.
+     */
+    if (typeof card.code === 'string') {
+      const digits = card.code.trim()
+      if (card.format === 'ean13' || card.format === 'ean8') {
+        const length = card.format === 'ean13' ? 13 : 8
+        if (!new RegExp(`^\\d{${length}}$`).test(digits)) {
+          errors.push(`${where}: un ${card.format} ha esattamente ${length} cifre (${digits}).`)
+        } else if (eanChecksum(digits.slice(0, -1)) !== Number(digits.slice(-1))) {
+          errors.push(`${where}: cifra di controllo sbagliata.`)
+        }
+      }
+      if (card.format === 'itf' && !/^(\d\d)+$/.test(digits)) {
+        errors.push(`${where}: l'ITF vuole solo cifre, in numero pari (${digits}).`)
+      }
+      if (card.format === 'code39' && !/^[0-9A-Z\-. $/+%]+$/.test(digits.toUpperCase())) {
+        errors.push(`${where}: carattere non ammesso in un Code 39.`)
+      }
+      if (card.format === 'code128' && !/^[\x20-\x7e]+$/.test(digits)) {
+        errors.push(`${where}: carattere non ammesso in un Code 128.`)
+      }
+
+      /* Due carte con lo stesso codice sono quasi sempre la stessa carta
+         inserita due volte, da due telefoni. Non è un errore: due tessere dello
+         stesso circuito possono averlo davvero. */
+      const already = seenCodes.get(digits)
+      if (already !== undefined) warnings.push(`${where}: stesso codice di «${already}».`)
+      else seenCodes.set(digits, card.name)
+    }
+
+    if (!isDate(card.addedAt)) errors.push(`${where}: data non valida (${card.addedAt}).`)
+
+    if (card.image !== undefined) {
+      if (typeof card.image !== 'string' || !CARD_IMAGE_RE.test(card.image)) {
+        errors.push(`${where}: l'immagine deve essere un PNG, JPEG o WebP incorporato.`)
+      } else if (card.image.length > MAX_IMAGE_CHARS) {
+        errors.push(
+          `${where}: immagine da ${Math.round(card.image.length / 1024)} kB, oltre il tetto di ` +
+            `${Math.round(MAX_IMAGE_CHARS / 1024)} kB.`,
+        )
+      }
+    }
+    if (card.color !== undefined && !CARD_COLOR_RE.test(String(card.color))) {
+      errors.push(`${where}: colore non valido (${card.color}).`)
+    }
+    if (card.note !== undefined && typeof card.note !== 'string') {
+      errors.push(`${where}: «note» deve essere testo.`)
+    }
+  }
+
+  return { errors, warnings }
+}
+
 export function buildReport(dataset) {
   const months = new Map()
   for (const expense of dataset.expenses) {

@@ -75,6 +75,22 @@
   --meter-savings: var(--series-7);
   --meter-fixed: var(--seq-6);
 
+
+  /*
+   * ── la faccia di una tessera ──
+   *
+   * **Non seguono il tema, e non è una dimenticanza.** Un lettore ottico misura
+   * il contrasto fra le barre e il fondo: su un grigio scuro quel contrasto
+   * cala fino a fargli sbagliare la lettura, e il codice a barre di una carta
+   * fedeltà è l'unica cosa dell'app che deve funzionare per una macchina invece
+   * che per una persona. È anche la cosa che più somiglia ad alzare la
+   * luminosità, che dal browser non si può fare. Quindi i due valori sono
+   * identici nei tre stati di tema, e vanno lasciati così. → ADR-0084
+   */
+  --card-face: #ffffff;
+  --card-face-ink: #101820;
+  --card-focus: rgba(8, 12, 16, 0.96);
+
   --shadow-card: 0 1px 2px rgba(16, 24, 32, 0.05), 0 8px 24px -16px rgba(16, 24, 32, 0.25);
 
   /* ── tipografia: display per i titoli, mono per i numeri (è un registro) ── */
@@ -146,6 +162,11 @@
     --seq-6: #86b6ef;
     --seq-7: #b7d3f6;
 
+    /* Identici al tema chiaro di proposito: li legge un lettore ottico. → ADR-0084 */
+    --card-face: #ffffff;
+    --card-face-ink: #101820;
+    --card-focus: rgba(8, 12, 16, 0.96);
+
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px -18px rgba(0, 0, 0, 0.8);
   --glass-bg: rgba(22, 29, 35, 0.62);
   --glass-border: rgba(255, 255, 255, 0.12);
@@ -198,6 +219,11 @@
   --seq-5: #5598e7;
   --seq-6: #86b6ef;
   --seq-7: #b7d3f6;
+
+  /* Identici al tema chiaro di proposito: li legge un lettore ottico. → ADR-0084 */
+  --card-face: #ffffff;
+  --card-face-ink: #101820;
+  --card-focus: rgba(8, 12, 16, 0.96);
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px -18px rgba(0, 0, 0, 0.8);
   --glass-bg: rgba(22, 29, 35, 0.62);
