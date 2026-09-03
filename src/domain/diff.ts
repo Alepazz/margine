@@ -20,6 +20,13 @@ export interface ExpenseDelta {
 }
 
 /**
+ * Un campo di una spesa, `id` escluso: due spese si confrontano **per** id,
+ * quindi non può essere fra quelli che si muovono. Le tre tabelle di questo
+ * modulo sono indicizzate così, e sono totali su di esso.
+ */
+type ExpenseField = Exclude<keyof Expense, 'id'>
+
+/**
  * Confronto stabile fra due spese, indipendente dall'ordine delle chiavi.
  *
  * Enumerare i campi a mano sarebbe più leggibile ma si sfalderebbe in silenzio
@@ -101,7 +108,7 @@ export function visibleDeltas(
  * presidia: aggiungere un campo a `Expense` senza dargli un'etichetta fa cadere
  * quel test invece di produrre un «modificata» che non dice cosa.
  */
-export const FIELD_LABELS: Record<Exclude<keyof Expense, 'id'>, string> = {
+export const FIELD_LABELS: Record<ExpenseField, string> = {
   date: 'data',
   title: 'descrizione',
   amount: 'importo',
@@ -118,12 +125,75 @@ export const FIELD_LABELS: Record<Exclude<keyof Expense, 'id'>, string> = {
   offBudget: 'capitale',
 }
 
-export function changedFields(delta: ExpenseDelta): string[] {
-  if (delta.before === undefined) return []
+/**
+ * Quali campi di una spesa spostano **denaro**, e quali no.
+ *
+ * Serve alla campanella: una correzione che non muove la cifra non è una
+ * novità, è manutenzione. È una scelta di Alessio sui dati veri — «Assicurazione
+ * e simili non serve averli come notifica, a meno che non cambi la cifra
+ * spesa». → ADR-0094
+ *
+ * I tre veri sono i tre che spostano soldi **fra le due persone**: quanto,
+ * come è diviso, chi ha anticipato. Gli altri muovono un numero da qualche
+ * parte — la data sceglie il mese, `recurring` il secchio, `offBudget` se la
+ * spesa esiste per i conti — ma non cambiano quanto è stato speso né chi lo
+ * deve a chi, e sono esattamente le correzioni che si fanno di continuo: un
+ * refuso nel titolo, una categoria sbagliata, una spunta dimenticata.
+ *
+ * È un record **totale** e non un insieme, di proposito: un campo nuovo in
+ * `Expense` non compila finché non si è deciso se è denaro. Un insieme lo
+ * avrebbe dato per «non è denaro» in silenzio, che fra i due è il verso
+ * sbagliato in cui sbagliare — un importo che si muove senza dirlo. È la stessa
+ * ragione per cui `fileOf` e `targetOf` sono esaustive, e non vale per ogni
+ * tabella: dove il ripiego è innocuo la totalità è solo cerimonia.
+ */
+export const MONEY_FIELDS: Record<ExpenseField, boolean> = {
+  amount: true,
+  shares: true,
+  paidBy: true,
+  date: false,
+  title: false,
+  tricount: false,
+  category: false,
+  subcategory: false,
+  recurring: false,
+  notes: false,
+  receiptLinks: false,
+  welfare: false,
+  tax730: false,
+  offBudget: false,
+}
+
+/**
+ * Quali campi si sono mossi, come chiavi.
+ *
+ * Un posto solo a rispondere alla domanda, perché a farsela sono due: chi
+ * scrive le etichette e chi cerca il denaro. Con due cicli separati basterebbe
+ * che uno dei due trattasse un campo diversamente perché la riga della
+ * campanella dicesse «modificata: importo» senza contarlo come denaro.
+ */
+function movedKeys(delta: ExpenseDelta): ExpenseField[] {
   const before = delta.before
-  const out: string[] = []
-  for (const [key, label] of Object.entries(FIELD_LABELS) as [keyof Expense, string][]) {
-    if (stable(before[key]) !== stable(delta.expense[key])) out.push(label)
-  }
-  return out
+  if (before === undefined) return []
+  return (Object.keys(FIELD_LABELS) as ExpenseField[]).filter(
+    (key) => stable(before[key]) !== stable(delta.expense[key]),
+  )
+}
+
+/**
+ * Vero se questa novità sposta dei soldi.
+ *
+ * Una spesa comparsa o sparita ne sposta sempre — c'è un importo in più o in
+ * meno. Una **modifica** solo se ha toccato uno dei tre campi del denaro; e
+ * una modifica senza il «prima» conta come se li avesse toccati, perché in
+ * mancanza dei fatti è meglio una riga di troppo che un importo che si muove
+ * in silenzio.
+ */
+export function movesMoney(delta: ExpenseDelta): boolean {
+  if (delta.kind !== 'changed' || delta.before === undefined) return true
+  return movedKeys(delta).some((key) => MONEY_FIELDS[key])
+}
+
+export function changedFields(delta: ExpenseDelta): string[] {
+  return movedKeys(delta).map((key) => FIELD_LABELS[key])
 }

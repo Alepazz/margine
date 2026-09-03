@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { OP_WORDS, describeOps } from '../data/outbox'
-import type { ExpenseDelta } from './diff'
+import { OP_WORDS, applyOps, describeOps } from '../data/outbox'
+import { diffExpenses, movesMoney, type ExpenseDelta } from './diff'
+import type { Dataset, Expense } from './types'
 import type { Op, OutboxEntry } from '../data/outbox'
 import {
   APP_COMMIT_SUFFIX,
@@ -15,6 +16,7 @@ import {
   partsOfSummary,
   phraseOf,
   SILENT_KINDS,
+  COLLAPSED_GROUPS,
   touchesExpenses,
   unseenCount,
   unseenSince,
@@ -133,7 +135,22 @@ describe('quali commit hanno un dettaglio da leggere', () => {
 
   it('un commit di spese sì', () => {
     expect(touchesExpenses(change('2 spese aggiunte'))).toBe(true)
-    expect(touchesExpenses(change('1 annotazione'))).toBe(true)
+    expect(touchesExpenses(change('1 spesa corretta'))).toBe(true)
+  })
+
+  /*
+   * Un'annotazione tocca le spese ma è muta (→ ADR-0094): non potendo fare una
+   * riga, il suo dettaglio non serve a nessuno e i 734 kB si risparmiano. È il
+   * silenzio che costa zero — quello che si deduce dal messaggio.
+   */
+  it('un commit di sole annotazioni no, perché non farebbe nessuna riga', () => {
+    expect(touchesExpenses(change('1 annotazione'))).toBe(false)
+    expect(touchesExpenses(change('3 annotazioni'))).toBe(false)
+  })
+
+  /* Misto: la spesa vuole il dettaglio, quindi si scarica comunque. */
+  it('un commit misto sì, per la parte che una riga la farebbe', () => {
+    expect(touchesExpenses(change('1 annotazione, 1 spesa aggiunta'))).toBe(true)
   })
 
   it('un commit che non tocca le spese no', () => {
@@ -428,8 +445,74 @@ describe('quante righe non sono ancora state guardate', () => {
 describe('le operazioni mute', () => {
   const senzaDettaglio = () => ({})
 
-  it('sono le due spunte, e nient’altro', () => {
-    expect([...SILENT_KINDS].sort()).toEqual(['list-take', 'list-untake'])
+  const spesaViva = (): Expense => ({
+    id: 'e1',
+    date: '2026-08-26',
+    title: 'Assicurazione',
+    amount: 340,
+    shares: { me: 170, partner: 170 },
+    paidBy: 'partner',
+    tricount: 'condivise',
+    category: 'casa',
+    recurring: false,
+  })
+
+  const datasetCon = (...expenses: Expense[]): Dataset =>
+    ({
+      version: 1,
+      updatedAt: '2026-09-03T10:00:00.000Z',
+      expenses,
+      tricounts: [],
+      settlements: [],
+      prices: [],
+    }) as unknown as Dataset
+
+  /*
+   * Le due spunte, e le annotazioni: quelle per deduzione, non per scelta —
+   * un'annotazione tocca nota, scontrino, 730 e welfare, e nessuno dei quattro
+   * è un campo del denaro. → ADR-0094
+   */
+  it('sono le due spunte e le annotazioni, e nient’altro', () => {
+    expect([...SILENT_KINDS].sort()).toEqual(['list-take', 'list-untake', 'patch'])
+  })
+
+  it('un commit di sole annotazioni non fa nessuna riga', () => {
+    const changes = parseChanges([commit({ message: `2 annotazioni${APP_COMMIT_SUFFIX}` })])
+    expect(changes).toHaveLength(1)
+    expect(noticesOf(changes, senzaDettaglio)).toEqual([])
+  })
+
+  /*
+   * Il test che rende **sound** il silenzio di `patch`, e non solo comodo.
+   *
+   * `SILENT_KINDS` dà l'annotazione per muta senza guardare il confronto, sulla
+   * deduzione che nessuno dei campi di `Annotation` sia denaro. Elencare quei
+   * campi a mano non presidia niente: se `applyPatch` un giorno ne toccasse uno
+   * in più, la lista scritta qui resterebbe di quattro e il silenzio comincerebbe
+   * a nascondere un importo. Quindi l'annotazione si **applica davvero**, con
+   * tutti i suoi campi addosso, e si chiede al confronto se ha mosso dei soldi.
+   * → ADR-0094
+   */
+  it('un’annotazione applicata per davvero non muove denaro', () => {
+    const prima = spesaViva()
+    const dopo = applyOps(datasetCon(prima), [
+      {
+        kind: 'patch',
+        ts: 1,
+        entryId: '1-0-patch',
+        expenseId: prima.id,
+        tax730: true,
+        welfare: true,
+        notes: 'pagata a rate',
+        receiptLinks: ['https://esempio/scontrino'],
+      },
+    ])
+    const deltas = diffExpenses(datasetCon(prima), dopo)
+    /* Il confronto la vede cambiata — quindi il test non è vuoto — ma non nei
+       campi del denaro. */
+    expect(deltas).toHaveLength(1)
+    expect(deltas[0]?.kind).toBe('changed')
+    expect(movesMoney(deltas[0]!)).toBe(false)
   })
 
   it('un commit di sole spunte non fa nessuna riga', () => {
@@ -446,7 +529,8 @@ describe('le operazioni mute', () => {
     ])
     const righe = noticesOf(changes, senzaDettaglio)
     expect(righe).toHaveLength(1)
-    expect(righe[0]?.kind === 'summary' ? righe[0].part.kind : undefined).toBe('list-add')
+    /* La cosa aggiunta c'è, ma come riga di gruppo: la lista collassa. → ADR-0095 */
+    expect(righe[0]?.kind).toBe('group')
   })
 
   /* Il gruppo esiste e le cinque operazioni gli rispondono: senza, la riga non
@@ -465,5 +549,172 @@ describe('le operazioni mute', () => {
   it('col gruppo spento il commit non arriva nemmeno', () => {
     const raw = [commit({ message: `1 cosa aggiunta alla lista${APP_COMMIT_SUFFIX}` })]
     expect(parseChanges(raw, { groups: ['spese'] })).toEqual([])
+  })
+})
+
+/*
+ * «Alepazz ha aggiunto una cosa alla lista è troppo rumore, per ogni elemento.
+ * Direi che metterei una generica notifica e fine, che compare ogni volta che
+ * c'è almeno un elemento non ancora visualizzato tramite campanella» — Alessio,
+ * il 03/09/2026. Ogni cosa aggiunta è un commit, quindi la spesa di una
+ * settimana faceva venti righe e un pallino a `9+`. → ADR-0095
+ */
+describe('i gruppi che collassano in una riga sola', () => {
+  const senzaDettaglio = () => ({})
+
+  /** `n` commit, uno per cosa aggiunta, dal più recente al più vecchio. */
+  const listaDi = (n: number) =>
+    parseChanges(
+      Array.from({ length: n }, (_, i) =>
+        commit({
+          sha: `c${i}`,
+          message: `1 cosa aggiunta alla lista${APP_COMMIT_SUFFIX}`,
+          date: `2026-09-03T${String(10 + i).padStart(2, '0')}:00:00.000Z`,
+        }),
+      ),
+    )
+
+  it('la lista collassa, e nient’altro', () => {
+    expect(COLLAPSED_GROUPS.lista).toMatch(/\S/)
+    const altri = CHANGE_GROUPS.filter((g) => g !== 'lista')
+    for (const gruppo of altri) expect(COLLAPSED_GROUPS[gruppo], gruppo).toBeUndefined()
+  })
+
+  it('venti commit di lista fanno una riga sola', () => {
+    const righe = noticesOf(listaDi(20), senzaDettaglio)
+    expect(righe).toHaveLength(1)
+    expect(righe[0]?.kind).toBe('group')
+  })
+
+  /* Il pallino è il numero di righe non ancora guardate: venti cose valgono 1. */
+  it('e il pallino dice 1, non 9+', () => {
+    expect(badgeLabel(unseenCount(noticesOf(listaDi(20), senzaDettaglio), undefined))).toBe('1')
+  })
+
+  /*
+   * L'istante è quello della novità **più recente**: è ciò che riaccende il
+   * pallino quando ne arriva un'altra dopo che hai guardato. Con l'istante
+   * della più vecchia la riga resterebbe «già vista» per sempre.
+   */
+  it('porta l’istante della novità più recente', () => {
+    const righe = noticesOf(listaDi(3), senzaDettaglio)
+    expect(righe[0]?.at).toBe('2026-09-03T12:00:00.000Z')
+    /* Guardato a mezzogiorno: niente di nuovo. Poi ne arriva una alle 13. */
+    expect(unseenCount(righe, '2026-09-03T12:00:00.000Z')).toBe(0)
+    expect(unseenCount(noticesOf(listaDi(4), senzaDettaglio), '2026-09-03T12:00:00.000Z')).toBe(1)
+  })
+
+  it('non ha né soggetto né sha: sta a cavallo dei commit', () => {
+    const riga = noticesOf(listaDi(3), senzaDettaglio)[0]!
+    expect(riga.kind).toBe('group')
+    expect(riga).not.toHaveProperty('who')
+    expect(riga).not.toHaveProperty('sha')
+  })
+
+  it('aggiunte, modifiche ed eliminazioni finiscono nella stessa riga', () => {
+    const changes = parseChanges([
+      commit({ sha: 'c1', message: `2 cose aggiunte alla lista${APP_COMMIT_SUFFIX}` }),
+      commit({ sha: 'c2', message: `1 voce della lista modificata${APP_COMMIT_SUFFIX}` }),
+      commit({ sha: 'c3', message: `1 voce della lista eliminata${APP_COMMIT_SUFFIX}` }),
+    ])
+    expect(noticesOf(changes, senzaDettaglio)).toHaveLength(1)
+  })
+
+  it('senza novità di lista non c’è nessuna riga di gruppo', () => {
+    const changes = parseChanges([commit({ message: `2 prezzi rilevati${APP_COMMIT_SUFFIX}` })])
+    expect(noticesOf(changes, senzaDettaglio).every((r) => r.kind !== 'group')).toBe(true)
+  })
+
+  /*
+   * La riga collassata non copre le altre novità del suo stesso commit: la cosa
+   * aggiunta collassa, il prezzo resta una riga sua.
+   */
+  it('in un commit misto le altre novità restano', () => {
+    const changes = parseChanges([
+      commit({ message: `1 cosa aggiunta alla lista, 1 prezzo rilevato${APP_COMMIT_SUFFIX}` }),
+    ])
+    const righe = noticesOf(changes, senzaDettaglio)
+    expect(righe).toHaveLength(2)
+    expect(righe.map((r) => r.kind).sort()).toEqual(['group', 'summary'])
+  })
+
+  /* Le righe restano in ordine di tempo: quella di gruppo va dove le tocca. */
+  it('si mette in ordine di tempo con le altre', () => {
+    const changes = parseChanges([
+      commit({ sha: 'c1', message: `1 prezzo rilevato${APP_COMMIT_SUFFIX}`, date: '2026-09-03T14:00:00.000Z' }),
+      commit({ sha: 'c2', message: `1 cosa aggiunta alla lista${APP_COMMIT_SUFFIX}`, date: '2026-09-03T13:00:00.000Z' }),
+      commit({ sha: 'c3', message: `2 prezzi rilevati${APP_COMMIT_SUFFIX}`, date: '2026-09-03T12:00:00.000Z' }),
+    ])
+    expect(noticesOf(changes, senzaDettaglio).map((r) => r.kind)).toEqual([
+      'summary',
+      'group',
+      'summary',
+    ])
+  })
+})
+
+/*
+ * Una correzione che non muove la cifra non è una novità: la regola sta in
+ * `movesMoney`, e qui si prova che la campanella la applica — cioè che quella
+ * riga non compare. → ADR-0094
+ */
+describe('le correzioni che non muovono la cifra', () => {
+  const spesa = (over: Partial<Expense> = {}): Expense => ({
+    id: 'e1',
+    date: '2026-08-26',
+    title: 'Assicurazione',
+    amount: 340,
+    shares: { me: 170, partner: 170 },
+    paidBy: 'partner',
+    tricount: 'condivise',
+    category: 'casa',
+    recurring: false,
+    ...over,
+  })
+
+  const correzione = (over: Partial<Expense>): ExpenseDelta => ({
+    kind: 'changed',
+    expense: spesa(over),
+    before: spesa(),
+  })
+
+  const changes = parseChanges([
+    commit({ message: `1 spesa corretta${APP_COMMIT_SUFFIX}` }),
+  ])
+
+  it('un titolo corretto non fa riga, e il commit sparisce del tutto', () => {
+    expect(noticesOf(changes, () => ({ deltas: [correzione({ title: 'Assicurazione auto' })] }))).toEqual([])
+  })
+
+  it('un importo corretto la fa', () => {
+    const righe = noticesOf(changes, () => ({
+      deltas: [correzione({ amount: 360, shares: { me: 180, partner: 180 } })],
+    }))
+    expect(righe).toHaveLength(1)
+    expect(righe[0]?.kind).toBe('delta')
+  })
+
+  /* In un commit con due correzioni resta solo quella che muove i soldi. */
+  it('in un commit misto resta solo quella che muove i soldi', () => {
+    const righe = noticesOf(
+      parseChanges([commit({ message: `2 spese corrette${APP_COMMIT_SUFFIX}` })]),
+      () => ({
+        deltas: [correzione({ category: 'auto' }), correzione({ paidBy: 'me' })],
+      }),
+    )
+    expect(righe).toHaveLength(1)
+    expect(righe[0]?.kind === 'delta' ? righe[0].delta.expense.paidBy : undefined).toBe('me')
+  })
+
+  /*
+   * Il prezzo dichiarato: finché il dettaglio non è arrivato non si può sapere
+   * se la cifra si è mossa, quindi la riga generica compare e poi sparisce. È
+   * la stessa finestra di ADR-0052 per le spese fuori dai propri tricount, e
+   * dura una richiesta.
+   */
+  it('prima del dettaglio la riga generica c’è', () => {
+    const righe = noticesOf(changes, () => ({}))
+    expect(righe).toHaveLength(1)
+    expect(righe[0]).toMatchObject({ kind: 'summary', pending: true })
   })
 })

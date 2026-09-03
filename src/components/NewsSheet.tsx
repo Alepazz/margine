@@ -103,8 +103,14 @@ export function NewsSheet({ onClose }: { onClose: () => void }): ReactNode {
   const other = config.people[view.person === 'me' ? 'partner' : 'me']
   const today = todayIso()
 
-  /** Il testo di una riga: qui, perché serve sapere come si chiamano le persone. */
-  const testoDi = (notice: NoticeItem): string => {
+  /**
+   * Il testo di una riga: qui, perché serve sapere come si chiamano le persone.
+   *
+   * Non prende le righe di gruppo, ed è il tipo a dirlo: quelle non hanno un
+   * soggetto da nominare, quindi non c'è una frase da comporre — il loro testo
+   * arriva già scritto dal dominio. → ADR-0095
+   */
+  const testoDi = (notice: Exclude<NoticeItem, { kind: 'group' }>): string => {
     const chi = news.knowsMe ? other.name : notice.who
     if (notice.kind === 'delta') return `${chi} ${VERB[notice.delta.kind]} ${notice.delta.expense.title}`
     return `${chi} ${phraseOf(notice.part)}`
@@ -177,6 +183,23 @@ export function NewsSheet({ onClose }: { onClose: () => void }): ReactNode {
               */
               <div className="list">
                 {news.notices.map((notice) => {
+                  /*
+                    La riga di un gruppo collassato è un'altra riga, più
+                    semplice: nessun soggetto — le cose in lista possono
+                    averle messe tutti e due — nessun importo, e niente da
+                    riprovare, perché non ha un dettaglio da leggere.
+                    → ADR-0095
+                  */
+                  if (notice.kind === 'group') {
+                    return (
+                      <div className="news-row" key={notice.key}>
+                        <div className="news-text">
+                          <span>{notice.text}</span>
+                          <span className="news-sub">{whenLabel(notice.at, today)}</span>
+                        </div>
+                      </div>
+                    )
+                  }
                   const dettaglio =
                     notice.kind === 'delta'
                       ? detailOf(notice.delta, config.categories, dataset.tricounts)

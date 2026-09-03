@@ -326,9 +326,12 @@ export type NewsDetail =
 export interface NewsState {
   /** I commit non ancora svuotati, dal più recente. */
   changes: Change[]
-  /** Le righe da mostrare: una per cosa, non per salvataggio. */
+  /**
+   * Le righe da mostrare: una per cosa, non per salvataggio — tranne i gruppi
+   * che collassano, dove sono una per gruppo. → ADR-0052, ADR-0095
+   */
   notices: NoticeItem[]
-  /** Il numero sul pallino: **è** la lunghezza di `notices`, non una stima. */
+  /** Il numero sul pallino: quante di `notices` non sono ancora state guardate. */
   unseen: number
   /** I gruppi accesi in Impostazioni. */
   groups: ChangeGroup[]

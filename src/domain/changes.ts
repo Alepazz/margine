@@ -13,7 +13,7 @@
 
 import { OP_WORDS } from '../data/outbox'
 import type { Op } from '../data/outbox'
-import type { ExpenseDelta } from './diff'
+import { movesMoney, type ExpenseDelta } from './diff'
 
 /**
  * Il suffisso che l'app aggiunge a ogni suo messaggio di commit.
@@ -122,7 +122,14 @@ export interface Change {
   groups: ChangeGroup[]
   /** Con cosa confrontare per sapere quali spese ha toccato. */
   parent: string | null
-  /** Quante cose ha toccato: il contributo di questa riga al numero sul pallino. */
+  /**
+   * Quante cose dice di aver toccato il messaggio.
+   *
+   * **Non** è il contributo al pallino, che conta le righe: una novità di lista
+   * con cinque cose ne fa una, un'annotazione zero, e una correzione innocua
+   * zero appena arriva il confronto. Nessuno lo legge oggi fuori dai test.
+   * → ADR-0094, ADR-0095, ADR-0061
+   */
   count: number
   /** Le operazioni dentro, per scriverne le frasi senza rileggere il messaggio. */
   parts: SummaryPart[]
@@ -172,11 +179,13 @@ export function groupsOfSummary(summary: string): ChangeGroup[] {
 }
 
 /**
- * Quante cose ha toccato un commit: è il numero sulla campanella.
+ * Quante cose dichiara di aver toccato un commit, lette dal suo messaggio.
  *
- * Si ricava **dal messaggio**, quindi si sa senza scaricare il dettaglio. È la
- * ragione per cui il pallino può contare le spese e non i salvataggi senza
- * costare una richiesta: «3 spese aggiunte» sono tre, e lo dice il testo.
+ * Si ricava **senza rete**: «3 spese aggiunte» sono tre, e lo dice il testo.
+ * Era il numero sul pallino, e non lo è più: quello conta le **righe** (→
+ * ADR-0061), che dopo i muti e i gruppi che collassano sono un altro numero.
+ * Resta perché è l'unico modo di sapere quante cose ci sono dentro un commit
+ * prima di decifrarlo. → ADR-0094, ADR-0095
  */
 export function countOfSummary(summary: string): number {
   return partsOfSummary(summary).reduce((total, part) => total + part.count, 0)
@@ -205,12 +214,43 @@ export const EXPENSE_KINDS: ReadonlySet<Op['kind']> = new Set<Op['kind']>([
  * mostra — è già successo, misurato 23 contro 21.
  *
  * Aggiungere una cosa alla lista invece **è** una novità: è una richiesta, e
- * l'altra persona la deve vedere. → ADR-0091
+ * l'altra persona la deve vedere — ma tutte insieme fanno una riga sola, non
+ * una ciascuna. → ADR-0091, ADR-0095
+ *
+ * `patch` è muto per **deduzione**, non per scelta: un'annotazione tocca la
+ * nota, lo scontrino, il 730 e il welfare, e nessuno dei quattro è un campo del
+ * denaro, quindi sotto ADR-0094 non potrebbe mai fare una riga. Dirlo dal
+ * messaggio invece di scoprirlo dal confronto lo rende **gratuito**: niente
+ * download di due file da 367 kB, e niente riga generica che compare e poi
+ * sparisce. → ADR-0094, ADR-0087
  */
 export const SILENT_KINDS: ReadonlySet<Op['kind']> = new Set<Op['kind']>([
   'list-take',
   'list-untake',
+  'patch',
 ])
+
+/**
+ * I gruppi che fanno **una riga sola**, per quante cose siano e da quanti
+ * commit — e senza il nome di chi le ha fatte.
+ *
+ * La lista della spesa è il primo: ogni cosa aggiunta è un commit, quindi venti
+ * cose facevano venti righe e un pallino a `9+`. «Direi che metterei una
+ * generica notifica e fine, che compare ogni volta che c'è almeno un elemento
+ * non ancora visualizzato» — parole di Alessio, ed è letteralmente quello che
+ * fa questa tabella. Il *cosa* sta nella lista, che è il posto dove serve
+ * saperlo: qui basta che ci sia qualcosa da guardare.
+ *
+ * Il valore **è la frase**, quindi quali gruppi collassano e cosa scrivono sono
+ * un'informazione sola e non possono divergere. La tabella è parziale, non
+ * totale: qui il ripiego di un gruppo nuovo è «non collassa», cioè il
+ * comportamento di sempre, quindi obbligare a scrivere `null` cinque volte
+ * sarebbe cerimonia — la totalità si paga dove il ripiego fa danno, come in
+ * `fileOf`, `targetOf` e `MONEY_FIELDS`. → ADR-0095, ADR-0052
+ */
+export const COLLAPSED_GROUPS: Partial<Record<ChangeGroup, string>> = {
+  lista: 'Ci sono cose nuove nella lista della spesa',
+}
 
 /**
  * Vero se in questo commit c'è almeno un'operazione su una spesa.
@@ -230,9 +270,16 @@ export const SILENT_KINDS: ReadonlySet<Op['kind']> = new Set<Op['kind']>([
  *
  * Sta qui e non nello store perché è una domanda sul **messaggio**: si risponde
  * senza rete, ed è quello che la rende utile. → ADR-0087
+ *
+ * I muti non contano: un'operazione che non può fare una riga non ha un
+ * dettaglio che valga la pena leggere. È ciò che rende gratuito il silenzio
+ * delle annotazioni — quattro nella storia vera — invece di costargli due file.
+ * Le correzioni invece si scaricano comunque: che una abbia mosso la cifra o no
+ * si sa **solo** dal confronto, quindi la domanda resta aperta finché non è
+ * arrivato. → ADR-0094
  */
 export function touchesExpenses(change: Change): boolean {
-  return change.parts.some((part) => EXPENSE_KINDS.has(part.kind))
+  return change.parts.some((part) => EXPENSE_KINDS.has(part.kind) && !SILENT_KINDS.has(part.kind))
 }
 
 /**
@@ -260,9 +307,10 @@ export const PHRASES: Record<Op['kind'], [string, string]> = {
   'price-delete': ['ha eliminato una rilevazione', 'ha eliminato {n} rilevazioni'],
   'list-add': ['ha aggiunto una cosa alla lista', 'ha aggiunto {n} cose alla lista'],
   'list-edit': ['ha modificato una voce della lista', 'ha modificato {n} voci della lista'],
-  /* Ci sono e non si vedono: `SILENT_KINDS` le tiene fuori dalla campanella. La
-     frase esiste perché il vocabolario dev'essere completo — `git log` si legge
-     — e perché il giorno che si volesse mostrarle, il testo c'è già. */
+  /* Ci sono e non si vedono: `SILENT_KINDS` le tiene fuori dalla campanella,
+     come `patch` più sopra. La frase esiste perché il vocabolario dev'essere
+     completo — `git log` si legge — e perché il giorno che si volesse
+     mostrarle, il testo c'è già. → ADR-0091, ADR-0094 */
   'list-take': ['ha preso una cosa', 'ha preso {n} cose'],
   'list-untake': ['ha rimesso in lista una cosa', 'ha rimesso in lista {n} cose'],
   'list-delete': ['ha eliminato una voce della lista', 'ha eliminato {n} voci della lista'],
@@ -279,6 +327,15 @@ export function phraseOf(part: SummaryPart): string {
   const [one, many] = PHRASES[part.kind]
   return part.count === 1 ? one : many.replace('{n}', String(part.count))
 }
+
+/**
+ * Dal più recente: l'ordine di tutto ciò che la campanella mostra.
+ *
+ * Sta in un posto solo perché a ordinare sono due — i commit e le righe — e due
+ * comparatori identici scritti a mano sono due cose che possono divergere.
+ */
+const byNewest = (a: { at: string }, b: { at: string }): number =>
+  a.at < b.at ? 1 : a.at > b.at ? -1 : 0
 
 export interface ParseOptions {
   /**
@@ -326,7 +383,7 @@ export function parseChanges(commits: readonly RawCommit[], options: ParseOption
       count: countOfSummary(summary),
     })
   }
-  return out.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+  return out.sort(byNewest)
 }
 
 /**
@@ -397,6 +454,15 @@ export type NoticeItem =
       /** Il dettaglio non si è potuto leggere: toccando si riprova. */
       failed?: boolean
     }
+  /**
+   * Un gruppo intero in una riga: nessun nome, nessun numero, nessuno sha.
+   *
+   * Non ha un soggetto perché le cose possono averle messe in lista tutti e
+   * due, e non ha uno sha perché sta a cavallo di quanti commit servono.
+   * L'istante è quello della novità **più recente** del gruppo, così il pallino
+   * si riaccende quando ne arriva un'altra dopo che hai guardato. → ADR-0095
+   */
+  | { kind: 'group'; key: string; at: string; text: string }
 
 /** Cosa si sa del dettaglio di un commit. `deltas` è **già filtrato** per visibilità. */
 export interface NewsDetailView {
@@ -429,6 +495,11 @@ export function noticesOf(
   detailOf: (sha: string) => NewsDetailView,
 ): NoticeItem[] {
   const out: NoticeItem[] = []
+  /* I gruppi che collassano, con l'istante della loro novità più recente: la
+     prima volta che si incontra un gruppo è quella, perché `changes` arriva
+     ordinato dalla più fresca. → ADR-0095 */
+  const collapsed = new Map<ChangeGroup, { at: string; text: string }>()
+
   for (const change of changes) {
     const { deltas, failed } = detailOf(change.sha)
     const base = { sha: change.sha, at: change.at, who: change.who }
@@ -437,6 +508,12 @@ export function noticesOf(
       /* I muti non fanno riga, e siccome il pallino conta le righe non fanno
          nemmeno numero: è la stessa cosa detta una volta. → ADR-0091 */
       if (SILENT_KINDS.has(part.kind)) continue
+      const group = GROUP_OF[part.kind]
+      const text = COLLAPSED_GROUPS[group]
+      if (text !== undefined) {
+        if (!collapsed.has(group)) collapsed.set(group, { at: change.at, text })
+        continue
+      }
       if (EXPENSE_KINDS.has(part.kind) && deltas !== undefined) continue
       out.push({
         kind: 'summary',
@@ -449,9 +526,20 @@ export function noticesOf(
     }
 
     for (const delta of deltas ?? []) {
+      /* Una correzione che non muove la cifra non è una novità. Vale solo per
+         le modifiche: una spesa comparsa o sparita muove sempre. → ADR-0094 */
+      if (!movesMoney(delta)) continue
       out.push({ kind: 'delta', key: `${change.sha}-${delta.expense.id}`, ...base, delta })
     }
-
   }
-  return out
+
+  for (const [group, { at, text }] of collapsed) {
+    out.push({ kind: 'group', key: `gruppo-${group}`, at, text })
+  }
+
+  /* In ordine di tempo, perché la riga collassata porta l'istante della novità
+     più recente del suo gruppo e va dove le tocca. L'ordinamento di JavaScript
+     è stabile, quindi le righe di uno stesso commit — che hanno tutte lo stesso
+     istante — restano nell'ordine in cui sono state costruite. */
+  return out.sort(byNewest)
 }
